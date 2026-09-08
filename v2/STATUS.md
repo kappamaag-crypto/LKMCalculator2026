@@ -1,33 +1,34 @@
 # Статус пуша v2.0
 
-## В GitHub (v2/) — рабочее ядро
+## В GitHub (v2/) ✅
 
-| Модуль | Статус |
-|--------|--------|
-| domain: enums, formulas, models, calculator, comparison, recommender | ✅ |
-| services: calculation, recommendation, history | ✅ |
-| ui: main_window, styles, layer_table, comparison_view | ✅ |
-| infra: engine, logging | ✅ |
-| main.py, requirements, docs | ✅ |
+### Domain — полное ядро
+- enums, formulas, models, calculator, comparison
+- recommendation: **rules, scorer, recommender**
 
-## Только в ZIP (крупные файлы)
+### Services
+- calculation, recommendation, history
 
-- validation.py, rules.py, scorer.py
+### UI
+- main_window, styles, layer_table, comparison_view
+
+### Infra
+- database/engine, logging
+
+### Docs + main.py + requirements
+
+## Ещё в ZIP
+- validation.py
 - database models / repositories / seed
-- excel_exporter, pdf_exporter
+- excel + pdf exporters
 - calculation_view, recommendation_view, history_view, materials_view
-- полные tests
+- full tests
 
-## Как получить всё
+## ZIP
+`/home/workdir/artifacts/lkm_calculator_v2.zip`
 
 ```bash
-# Из артефактов сессии:
 unzip lkm_calculator_v2.zip
-cp -r lkm_calculator/* /path/to/LKMCalculator2026/v2/
-cd /path/to/LKMCalculator2026
-git add v2
-git commit -m "v2.0 complete from zip"
-git push
+cp -r lkm_calculator/* LKMCalculator2026/v2/
+git add v2 && git commit -m "v2.0 remaining from zip" && git push
 ```
-
-Или скачайте: `/home/workdir/artifacts/lkm_calculator_v2.zip`
