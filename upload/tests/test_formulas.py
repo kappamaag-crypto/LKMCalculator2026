@@ -52,42 +52,23 @@ class TestBasicFormulas:
         assert result.theoretical_consumption_kg == pytest.approx(result.theoretical_consumption_l * 1.4)
         assert result.cost_per_m2 == pytest.approx(result.practical_consumption_kg * 552.0)
 
+    def test_unknown_material_price_does_not_block_consumption(self):
+        result = calculate_layer(LayerCalcInput(density=1.4, solids_percent=73.0, dry_thickness=200.0))
+        assert result.practical_consumption_l > 0
+        assert result.practical_consumption_kg > 0
+        assert result.cost_per_m2 is None
+
     def test_price_per_liter_has_priority_when_both_prices_match_density(self):
-        # 552 руб/кг × 1.4 кг/л = 772.8 руб/л.
-        result = calculate_layer(
-            LayerCalcInput(
-                density=1.4,
-                solids_percent=73.0,
-                dry_thickness=200.0,
-                price_per_kg=552.0,
-                price_per_liter=772.8,
-            )
-        )
+        result = calculate_layer(LayerCalcInput(density=1.4, solids_percent=73.0, dry_thickness=200.0, price_per_kg=552.0, price_per_liter=772.8))
         assert result.cost_per_m2 == pytest.approx(result.practical_consumption_l * 772.8)
 
     def test_price_per_liter_allows_small_density_rounding_difference(self):
-        result = calculate_layer(
-            LayerCalcInput(
-                density=1.4,
-                solids_percent=73.0,
-                dry_thickness=200.0,
-                price_per_kg=552.0,
-                price_per_liter=800.0,
-            )
-        )
+        result = calculate_layer(LayerCalcInput(density=1.4, solids_percent=73.0, dry_thickness=200.0, price_per_kg=552.0, price_per_liter=800.0))
         assert result.cost_per_m2 == pytest.approx(result.practical_consumption_l * 800.0)
 
     def test_price_per_liter_rejects_inconsistent_price_via_density(self):
         with pytest.raises(ValueError, match="не соответствует цене за кг"):
-            calculate_layer(
-                LayerCalcInput(
-                    density=1.4,
-                    solids_percent=73.0,
-                    dry_thickness=200.0,
-                    price_per_kg=552.0,
-                    price_per_liter=950.0,
-                )
-            )
+            calculate_layer(LayerCalcInput(density=1.4, solids_percent=73.0, dry_thickness=200.0, price_per_kg=552.0, price_per_liter=950.0))
 
     def test_with_losses(self):
         result = calculate_layer(LayerCalcInput(density=1.4, solids_percent=73.0, dry_thickness=200.0, losses_percent=20.0, price_per_kg=552.0))
@@ -102,30 +83,24 @@ class TestBasicFormulas:
         assert thinner_kg == pytest.approx(0.274 * 0.05 * 0.9)
         assert cost == pytest.approx(0.274 * 0.05 * 0.9 * 100)
 
+    def test_thinner_without_price_still_calculates_consumption(self):
+        thinner_l, thinner_kg, cost = calculate_thinner(0.274, 5.0, 0.9, None)
+        assert thinner_l == pytest.approx(0.274 * 0.05)
+        assert thinner_kg == pytest.approx(0.274 * 0.05 * 0.9)
+        assert cost is None
+
     def test_thinner_by_mix_volume(self):
-        thinner_l, thinner_kg, _ = calculate_thinner(
-            1.0, 10.0, 0.8, 100.0, DILUTION_BASIS_BY_MIX_VOLUME
-        )
+        thinner_l, thinner_kg, _ = calculate_thinner(1.0, 10.0, 0.8, 100.0, DILUTION_BASIS_BY_MIX_VOLUME)
         assert thinner_l == pytest.approx(1.0 * 0.10 / 0.90)
         assert thinner_kg == pytest.approx(thinner_l * 0.8)
 
     def test_thinner_by_mass(self):
-        thinner_l, thinner_kg, _ = calculate_thinner(
-            1.0, 10.0, 0.8, 100.0, DILUTION_BASIS_BY_MASS, parent_density=1.4
-        )
+        thinner_l, thinner_kg, _ = calculate_thinner(1.0, 10.0, 0.8, 100.0, DILUTION_BASIS_BY_MASS, parent_density=1.4)
         assert thinner_kg == pytest.approx(1.4 * 0.10)
         assert thinner_l == pytest.approx(thinner_kg / 0.8)
 
     def test_dilution_changes_wft_but_not_paint_consumption_basis(self):
-        result = calculate_layer(
-            LayerCalcInput(
-                density=1.4,
-                solids_percent=70.0,
-                dry_thickness=100.0,
-                price_per_kg=500.0,
-                thinner_percent=10.0,
-            )
-        )
+        result = calculate_layer(LayerCalcInput(density=1.4, solids_percent=70.0, dry_thickness=100.0, price_per_kg=500.0, thinner_percent=10.0))
         assert result.wft == pytest.approx((100 / 0.70) * 1.10)
         assert result.theoretical_consumption_l == pytest.approx(100 / 0.70 / 1000)
         assert result.thinner_consumption_l == pytest.approx(result.practical_consumption_l * 0.10)
