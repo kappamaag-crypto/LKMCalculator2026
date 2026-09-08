@@ -14,7 +14,6 @@ from app.domain.models import (
 from app.domain.calculator import SystemCalculator, LayerInput, LayerCalculator
 from app.domain.comparison import ComparisonEngine
 from app.domain.validation import ValidationResult
-from app.domain.formulas import round3
 
 
 class CalculationService:
@@ -22,6 +21,7 @@ class CalculationService:
     Сервис расчётов.
 
     Оркестрирует calculator + validation + (опционально) репозитории.
+    Инженерные формулы остаются в domain/calculator.py и domain/formulas.py.
     """
 
     def __init__(
@@ -40,6 +40,7 @@ class CalculationService:
         losses_percent: float = 0.0,
         thinner_percent: float = 0.0,
         thinner: Optional[Material] = None,
+        thinner_basis: Optional[str] = None,
         area_m2: float = 1.0,
     ):
         return LayerCalculator.calculate(
@@ -48,6 +49,7 @@ class CalculationService:
             losses_percent=losses_percent,
             thinner_percent=thinner_percent,
             thinner=thinner,
+            thinner_basis=thinner_basis,
             area_m2=area_m2,
         )
 
