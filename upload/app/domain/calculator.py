@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Optional, Sequence, Callable
 
 from app.domain.models import Material, LayerResult, CoatingSystem, ObjectData, SystemCalculationResult
-from app.domain.formulas import LayerCalcInput, calculate_layer, scale_to_area, total_area
+from app.domain.formulas import LayerCalcInput, calculate_layer, scale_to_area
 from app.domain.validation import ValidationResult, validate_before_calculation
 
 
@@ -113,12 +113,14 @@ class SystemCalculator:
         self.compatibility_checker = compatibility_checker
         self.default_losses = default_losses
 
-    def resolve_area(self, obj: ObjectData) -> float:
-        if obj.area_m2 > 0:
-            return obj.area_m2
-        if obj.area_per_element > 0 and obj.elements_count > 0:
-            return total_area(obj.area_per_element, obj.elements_count)
-        return 0.0
+    @staticmethod
+    def resolve_area(obj: ObjectData) -> float:
+        """Возвращает заданную пользователем площадь объекта в м².
+
+        Площадь — единственный источник масштаба расчёта. Старый режим
+        «площадь элемента × количество элементов» намеренно не поддерживается.
+        """
+        return obj.area_m2 if obj.area_m2 > 0 else 0.0
 
     def calculate(
         self,
