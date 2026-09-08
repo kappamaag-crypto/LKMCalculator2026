@@ -20,8 +20,7 @@ class Base(DeclarativeBase):
 def get_engine(db_path: Path | None = None):
     ensure_directories()
     path = db_path or DB_PATH
-    url = f"sqlite:///{path}"
-    engine = create_engine(url, echo=False, connect_args={"check_same_thread": False})
+    engine = create_engine(f"sqlite:///{path}", echo=False, connect_args={"check_same_thread": False})
 
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -60,7 +59,6 @@ def init_db(engine=None) -> None:
     from app.infrastructure.database import models  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
-    # Existing SQLite databases may already contain the legacy tables. Alembic
-    # performs only additive ALTER/CREATE operations in the v3 migration.
     from app.infrastructure.database.migrate import upgrade_database
-    upgrade_database()
+    db_path = Path(engine.url.database) if engine.url.database else DB_PATH
+    upgrade_database(db_path)
