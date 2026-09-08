@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import (
-    QMainWindow, QTabWidget, QStatusBar, QMessageBox, QLabel,
-)
+from PySide6.QtWidgets import QMainWindow, QTabWidget, QStatusBar, QMessageBox, QLabel
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 
 from app import __version__, __app_name__
 from app.domain.models import Material, CoatingSystem, LayerDefinition
-from app.domain.enums import (
-    MaterialType, BinderType, CorrosionCategory, DurabilityLevel,
-    SurfaceType, EnvironmentType,
-)
+from app.domain.enums import MaterialType, BinderType, CorrosionCategory, DurabilityLevel, SurfaceType, EnvironmentType
 from app.services.calculation_service import CalculationService
 from app.services.recommendation_service import RecommendationService
 from app.ui.styles import APP_STYLE
@@ -47,65 +42,47 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"{__app_name__} v{__version__}")
-        self.setMinimumSize(1100, 700)
-        self.resize(1280, 800)
-        self.setStyleSheet(APP_STYLE)
-        self.calc_service = CalculationService()
-        self.rec_service = RecommendationService()
-        self._materials = _demo_materials()
-        self._systems = _demo_systems()
-        self._build_ui()
-        self._load_demo_data()
-        self.statusBar().showMessage("Готово. Демо-данные загружены.")
+        self.setMinimumSize(1100, 700); self.resize(1280, 800); self.setStyleSheet(APP_STYLE)
+        self.calc_service = CalculationService(); self.rec_service = RecommendationService(); self._materials = _demo_materials(); self._systems = _demo_systems()
+        self._build_ui(); self._load_demo_data(); self.statusBar().showMessage("Готово. Демо-данные загружены.")
 
     def _build_ui(self) -> None:
         self.tabs = QTabWidget(); self.setCentralWidget(self.tabs)
-        self.calc_view = CalculationView(self.calc_service)
-        self.rec_view = RecommendationView(self.rec_service)
-        self.cmp_view = ComparisonView(self.calc_service)
-        self.two_component_view = TwoComponentView()
-        self.tabs.addTab(self.calc_view, "Расчёт")
-        self.tabs.addTab(self.rec_view, "Рекомендации")
-        self.tabs.addTab(self.cmp_view, "Сравнение")
-        self.tabs.addTab(self.two_component_view, "2К-информация")
-        self.materials_view = MaterialsView(self._materials)
-        self.history_view = HistoryView()
+        self.calc_view = CalculationView(self.calc_service); self.rec_view = RecommendationView(self.rec_service); self.cmp_view = ComparisonView(self.calc_service); self.two_component_view = TwoComponentView()
+        self.tabs.addTab(self.calc_view, "Расчёт"); self.tabs.addTab(self.rec_view, "Рекомендации"); self.tabs.addTab(self.cmp_view, "Сравнение"); self.tabs.addTab(self.two_component_view, "2К-информация")
+        self.materials_view = MaterialsView(self._materials); self.history_view = HistoryView()
         self.tabs.addTab(self.materials_view, "База материалов")
         stub_sys = QLabel("Раздел «Системы» — редактор шаблонов (в разработке)"); stub_sys.setAlignment(Qt.AlignCenter); stub_sys.setProperty("subheading", True); self.tabs.addTab(stub_sys, "Системы")
         self.tabs.addTab(self.history_view, "История")
         stub_set = QLabel("Раздел «Настройки» — в разработке"); stub_set.setAlignment(Qt.AlignCenter); stub_set.setProperty("subheading", True); self.tabs.addTab(stub_set, "Настройки")
-        self.calc_view.calculation_done.connect(self._on_calc_done)
-        self.materials_view.materials_changed.connect(self._on_materials_changed)
+        self.calc_view.calculation_done.connect(self._on_calc_done); self.materials_view.materials_changed.connect(self._on_materials_changed); self.history_view.load_requested.connect(self._on_history_load)
         menubar = self.menuBar(); file_menu = menubar.addMenu("Файл"); act_exit = QAction("Выход", self); act_exit.triggered.connect(self.close); file_menu.addAction(act_exit)
-        help_menu = menubar.addMenu("Справка"); act_about = QAction("О программе", self); act_about.triggered.connect(self._on_about); help_menu.addAction(act_about)
-        self.setStatusBar(QStatusBar())
+        help_menu = menubar.addMenu("Справка"); act_about = QAction("О программе", self); act_about.triggered.connect(self._on_about); help_menu.addAction(act_about); self.setStatusBar(QStatusBar())
 
     def _load_demo_data(self) -> None:
         self.calc_view.set_materials(self._materials); self.rec_view.set_systems(self._systems)
 
     @staticmethod
     def _money(value, decimals=2) -> str:
-        if value is None:
-            return "—"
+        if value is None: return "—"
         return f"{value:,.{decimals}f}".replace(",", " ")
 
     def _on_calc_done(self, result) -> None:
-        self.statusBar().showMessage(
-            f"Расчёт выполнен: {result.total_dft:.0f} мкм, "
-            f"{self._money(result.total_cost_per_m2)} руб/м², "
-            f"объект {self._money(result.total_cost, 0)} руб",
-            10000,
-        )
+        self.statusBar().showMessage(f"Расчёт выполнен: {result.total_dft:.0f} мкм, {self._money(result.total_cost_per_m2)} руб/м², объект {self._money(result.total_cost, 0)} руб", 10000)
         self.cmp_view.add_from_calculation(result)
+        try: self.history_view.save_result(result)
+        except Exception as exc: self.statusBar().showMessage(f"Не удалось сохранить расчёт в историю: {exc}", 10000)
+
+    def _on_history_load(self, snapshot: dict) -> None:
         try:
-            self.history_view.save_result(result)
-        except Exception as exc:
-            self.statusBar().showMessage(f"Не удалось сохранить расчёт в историю: {exc}", 10000)
+            self.calc_view.restore_snapshot(snapshot)
+            self.tabs.setCurrentWidget(self.calc_view)
+            self.statusBar().showMessage("Снимок истории восстановлен и доступен для редактирования.", 10000)
+        except (TypeError, ValueError, KeyError) as exc:
+            QMessageBox.warning(self, "История", f"Не удалось восстановить снимок: {exc}")
 
     def _on_materials_changed(self, materials: list) -> None:
-        self._materials = materials
-        self.calc_view.set_materials(materials)
-        self.statusBar().showMessage(f"База материалов обновлена: {len(materials)} записей", 5000)
+        self._materials = materials; self.calc_view.set_materials(materials); self.statusBar().showMessage(f"База материалов обновлена: {len(materials)} записей", 5000)
 
     def _on_about(self) -> None:
         QMessageBox.about(self, "О программе", f"<b>{__app_name__}</b> v{__version__}<br><br>Профессиональный калькулятор расхода ЛКМ<br>и предварительного подбора систем АКЗ.<br><br>Формулы расчёта соответствуют исходному калькулятору.<br>Рекомендации носят предварительный характер.")
