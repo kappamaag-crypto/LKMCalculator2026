@@ -1,5 +1,4 @@
-"""
-Calculation engine — расчёт слоёв и систем.
+"""Calculation engine — расчёт слоёв и систем.
 
 Все инженерные промежуточные значения сохраняются без округления.
 Закупка, упаковки и остатки не рассчитываются.
@@ -48,10 +47,8 @@ class LayerCalculator:
         if solids is None or solids <= 0:
             raise ValueError(f"Сухой остаток материала «{material.material_name}» неизвестен или некорректен.")
 
-        # Цена нужна только для расчёта стоимости. Расход должен рассчитываться
-        # даже при отсутствии цены: UNKNOWN не равен нулю.
-        thinner_density: Optional[float] = None
-        thinner_price: Optional[float] = None
+        thinner_density = 1.0
+        thinner_price = None
         if thinner_percent > 0:
             if thinner is None:
                 raise ValueError(
@@ -60,8 +57,8 @@ class LayerCalculator:
                 )
             if thinner.density is None or thinner.density <= 0:
                 raise ValueError(f"Плотность разбавителя «{thinner.material_name}» неизвестна или некорректна.")
-            if thinner.price_per_kg is None or thinner.price_per_kg < 0:
-                raise ValueError(f"Цена разбавителя «{thinner.material_name}» за кг неизвестна или некорректна.")
+            # Цена разбавителя не обязательна для физического расчёта расхода.
+            # UNKNOWN не превращается в нулевую стоимость.
             thinner_density = thinner.density
             thinner_price = thinner.price_per_kg
 
@@ -74,8 +71,8 @@ class LayerCalculator:
             price_per_kg=material.price_per_kg,
             price_per_liter=material.price_per_liter,
             thinner_percent=thinner_percent,
-            thinner_density=thinner_density if thinner_density is not None else 1.0,
-            thinner_price_per_kg=thinner_price if thinner_price is not None else 0.0,
+            thinner_density=thinner_density,
+            thinner_price_per_kg=thinner_price,
             thinner_basis=basis,
         )
         calc = calculate_layer(inp)
@@ -103,7 +100,8 @@ class LayerCalculator:
         if area_m2 > 0:
             result.total_consumption_kg = scale_to_area(result.practical_consumption_kg, area_m2)
             result.total_consumption_l = scale_to_area(result.practical_consumption_l, area_m2)
-            result.total_cost = scale_to_area(result.cost_per_m2 + result.thinner_cost_per_m2, area_m2)
+            known_costs = [v for v in (result.cost_per_m2, result.thinner_cost_per_m2) if v is not None]
+            result.total_cost = scale_to_area(sum(known_costs), area_m2) if len(known_costs) == 2 else 0.0
 
         return result
 
@@ -162,9 +160,18 @@ class SystemCalculator:
         total_pract_kg = sum(lr.practical_consumption_kg for lr in layer_results)
         total_theor_l = sum(lr.theoretical_consumption_l for lr in layer_results)
         total_pract_l = sum(lr.practical_consumption_l for lr in layer_results)
-        total_cost_m2 = sum(lr.cost_per_m2 + lr.thinner_cost_per_m2 for lr in layer_results)
-        total_cost = sum(lr.total_cost for lr in layer_results)
-        total_thinner_cost = sum(scale_to_area(lr.thinner_cost_per_m2, area) for lr in layer_results)
+
+        layer_costs = [lr.cost_per_m2 + lr.thinner_cost_per_m2 for lr in layer_results
+                       if lr.cost_per_m2 is not None and lr.thinner_cost_per_m2 is not None]
+        total_cost_m2 = sum(layer_costs) if len(layer_costs) == len(layer_results) else None
+
+        layer_total_costs = [lr.total_cost for lr in layer_results
+                             if lr.cost_per_m2 is not None and lr.thinner_cost_per_m2 is not None]
+        total_cost = sum(layer_total_costs) if len(layer_total_costs) == len(layer_results) else None
+
+        thinner_costs = [scale_to_area(lr.thinner_cost_per_m2, area) for lr in layer_results
+                         if lr.thinner_cost_per_m2 is not None]
+        total_thinner_cost = sum(thinner_costs) if len(thinner_costs) == len(layer_results) else None
 
         result = SystemCalculationResult(
             system=system or CoatingSystem(system_name="Пользовательская система"),
