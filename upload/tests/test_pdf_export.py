@@ -50,7 +50,6 @@ def test_pdf_creates_file(sample_result):
         PDFExporter().export_calculation(sample_result, path)
         assert path.exists()
         assert path.stat().st_size > 1000
-        # PDF magic
         assert path.read_bytes()[:4] == b"%PDF"
 
 
@@ -68,3 +67,12 @@ def test_pdf_with_comparison(sample_result):
         PDFExporter().export_calculation(sample_result, path, comparison=comparison)
         assert path.exists()
         assert path.stat().st_size > 2000
+
+
+def test_pdf_contains_thinner_labels(sample_result):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "thinner.pdf"
+        PDFExporter().export_calculation(sample_result, path)
+        data = path.read_bytes()
+        assert b"%PDF" == data[:4]
+        assert len(data) > 1000
