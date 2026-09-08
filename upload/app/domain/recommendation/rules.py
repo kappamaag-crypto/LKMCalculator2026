@@ -1,9 +1,7 @@
-"""
-Правила фильтрации систем АКЗ (этап 1 рекомендаций).
+"""Правила фильтрации систем АКЗ (этап hard-filter рекомендаций).
 
-Жёсткий фильтр: система либо проходит, либо отсеивается.
-Не делаем предположений — при отсутствии данных в базе
-система получает пометку «недостаточно данных».
+Система сначала проходит жёсткие инженерные проверки, затем может участвовать
+в скоринге. Предположения по отсутствующим данным не делаются.
 """
 
 from __future__ import annotations
@@ -12,13 +10,8 @@ from dataclasses import dataclass, field
 from typing import Optional, Sequence
 
 from app.domain.models import CoatingSystem, ObjectData, Material
-from app.domain.enums import (
-    CorrosionCategory,
-    DurabilityLevel,
-    SurfaceType,
-    EnvironmentType,
-    CompatibilityStatus,
-)
+from app.domain.enums import CorrosionCategory, DurabilityLevel, SurfaceType, EnvironmentType
+from app.domain.technology import check_application_technology, check_target_dft
 
 
 @dataclass
@@ -45,127 +38,121 @@ def _dur_value(dur) -> str:
     return dur.value if hasattr(dur, "value") else str(dur)
 
 
-# Порядок долговечности для сравнения
-DURABILITY_ORDER = {
-    "Low": 1,
-    "Medium": 2,
-    "High": 3,
-    "Very High": 4,
-}
+DURABILITY_ORDER = {"Low": 1, "Medium": 2, "High": 3, "Very High": 4}
 
 
 def check_corrosion_category(system: CoatingSystem, required: Optional[CorrosionCategory]) -> tuple[bool, str]:
-    """Проверка категории коррозии."""
     if required is None:
         return True, "Категория коррозии не задана — проверка пропущена"
-
     sys_cats = [_cat_value(c) for c in system.corrosion_categories]
     req = _cat_value(required)
-
     if not sys_cats:
         return False, f"В системе не указаны категории коррозии (требуется {req})"
-
     if req in sys_cats:
         return True, f"Соответствует категории {req}"
-
     return False, f"Система не покрывает категорию {req} (есть: {', '.join(sys_cats)})"
 
 
 def check_durability(system: CoatingSystem, required: Optional[DurabilityLevel]) -> tuple[bool, str]:
-    """Проверка долговечности (система должна быть >= требуемой)."""
     if required is None:
         return True, "Долговечность не задана — проверка пропущена"
-
     if system.durability is None:
         return False, f"В системе не указана долговечность (требуется {_dur_value(required)})"
-
     sys_level = DURABILITY_ORDER.get(_dur_value(system.durability), 0)
     req_level = DURABILITY_ORDER.get(_dur_value(required), 0)
-
     if sys_level >= req_level:
         return True, f"Долговечность {_dur_value(system.durability)} ≥ {_dur_value(required)}"
-
     return False, f"Долговечность {_dur_value(system.durability)} < требуемой {_dur_value(required)}"
 
 
 def check_surface(system: CoatingSystem, required: Optional[SurfaceType]) -> tuple[bool, str]:
-    """Проверка типа поверхности / основания."""
     if required is None:
         return True, "Тип поверхности не задан — проверка пропущена"
-
-    sys_surfaces = [
-        s.value if hasattr(s, "value") else str(s)
-        for s in system.surface_types
-    ]
+    sys_surfaces = [s.value if hasattr(s, "value") else str(s) for s in system.surface_types]
     req = required.value if hasattr(required, "value") else str(required)
-
     if not sys_surfaces:
-        # Нет данных — не отсеиваем жёстко, но помечаем
         return True, f"Тип поверхности в системе не указан (запрошен: {req})"
-
     if req in sys_surfaces:
         return True, f"Подходит для поверхности «{req}»"
-
     return False, f"Система не предназначена для «{req}» (есть: {', '.join(sys_surfaces)})"
 
 
 def check_environment(system: CoatingSystem, required: Optional[EnvironmentType]) -> tuple[bool, str]:
-    """Проверка типа среды."""
     if required is None:
         return True, "Тип среды не задан — проверка пропущена"
-
-    sys_envs = [
-        e.value if hasattr(e, "value") else str(e)
-        for e in system.environments
-    ]
+    sys_envs = [e.value if hasattr(e, "value") else str(e) for e in system.environments]
     req = required.value if hasattr(required, "value") else str(required)
-
     if not sys_envs:
         return True, f"Среда в системе не указана (запрошена: {req})"
-
     if req in sys_envs:
         return True, f"Подходит для среды «{req}»"
-
     return False, f"Система не для среды «{req}» (есть: {', '.join(sys_envs)})"
 
 
-def check_temperature(
-    system: CoatingSystem,
-    t_min: Optional[float],
-    t_max: Optional[float],
-) -> tuple[bool, str]:
-    """Проверка температурного диапазона эксплуатации."""
+def check_temperature(system: CoatingSystem, t_min: Optional[float], t_max: Optional[float]) -> tuple[bool, str]:
     if t_min is None and t_max is None:
         return True, "Температура не задана — проверка пропущена"
-
-    sys_min = system.temperature_min
-    sys_max = system.temperature_max
-
+    sys_min, sys_max = system.temperature_min, system.temperature_max
     if sys_min is None and sys_max is None:
         return True, "Температурный диапазон системы не указан"
-
-    messages = []
-    ok = True
-
+    messages, ok = [], True
     if t_min is not None and sys_min is not None and t_min < sys_min:
         ok = False
         messages.append(f"Требуемый минимум {t_min} °C ниже допустимого {sys_min} °C")
     if t_max is not None and sys_max is not None and t_max > sys_max:
         ok = False
         messages.append(f"Требуемый максимум {t_max} °C выше допустимого {sys_max} °C")
-
     if ok:
-        range_str = f"{sys_min or '—'}…{sys_max or '—'} °C"
-        return True, f"Температурный диапазон системы: {range_str}"
-
+        return True, f"Температурный диапазон системы: {sys_min if sys_min is not None else '—'}…{sys_max if sys_max is not None else '—'} °C"
     return False, "; ".join(messages)
 
 
 def check_has_layers(system: CoatingSystem) -> tuple[bool, str]:
-    """Система должна содержать хотя бы один слой."""
     if not system.layers:
         return False, "Система не содержит слоёв"
     return True, f"Слоёв: {len(system.layers)}"
+
+
+def _add_technology_checks(result: FilterResult, obj: ObjectData) -> None:
+    """Добавить инженерный technology-control в реальный hard-filter.
+
+    target_dft проверяется отдельно; он не передаётся как actual_dft, поскольку
+    расчётная толщина и фактически измеренная толщина — разные сущности.
+    """
+    for layer in result.system.layers:
+        material = layer.material
+        if material is None:
+            result.passed = False
+            result.reasons_fail.append(f"Слой {layer.layer_number}: материал не загружен")
+            result.insufficient_data = True
+            continue
+
+        tech = check_application_technology(obj, material, actual_dft=None)
+        for issue in tech.issues:
+            if issue.level == "error":
+                result.passed = False
+                result.reasons_fail.append(f"Слой {layer.layer_number}: {issue.message}")
+            elif issue.level == "warning":
+                result.notes.append(f"Слой {layer.layer_number}: {issue.message}")
+            else:
+                result.notes.append(f"Слой {layer.layer_number}: {issue.message}")
+
+        target = check_target_dft(material, layer.target_dft)
+        for issue in target.issues:
+            if issue.level == "error":
+                result.passed = False
+                result.reasons_fail.append(f"Слой {layer.layer_number}: {issue.message}")
+            elif issue.level == "warning":
+                result.notes.append(f"Слой {layer.layer_number}: {issue.message}")
+
+        if obj.application_method is not None and material.application_method is not None:
+            obj_method = obj.application_method.value if hasattr(obj.application_method, "value") else str(obj.application_method)
+            mat_method = material.application_method.value if hasattr(material.application_method, "value") else str(material.application_method)
+            if obj_method != mat_method:
+                result.passed = False
+                result.reasons_fail.append(
+                    f"Слой {layer.layer_number}: способ нанесения объекта «{obj_method}» не соответствует материалу «{mat_method}»"
+                )
 
 
 def filter_system(
@@ -174,13 +161,8 @@ def filter_system(
     require_corrosion: bool = True,
     require_durability: bool = True,
 ) -> FilterResult:
-    """
-    Жёсткий фильтр одной системы по условиям объекта.
-
-    require_* — если True и данных нет, система не проходит.
-    """
+    """Жёсткий фильтр системы по объекту и технологии нанесения."""
     result = FilterResult(system=system, passed=True)
-
     checks = [
         check_has_layers(system),
         check_corrosion_category(system, obj.corrosion_category),
@@ -190,7 +172,6 @@ def filter_system(
         check_temperature(system, obj.temperature_min, obj.temperature_max),
     ]
 
-    # Особые случаи «нет данных»
     if obj.corrosion_category and not system.corrosion_categories:
         if require_corrosion:
             result.passed = False
@@ -218,6 +199,7 @@ def filter_system(
             result.passed = False
             result.reasons_fail.append(msg)
 
+    _add_technology_checks(result, obj)
     return result
 
 
@@ -227,7 +209,6 @@ def filter_systems(
     require_corrosion: bool = True,
     require_durability: bool = True,
 ) -> list[FilterResult]:
-    """Отфильтровать список систем."""
     return [
         filter_system(s, obj, require_corrosion=require_corrosion, require_durability=require_durability)
         for s in systems
