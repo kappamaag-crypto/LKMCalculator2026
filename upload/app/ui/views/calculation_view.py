@@ -25,7 +25,7 @@ class CalculationView(QWidget):
         row.addStretch(); al.addLayout(row); h=QLabel('После добавления параметры DFT, потери, разбавитель и цена редактируются непосредственно в строке. Результаты обновляются автоматически.'); h.setWordWrap(True); h.setProperty('subheading',True); al.addWidget(h); self.layer_table=LayerTableWidget(); self.layer_table.layer_changed.connect(self._schedule_live_recalculate); al.addWidget(self.layer_table); rl.addWidget(lb)
         buttons=QHBoxLayout(); self.btn_calc=QPushButton('Рассчитать'); self.btn_calc.clicked.connect(self._on_calculate); self.btn_demo=QPushButton('Демо-система'); self.btn_demo.setProperty('secondary',True); self.btn_demo.clicked.connect(self._on_load_demo); self.btn_excel=QPushButton('Excel'); self.btn_excel.setProperty('secondary',True); self.btn_excel.clicked.connect(self._on_export_excel); self.btn_excel.setEnabled(False); self.btn_pdf=QPushButton('PDF'); self.btn_pdf.setProperty('secondary',True); self.btn_pdf.clicked.connect(self._on_export_pdf); self.btn_pdf.setEnabled(False); self.btn_to_cmp=QPushButton('В сравнение'); self.btn_to_cmp.setProperty('secondary',True); self.btn_to_cmp.clicked.connect(self._on_to_comparison); self.btn_to_cmp.setEnabled(False)
         for x in (self.btn_calc,self.btn_demo,self.btn_excel,self.btn_pdf,self.btn_to_cmp):buttons.addWidget(x)
-        buttons.addStretch(); rl.addLayout(buttons); rb=QGroupBox('Результат'); rr=QVBoxLayout(rb); self.lbl_summary=QLabel('Выполните расчёт'); self.lbl_summary.setProperty('subheading',True); self.lbl_summary.setWordWrap(True); self.txt_details=QTextEdit(); self.txt_details.setReadOnly(True); self.txt_details.setMaximumHeight(180); rr.addWidget(self.lbl_summary); rr.addWidget(self.txt_details); rl.addWidget(rb); sp.addWidget(right); sp.setStretchFactor(0,1); sp.setStretchFactor(1,2); root.addWidget(sp)
+        buttons.addStretch(); rl.addLayout(buttons); rb=QGroupBox('Результат'); rr=QVBoxLayout(rb); self.lbl_summary=QLabel('Выполните расчёт'); self.lbl_summary.setProperty('subheading',True); self.lbl_summary.setWordWrap(True); self.txt_details=QTextEdit(); self.txt_details.setReadOnly(True); self.txt_details.setMaximumHeight(210); rr.addWidget(self.lbl_summary); rr.addWidget(self.txt_details); rl.addWidget(rb); sp.addWidget(right); sp.setStretchFactor(0,1); sp.setStretchFactor(1,2); root.addWidget(sp)
     def set_materials(self,materials:list[Material]):
         self._materials=[m for m in materials if m.material_type!=MaterialType.THINNER]; self.cmb_material.clear()
         for m in self._materials:self.cmb_material.addItem(m.display_name(),m)
@@ -65,7 +65,13 @@ class CalculationView(QWidget):
             for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp):b.setEnabled(False)
             if dialogs:QMessageBox.critical(self,'Ошибки валидации',msg)
             return False
-        self._last_result=result; self.layer_table.set_layers(layers,result.layers); self.lbl_summary.setText(f'Толщина: {result.total_dft:.0f} мкм  |  Расход: {result.total_practical_consumption_l:.4f} л/м² / {result.total_practical_consumption_kg:.3f} кг/м²  |  Стоимость: {self._money(result.total_cost_per_m2)} руб/м²  |  Объект: {self._money(result.total_cost,0)} руб'); self.txt_details.setPlainText(self.service.format_summary(result))
+        self._last_result=result
+        thinner_l=sum(lr.thinner_consumption_l for lr in result.layers); thinner_kg=sum(lr.thinner_consumption_kg for lr in result.layers); area=result.object_data.area_m2
+        self.layer_table.set_layers(layers,result.layers)
+        self.lbl_summary.setText(f'Толщина: {result.total_dft:.0f} мкм  |  ЛКМ: {result.total_practical_consumption_l:.4f} л/м² / {result.total_practical_consumption_kg:.3f} кг/м²  |  Разбавитель: {thinner_l:.4f} л/м² / {thinner_kg:.3f} кг/м²  |  Стоимость: {self._money(result.total_cost_per_m2)} руб/м²  |  Объект: {self._money(result.total_cost,0)} руб')
+        if area>0:
+            self.lbl_summary.setToolTip(f'Разбавитель на объект: {thinner_l*area:.3f} л / {thinner_kg*area:.3f} кг')
+        self.txt_details.setPlainText(self.service.format_summary(result))
         for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp):b.setEnabled(True)
         if notify:self.calculation_done.emit(result)
         if validation.has_warnings and dialogs:QMessageBox.warning(self,'Предупреждения','\n'.join(f'• {w.message}' for w in validation.warnings))
