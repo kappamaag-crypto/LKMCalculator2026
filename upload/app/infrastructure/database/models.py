@@ -1,54 +1,29 @@
-"""SQLAlchemy ORM models."""
+"""SQLAlchemy ORM models for the v3 domain."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import (
-    String, Text, Float, Integer, Boolean, DateTime, ForeignKey, Table, Column,
-    UniqueConstraint,
-)
+from sqlalchemy import String, Text, Float, Integer, Boolean, DateTime, ForeignKey, Table, Column, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from app.infrastructure.database.engine import Base
 
 
-material_corrosion = Table(
-    "material_corrosion", Base.metadata,
-    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True),
-    Column("category", String(20), primary_key=True),
-)
-material_durability = Table(
-    "material_durability", Base.metadata,
-    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True),
-    Column("level", String(20), primary_key=True),
-)
-material_surface = Table(
-    "material_surface", Base.metadata,
-    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True),
-    Column("surface_type", String(50), primary_key=True),
-)
-material_environment = Table(
-    "material_environment", Base.metadata,
-    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True),
-    Column("environment", String(50), primary_key=True),
-)
-system_corrosion = Table(
-    "system_corrosion", Base.metadata,
-    Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True),
-    Column("category", String(20), primary_key=True),
-)
-system_environment = Table(
-    "system_environment", Base.metadata,
-    Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True),
-    Column("environment", String(50), primary_key=True),
-)
-system_surface = Table(
-    "system_surface", Base.metadata,
-    Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True),
-    Column("surface_type", String(50), primary_key=True),
-)
+material_corrosion = Table("material_corrosion", Base.metadata,
+    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("category", String(20), primary_key=True))
+material_durability = Table("material_durability", Base.metadata,
+    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("level", String(20), primary_key=True))
+material_surface = Table("material_surface", Base.metadata,
+    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("surface_type", String(50), primary_key=True))
+material_environment = Table("material_environment", Base.metadata,
+    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("environment", String(50), primary_key=True))
+system_corrosion = Table("system_corrosion", Base.metadata,
+    Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True), Column("category", String(20), primary_key=True))
+system_environment = Table("system_environment", Base.metadata,
+    Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True), Column("environment", String(50), primary_key=True))
+system_surface = Table("system_surface", Base.metadata,
+    Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True), Column("surface_type", String(50), primary_key=True))
 
 
 class MaterialORM(Base):
@@ -62,6 +37,7 @@ class MaterialORM(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     density: Mapped[float] = mapped_column(Float, default=0.0)
     solids_percent: Mapped[float] = mapped_column(Float, default=0.0)
+    solids_by_volume_percent: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     voc: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     color: Mapped[str] = mapped_column(String(100), default="")
     ral: Mapped[str] = mapped_column(String(50), default="")
@@ -75,6 +51,11 @@ class MaterialORM(Base):
     min_recoat_time_h: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     max_recoat_time_h: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     drying_time_h: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    full_cure_time_h: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    pot_life_h: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    induction_time_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    max_relative_humidity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    min_dew_point_margin_c: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     recommended_dft_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     recommended_dft_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     max_single_layer_dft: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -82,18 +63,22 @@ class MaterialORM(Base):
     thinner_name: Mapped[str] = mapped_column(String(200), default="")
     thinner_percent_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     thinner_percent_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    thinner_basis: Mapped[str] = mapped_column(String(40), default="BY_PAINT_VOLUME")
     packaging_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     packaging_l: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    is_two_component: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_incomplete: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str] = mapped_column(Text, default="")
     datasheet: Mapped[str] = mapped_column(String(500), default="")
+    datasheet_version: Mapped[str] = mapped_column(String(100), default="")
+    datasheet_date: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    safety_data_sheet: Mapped[str] = mapped_column(String(500), default="")
     certificate: Mapped[str] = mapped_column(String(500), default="")
+    certificate_version: Mapped[str] = mapped_column(String(100), default="")
+    test_protocol: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    def __repr__(self) -> str:
-        return f"<MaterialORM id={self.id} name={self.material_name!r}>"
 
 
 class CoatingSystemORM(Base):
@@ -105,6 +90,7 @@ class CoatingSystemORM(Base):
     durability: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     substrate: Mapped[str] = mapped_column(String(200), default="")
     total_dft_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    total_dft_target: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     total_dft_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     number_of_layers: Mapped[int] = mapped_column(Integer, default=0)
     temperature_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -116,9 +102,7 @@ class CoatingSystemORM(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    layers: Mapped[list["CoatingSystemLayerORM"]] = relationship(
-        back_populates="system", cascade="all, delete-orphan", order_by="CoatingSystemLayerORM.layer_number"
-    )
+    layers: Mapped[list["CoatingSystemLayerORM"]] = relationship(back_populates="system", cascade="all, delete-orphan", order_by="CoatingSystemLayerORM.layer_number")
 
 
 class CoatingSystemLayerORM(Base):
@@ -133,6 +117,9 @@ class CoatingSystemLayerORM(Base):
     target_dft: Mapped[float] = mapped_column(Float, default=0.0)
     thinner_percent: Mapped[float] = mapped_column(Float, default=0.0)
     thinner_material_id: Mapped[Optional[int]] = mapped_column(ForeignKey("materials.id", ondelete="SET NULL"), nullable=True)
+    thinner_basis: Mapped[str] = mapped_column(String(40), default="BY_PAINT_VOLUME")
+    passes: Mapped[int] = mapped_column(Integer, default=1)
+    application_method: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="")
     system: Mapped["CoatingSystemORM"] = relationship(back_populates="layers")
     __table_args__ = (UniqueConstraint("system_id", "layer_number", name="uq_system_layer_number"),)
