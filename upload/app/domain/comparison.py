@@ -1,5 +1,10 @@
 """
 Сравнение систем покрытия.
+
+Сравнение не считает большую толщину автоматически лучшей защитой:
+соответствие ISO 12944/ТДС должно быть подтверждено отдельно, а здесь
+сопоставляются измеримые показатели расчёта — расход, стоимость, толщина
+и количество слоёв.
 """
 
 from __future__ import annotations
@@ -37,11 +42,7 @@ class ComparisonEngine:
         obj: ObjectData,
         systems: Sequence[tuple[str, Sequence[LayerInput]]],
     ) -> ComparisonResult:
-        """
-        Сравнить несколько систем.
-
-        systems: список (имя_системы, [LayerInput, ...])
-        """
+        """Сравнить несколько систем."""
         if len(systems) < 2:
             raise ValueError("Для сравнения требуется не менее 2 систем")
         if len(systems) > 10:
@@ -80,47 +81,50 @@ class ComparisonEngine:
         return comparison
 
     def _annotate(self, comparison: ComparisonResult) -> None:
-        """Выделить лучшие/худшие по ключевым показателям."""
+        """Выделить показатели без предположения, что большая DFT лучше."""
         systems = comparison.systems
         if not systems:
             return
 
-        # Самая дешёвая / дорогая (по руб/м²)
         costs = [s.total_cost_per_m2 for s in systems]
         comparison.cheapest_index = costs.index(min(costs))
         comparison.most_expensive_index = costs.index(max(costs))
 
-        # Самая тонкая / толстая
         dfts = [s.total_dft for s in systems]
         comparison.thinnest_index = dfts.index(min(dfts))
         comparison.thickest_index = dfts.index(max(dfts))
 
-        # Минимум слоёв
         layer_counts = [len(s.layers) for s in systems]
         comparison.fewest_layers_index = layer_counts.index(min(layer_counts))
 
-        # Лучший баланс цена/защита:
-        # score = нормализованная толщина / нормализованная цена
-        # (больше толщина при меньшей цене → лучше)
-        max_dft = max(dfts) or 1.0
-        max_cost = max(costs) or 1.0
+        # "Лучший баланс" здесь означает только экономико-технологический баланс:
+        # низкая стоимость и меньшее число слоёв. Толщина не является бонусом сама по себе.
+        min_cost = min(costs)
+        max_cost = max(costs)
+        min_layers = min(layer_counts)
+        max_layers = max(layer_counts)
+
+        def normalize_inverse(value: float, low: float, high: float) -> float:
+            if high == low:
+                return 1.0
+            return (high - value) / (high - low)
+
         balance_scores = []
-        for s in systems:
-            norm_dft = s.total_dft / max_dft
-            norm_cost = s.total_cost_per_m2 / max_cost if max_cost else 1.0
-            # Чем выше толщина и ниже цена — тем лучше
-            score = norm_dft / norm_cost if norm_cost > 0 else 0.0
-            balance_scores.append(score)
+        for cost, layers in zip(costs, layer_counts):
+            cost_score = normalize_inverse(cost, min_cost, max_cost)
+            layer_score = normalize_inverse(float(layers), float(min_layers), float(max_layers))
+            # Цена важнее числа слоёв; итог 0..100.
+            balance_scores.append(0.7 * cost_score + 0.3 * layer_score)
+
         comparison.best_balance_index = balance_scores.index(max(balance_scores))
 
     def to_table(self, comparison: ComparisonResult) -> list[dict]:
         """
         Таблица сравнения для UI / Excel.
 
-        Возвращает список строк: [{indicator, sys0, sys1, ...}, ...]
+        Включает общие показатели и подробности по каждому слою.
         """
         systems = comparison.systems
-        n = len(systems)
         names = [s.system.system_name or f"Система {i+1}" for i, s in enumerate(systems)]
 
         def row(label: str, values: list, highlight_min: bool = False, highlight_max: bool = False) -> dict:
@@ -137,13 +141,37 @@ class ComparisonEngine:
             row("Название", names),
             row("Количество слоёв", [len(s.layers) for s in systems], highlight_min=True),
             row("Общая толщина, мкм", [s.total_dft for s in systems], highlight_min=True, highlight_max=True),
-            row("Расход, кг/м²", [s.total_practical_consumption_kg for s in systems], highlight_min=True),
-            row("Расход, л/м²", [s.total_practical_consumption_l for s in systems], highlight_min=True),
-            row("Стоимость, руб/м²", [s.total_cost_per_m2 for s in systems], highlight_min=True, highlight_max=True),
+            row("Расход ЛКМ, кг/м²", [s.total_practical_consumption_kg for s in systems], highlight_min=True),
+            row("Расход ЛКМ, л/м²", [s.total_practical_consumption_l for s in systems], highlight_min=True),
+            row("Стоимость ЛКМ, руб/м²", [s.total_cost_per_m2 for s in systems], highlight_min=True, highlight_max=True),
             row("Стоимость объекта, руб", [s.total_cost for s in systems], highlight_min=True),
-            row(
-                "Кол-во материала, кг",
-                [sum(lr.total_consumption_kg for lr in s.layers) for s in systems],
-            ),
+            row("Разбавитель, руб/м²", [s.total_thinner_cost / s.object_data.area_m2 if s.object_data.area_m2 > 0 else 0.0 for s in systems], highlight_min=True),
+            row("Закупка ЛКМ, кг", [sum(lr.total_consumption_kg for lr in s.layers) for s in systems], highlight_min=True),
         ]
+
+        max_layers = max((len(s.layers) for s in systems), default=0)
+        for layer_no in range(max_layers):
+            materials = []
+            dfts = []
+            consumptions = []
+            costs = []
+            for s in systems:
+                if layer_no < len(s.layers):
+                    lr = s.layers[layer_no]
+                    materials.append(lr.material.display_name())
+                    dfts.append(lr.target_dft)
+                    consumptions.append(lr.practical_consumption_kg)
+                    costs.append(lr.cost_per_m2 + lr.thinner_cost_per_m2)
+                else:
+                    materials.append("—")
+                    dfts.append("—")
+                    consumptions.append("—")
+                    costs.append("—")
+            rows.extend([
+                row(f"Слой {layer_no + 1}: материал", materials),
+                row(f"Слой {layer_no + 1}: DFT, мкм", dfts),
+                row(f"Слой {layer_no + 1}: расход, кг/м²", consumptions),
+                row(f"Слой {layer_no + 1}: стоимость, руб/м²", costs),
+            ])
+
         return rows
