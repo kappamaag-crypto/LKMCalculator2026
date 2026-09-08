@@ -13,7 +13,6 @@ from app.config import DB_PATH, ensure_directories
 
 
 class Base(DeclarativeBase):
-    """SQLAlchemy declarative base."""
     pass
 
 
@@ -59,6 +58,9 @@ def init_db(engine=None) -> None:
     from app.infrastructure.database import models  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
+    database = engine.url.database
+    if not database or database == ":memory:":
+        return
+
     from app.infrastructure.database.migrate import upgrade_database
-    db_path = Path(engine.url.database) if engine.url.database else DB_PATH
-    upgrade_database(db_path)
+    upgrade_database(Path(database))
