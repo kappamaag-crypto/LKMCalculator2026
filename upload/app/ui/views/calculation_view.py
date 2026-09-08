@@ -2,7 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
-from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QGroupBox,QLabel,QLineEdit,QDoubleSpinBox,QSpinBox,QComboBox,QPushButton,QMessageBox,QTextEdit,QSplitter,QFileDialog
+from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QGroupBox,QLabel,QLineEdit,QDoubleSpinBox,QComboBox,QPushButton,QMessageBox,QTextEdit,QSplitter,QFileDialog
 from PySide6.QtCore import Qt,Signal,QTimer
 from app.domain.models import Material,ObjectData
 from app.domain.enums import MaterialType,BinderType
@@ -19,10 +19,7 @@ class CalculationView(QWidget):
         super().__init__(parent); self.service=service; self._materials=[]; self._last_result=None; self._timer=QTimer(self); self._timer.setSingleShot(True); self._timer.setInterval(220); self._timer.timeout.connect(self._on_live_recalculate); self._build_ui()
     def _build_ui(self):
         root=QVBoxLayout(self); root.setContentsMargins(12,12,12,12); root.setSpacing(10); t=QLabel('Расчёт системы покрытия'); t.setProperty('heading',True); root.addWidget(t); sp=QSplitter(Qt.Horizontal)
-        left=QWidget(); ll=QVBoxLayout(left); b=QGroupBox('Объект'); f=QFormLayout(b); self.ed_object=QLineEdit(); self.ed_object.setPlaceholderText('Название объекта'); self.ed_customer=QLineEdit(); self.ed_customer.setPlaceholderText('Заказчик'); self.spin_area=QDoubleSpinBox(); self.spin_area.setRange(0,1000000); self.spin_area.setValue(100); self.spin_area.setDecimals(2); self.spin_area.setSuffix(' м²'); self.spin_elements=QSpinBox(); self.spin_elements.setRange(1,10000); self.spin_elements.setValue(1); self.spin_area_el=QDoubleSpinBox(); self.spin_area_el.setRange(0,100000); self.spin_area_el.setDecimals(2); self.spin_area_el.setSuffix(' м²');
-        for x,y in [('Объект:',self.ed_object),('Заказчик:',self.ed_customer),('Площадь:',self.spin_area),('Кол-во элементов:',self.spin_elements),('Площадь элемента:',self.spin_area_el)]:f.addRow(x,y)
-        for widget in (self.spin_area,self.spin_elements,self.spin_area_el): widget.valueChanged.connect(self._schedule_live_recalculate)
-        ll.addWidget(b); ll.addStretch(); sp.addWidget(left)
+        left=QWidget(); ll=QVBoxLayout(left); b=QGroupBox('Объект'); f=QFormLayout(b); self.ed_object=QLineEdit(); self.ed_object.setPlaceholderText('Название объекта'); self.ed_customer=QLineEdit(); self.ed_customer.setPlaceholderText('Заказчик'); self.spin_area=QDoubleSpinBox(); self.spin_area.setRange(0,1000000); self.spin_area.setValue(1); self.spin_area.setDecimals(2); self.spin_area.setSuffix(' м²'); f.addRow('Объект:',self.ed_object); f.addRow('Заказчик:',self.ed_customer); f.addRow('Площадь:',self.spin_area); self.spin_area.valueChanged.connect(self._schedule_live_recalculate); ll.addWidget(b); ll.addStretch(); sp.addWidget(left)
         right=QWidget(); rl=QVBoxLayout(right); lb=QGroupBox('Слои системы'); al=QVBoxLayout(lb); row=QHBoxLayout(); self.cmb_material=QComboBox(); self.cmb_material.setMinimumWidth(200); self.spin_dft=QDoubleSpinBox(); self.spin_dft.setRange(1,2000); self.spin_dft.setValue(100); self.spin_dft.setSuffix(' мкм'); self.spin_layer_losses=QDoubleSpinBox(); self.spin_layer_losses.setRange(0,99); self.spin_layer_losses.setSuffix(' %'); self.spin_thinner=QDoubleSpinBox(); self.spin_thinner.setRange(0,100); self.spin_thinner.setSuffix(' %'); add=QPushButton('Добавить слой'); add.clicked.connect(self._on_add_layer); rem=QPushButton('Удалить'); rem.setProperty('secondary',True); rem.clicked.connect(self._on_remove_layer); clr=QPushButton('Очистить'); clr.setProperty('secondary',True); clr.clicked.connect(self._on_clear_layers)
         for x in (QLabel('Материал:'),self.cmb_material,QLabel('DFT:'),self.spin_dft,QLabel('Потери:'),self.spin_layer_losses,QLabel('Разб.:'),self.spin_thinner,add,rem,clr):row.addWidget(x)
         al.addLayout(row); h=QLabel('Цена, DFT, потери, разбавитель и площадь редактируются прямо на экране. Результаты обновляются автоматически.'); h.setWordWrap(True); h.setProperty('subheading',True); al.addWidget(h); self.layer_table=LayerTableWidget(); self.layer_table.layer_changed.connect(self._schedule_live_recalculate); al.addWidget(self.layer_table); rl.addWidget(lb)
@@ -34,7 +31,7 @@ class CalculationView(QWidget):
         for m in self._materials:self.cmb_material.addItem(m.display_name(),m)
     def _current_material(self)->Optional[Material]:return self.cmb_material.currentData()
     def _build_object_data(self):
-        area=self.spin_area.value() or self.spin_area_el.value()*self.spin_elements.value(); return ObjectData(object_name=self.ed_object.text().strip(),customer=self.ed_customer.text().strip(),area_m2=area,elements_count=self.spin_elements.value(),area_per_element=self.spin_area_el.value())
+        return ObjectData(object_name=self.ed_object.text().strip(),customer=self.ed_customer.text().strip(),area_m2=self.spin_area.value())
     def _on_add_layer(self):
         m=self._current_material()
         if m is None:QMessageBox.warning(self,'Внимание','Выберите материал'); return
