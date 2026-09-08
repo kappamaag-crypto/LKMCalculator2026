@@ -41,20 +41,31 @@ class MaterialEditDialog(QDialog):
             idx = self.cmb_binder.findData(material.binder_type)
             if idx >= 0:
                 self.cmb_binder.setCurrentIndex(idx)
+
         self.spin_density = QDoubleSpinBox()
         self.spin_density.setRange(0, 10)
         self.spin_density.setDecimals(3)
-        self.spin_density.setValue(material.density if material else 1.3)
+        self.spin_density.setSpecialValueText("не задано")
+        self.spin_density.setValue(material.density if material and material.density is not None else 0)
+
         self.spin_solids = QDoubleSpinBox()
         self.spin_solids.setRange(0, 100)
-        self.spin_solids.setValue(material.solids_percent if material else 60)
-        self.spin_price = QDoubleSpinBox()
-        self.spin_price.setRange(0, 1_000_000)
-        self.spin_price.setDecimals(2)
-        self.spin_price.setValue(material.price_per_kg or 0 if material else 0)
-        self.spin_pack = QDoubleSpinBox()
-        self.spin_pack.setRange(0, 1000)
-        self.spin_pack.setValue(material.packaging_kg or 20 if material else 20)
+        self.spin_solids.setDecimals(2)
+        self.spin_solids.setSpecialValueText("не задано")
+        self.spin_solids.setValue(material.solids_percent if material and material.solids_percent is not None else 0)
+
+        self.spin_price_kg = QDoubleSpinBox()
+        self.spin_price_kg.setRange(0, 1_000_000)
+        self.spin_price_kg.setDecimals(2)
+        self.spin_price_kg.setSpecialValueText("не задано")
+        self.spin_price_kg.setValue(material.price_per_kg if material and material.price_per_kg is not None else 0)
+
+        self.spin_price_liter = QDoubleSpinBox()
+        self.spin_price_liter.setRange(0, 1_000_000)
+        self.spin_price_liter.setDecimals(2)
+        self.spin_price_liter.setSpecialValueText("не задано")
+        self.spin_price_liter.setValue(material.price_per_liter if material and material.price_per_liter is not None else 0)
+
         self.spin_dft_min = QDoubleSpinBox()
         self.spin_dft_min.setRange(0, 2000)
         self.spin_dft_min.setValue(material.recommended_dft_min or 0 if material else 0)
@@ -69,8 +80,8 @@ class MaterialEditDialog(QDialog):
         layout.addRow("Связующее:", self.cmb_binder)
         layout.addRow("Плотность, кг/л:", self.spin_density)
         layout.addRow("Сухой остаток, %:", self.spin_solids)
-        layout.addRow("Цена, руб/кг:", self.spin_price)
-        layout.addRow("Фасовка, кг:", self.spin_pack)
+        layout.addRow("Цена, руб/кг:", self.spin_price_kg)
+        layout.addRow("Цена, руб/л:", self.spin_price_liter)
         layout.addRow("DFT min, мкм:", self.spin_dft_min)
         layout.addRow("DFT max, мкм:", self.spin_dft_max)
 
@@ -88,10 +99,10 @@ class MaterialEditDialog(QDialog):
             brand=self.ed_brand.text().strip(),
             material_type=self.cmb_type.currentData() or MaterialType.OTHER,
             binder_type=self.cmb_binder.currentData() or BinderType.UNKNOWN,
-            density=self.spin_density.value(),
-            solids_percent=self.spin_solids.value(),
-            price_per_kg=self.spin_price.value() or None,
-            packaging_kg=self.spin_pack.value() or None,
+            density=self.spin_density.value() or None,
+            solids_percent=self.spin_solids.value() or None,
+            price_per_kg=self.spin_price_kg.value() or None,
+            price_per_liter=self.spin_price_liter.value() or None,
             recommended_dft_min=self.spin_dft_min.value() or None,
             recommended_dft_max=self.spin_dft_max.value() or None,
             is_active=True,
@@ -140,10 +151,10 @@ class MaterialsView(QWidget):
         btn_row.addStretch()
         root.addLayout(btn_row)
 
-        self.table = QTableWidget(0, 8)
+        self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels([
             "ID", "Название", "Производитель", "Тип", "Связующее",
-            "Плотность", "СО, %", "Цена, руб/кг",
+            "Плотность", "СО, %", "Цена, руб/кг", "Цена, руб/л",
         ])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -185,9 +196,10 @@ class MaterialsView(QWidget):
                 m.manufacturer or "—",
                 m.material_type.value if hasattr(m.material_type, "value") else str(m.material_type),
                 m.binder_type.value if hasattr(m.binder_type, "value") else str(m.binder_type),
-                f"{m.density:.2f}",
-                f"{m.solids_percent:.0f}",
-                f"{m.price_per_kg:.0f}" if m.price_per_kg else "—",
+                f"{m.density:.2f}" if m.density is not None else "—",
+                f"{m.solids_percent:.0f}" if m.solids_percent is not None else "—",
+                f"{m.price_per_kg:.0f}" if m.price_per_kg is not None else "—",
+                f"{m.price_per_liter:.0f}" if m.price_per_liter is not None else "—",
             ]
             for c, v in enumerate(vals):
                 item = QTableWidgetItem(v)
