@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 
 from app import __version__, __app_name__
-from app.domain.models import Material, CoatingSystem, LayerDefinition, ObjectData
+from app.domain.models import Material, CoatingSystem, LayerDefinition
 from app.domain.enums import (
     MaterialType, BinderType, CorrosionCategory, DurabilityLevel,
     SurfaceType, EnvironmentType,
@@ -22,6 +22,7 @@ from app.ui.views.recommendation_view import RecommendationView
 from app.ui.views.comparison_view import ComparisonView
 from app.ui.views.history_view import HistoryView
 from app.ui.views.materials_view import MaterialsView
+from app.ui.views.two_component_view import TwoComponentView
 
 
 def _demo_materials() -> list[Material]:
@@ -129,10 +130,12 @@ class MainWindow(QMainWindow):
         self.calc_view = CalculationView(self.calc_service)
         self.rec_view = RecommendationView(self.rec_service)
         self.cmp_view = ComparisonView(self.calc_service)
+        self.two_component_view = TwoComponentView()
 
         self.tabs.addTab(self.calc_view, "Расчёт")
         self.tabs.addTab(self.rec_view, "Рекомендации")
         self.tabs.addTab(self.cmp_view, "Сравнение")
+        self.tabs.addTab(self.two_component_view, "2К-информация")
 
         self.materials_view = MaterialsView(self._materials)
         self.history_view = HistoryView()
@@ -150,11 +153,9 @@ class MainWindow(QMainWindow):
         stub_set.setProperty("subheading", True)
         self.tabs.addTab(stub_set, "Настройки")
 
-        # Связи между вкладками
         self.calc_view.calculation_done.connect(self._on_calc_done)
         self.materials_view.materials_changed.connect(self._on_materials_changed)
 
-        # Меню
         menubar = self.menuBar()
         file_menu = menubar.addMenu("Файл")
         act_exit = QAction("Выход", self)
@@ -179,13 +180,11 @@ class MainWindow(QMainWindow):
             f"объект {result.total_cost:,.0f} руб".replace(",", " "),
             10000,
         )
-        # Автоматически добавить в сравнение
         self.cmp_view.add_from_calculation(result)
-        # Сохранить в историю
         try:
             self.history_view.save_result(result)
-        except Exception:
-            pass
+        except Exception as exc:
+            self.statusBar().showMessage(f"Не удалось сохранить расчёт в историю: {exc}", 10000)
 
     def _on_materials_changed(self, materials: list) -> None:
         self._materials = materials
