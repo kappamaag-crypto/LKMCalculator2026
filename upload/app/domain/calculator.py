@@ -1,7 +1,5 @@
 """
 Calculation engine — расчёт слоёв и систем.
-
-Использует формулы из domain.formulas (1:1 со старым калькулятором).
 """
 
 from __future__ import annotations
@@ -26,11 +24,7 @@ from app.domain.formulas import (
     total_area,
     round3,
 )
-from app.domain.validation import (
-    ValidationResult,
-    validate_before_calculation,
-    validate_object_data,
-)
+from app.domain.validation import ValidationResult, validate_before_calculation
 
 
 @dataclass
@@ -42,6 +36,7 @@ class LayerInput:
     losses_percent: float = 0.0
     thinner_percent: float = 0.0
     thinner: Optional[Material] = None
+    thinner_basis: Optional[str] = None
 
 
 class LayerCalculator:
@@ -55,10 +50,9 @@ class LayerCalculator:
         thinner_percent: float = 0.0,
         thinner: Optional[Material] = None,
         area_m2: float = 1.0,
+        thinner_basis: Optional[str] = None,
     ) -> LayerResult:
-        """
-        Рассчитать слой на 1 м² и масштабировать на площадь.
-        """
+        """Рассчитать слой на 1 м² и масштабировать на площадь."""
         price_kg = material.price_per_kg or 0.0
         thinner_density = 1.0
         thinner_price = 0.0
@@ -66,18 +60,21 @@ class LayerCalculator:
             thinner_density = thinner.density if thinner.density > 0 else 1.0
             thinner_price = thinner.price_per_kg or 0.0
         elif material.thinner_name and thinner_percent > 0:
-            # Разбавитель указан только именем — используем плотность 0.9 по умолчанию
+            # Не считаем это фактической плотностью поставляемого продукта:
+            # это только fallback для старых записей без объекта разбавителя.
             thinner_density = 0.9
 
+        basis = thinner_basis or material.thinner_basis
         inp = LayerCalcInput(
             density=material.density or 0.0,
-            solids_percent=material.solids_percent or 0.0,
+            solids_percent=material.solids_by_volume_percent or material.solids_percent or 0.0,
             dry_thickness=target_dft,
             losses_percent=losses_percent,
             price_per_kg=price_kg,
             thinner_percent=thinner_percent,
             thinner_density=thinner_density,
             thinner_price_per_kg=thinner_price,
+            thinner_basis=basis,
         )
         calc = calculate_layer(inp)
 
@@ -87,6 +84,7 @@ class LayerCalculator:
             losses_percent=losses_percent,
             thinner_percent=thinner_percent,
             thinner=thinner,
+            thinner_basis=basis,
             wft=calc.wft,
             theoretical_coverage=calc.theoretical_coverage,
             practical_coverage=calc.practical_coverage,
@@ -100,7 +98,6 @@ class LayerCalculator:
             thinner_cost_per_m2=calc.thinner_cost_per_m2,
         )
 
-        # Масштабирование на площадь
         if area_m2 > 0:
             result.total_consumption_kg = scale_to_area(result.practical_consumption_kg, area_m2)
             result.total_consumption_l = scale_to_area(result.practical_consumption_l, area_m2)
@@ -108,7 +105,6 @@ class LayerCalculator:
                 result.cost_per_m2 + result.thinner_cost_per_m2, area_m2
             )
 
-            # Упаковки
             packaging = material.packaging_kg
             if packaging and packaging > 0:
                 packages, purchase, remainder = calculate_packages(
@@ -137,7 +133,6 @@ class SystemCalculator:
         self.default_losses = default_losses
 
     def resolve_area(self, obj: ObjectData) -> float:
-        """Определить итоговую площадь."""
         if obj.area_m2 > 0:
             return obj.area_m2
         if obj.area_per_element > 0 and obj.elements_count > 0:
@@ -151,13 +146,6 @@ class SystemCalculator:
         system: Optional[CoatingSystem] = None,
         skip_validation: bool = False,
     ) -> tuple[SystemCalculationResult, ValidationResult]:
-        """
-        Рассчитать систему.
-
-        Returns:
-            (SystemCalculationResult, ValidationResult)
-        """
-        # Валидация
         validation = ValidationResult()
         if not skip_validation:
             layers_for_val = [
@@ -168,7 +156,6 @@ class SystemCalculator:
                 obj, layers_for_val, self.compatibility_checker
             )
             if validation.has_errors:
-                # Возвращаем пустой результат при ошибках
                 empty = SystemCalculationResult(
                     system=system or CoatingSystem(system_name="Ошибка валидации"),
                     object_data=obj,
@@ -188,10 +175,10 @@ class SystemCalculator:
                 thinner_percent=li.thinner_percent,
                 thinner=li.thinner,
                 area_m2=area,
+                thinner_basis=li.thinner_basis,
             )
             layer_results.append(lr)
 
-        # Итоги (только основные слои, без разбавителей как отдельных материалов)
         total_dft = round3(sum(lr.target_dft for lr in layer_results))
         total_theor_kg = round3(sum(lr.theoretical_consumption_kg for lr in layer_results))
         total_pract_kg = round3(sum(lr.practical_consumption_kg for lr in layer_results))
@@ -204,9 +191,9 @@ class SystemCalculator:
         total_thinner_cost = round3(
             sum(scale_to_area(lr.thinner_cost_per_m2, area) for lr in layer_results)
         )
-
-        # Стоимость закупки с учётом фасовки
-        total_purchase = round3(sum(lr.purchase_kg * (lr.material.price_per_kg or 0) for lr in layer_results))
+        total_purchase = round3(
+            sum(lr.purchase_kg * (lr.material.price_per_kg or 0) for lr in layer_results)
+        )
 
         result = SystemCalculationResult(
             system=system or CoatingSystem(system_name="Пользовательская система"),
@@ -233,11 +220,6 @@ class SystemCalculator:
         losses_percent: float | None = None,
         skip_validation: bool = False,
     ) -> tuple[SystemCalculationResult, ValidationResult]:
-        """
-        Рассчитать систему по шаблону CoatingSystem.
-
-        materials_by_id: словарь id → Material для подстановки.
-        """
         layer_inputs: list[LayerInput] = []
         losses = losses_percent if losses_percent is not None else self.default_losses
 
@@ -246,20 +228,17 @@ class SystemCalculator:
             if material is None and ld.material_id is not None:
                 material = materials_by_id.get(ld.material_id)
             if material is None:
-                # Пропускаем слой без материала — валидация поймает
                 continue
 
-            thinner = None
-            if ld.thinner_material_id:
-                thinner = materials_by_id.get(ld.thinner_material_id)
-
+            thinner = materials_by_id.get(ld.thinner_material_id) if ld.thinner_material_id else None
             layer_inputs.append(
                 LayerInput(
                     material=material,
                     target_dft=ld.target_dft,
-                    losses_percent=losses,
+                    losses_percent=ld.losses_percent if ld.losses_percent is not None else losses,
                     thinner_percent=ld.thinner_percent,
                     thinner=thinner,
+                    thinner_basis=ld.thinner_basis,
                 )
             )
 
