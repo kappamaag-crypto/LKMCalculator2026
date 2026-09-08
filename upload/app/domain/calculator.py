@@ -41,11 +41,16 @@ class LayerCalculator:
         if material.density is None or material.density <= 0:
             raise ValueError(f"Плотность материала «{material.material_name}» неизвестна или некорректна.")
 
+        # DFT/WFT и теоретический расход требуют именно объёмной доли сухого остатка.
+        # Массовый сухой остаток нельзя молча трактовать как объёмный: это даёт
+        # систематическую ошибку в инженерном расчёте.
         solids = material.solids_by_volume_percent
-        if solids is None:
-            solids = material.solids_percent
         if solids is None or solids <= 0:
-            raise ValueError(f"Сухой остаток материала «{material.material_name}» неизвестен или некорректен.")
+            raise ValueError(
+                f"Объёмный сухой остаток материала «{material.material_name}» "
+                "неизвестен или некорректен. Для расчёта DFT/WFT требуется "
+                "solids_by_volume_percent."
+            )
 
         thinner_density = 1.0
         thinner_price = None
@@ -218,10 +223,10 @@ class SystemCalculator:
                 LayerInput(
                     material=material,
                     target_dft=ld.target_dft,
-                    losses_percent=ld.losses_percent if ld.losses_percent is not None else losses,
+                    losses_percent=losses,
                     thinner_percent=ld.thinner_percent,
                     thinner=thinner,
-                    thinner_basis=ld.thinner_basis or material.thinner_basis,
+                    thinner_basis=ld.thinner_basis,
                 )
             )
         return self.calculate(obj, layer_inputs, system=system, skip_validation=skip_validation)
