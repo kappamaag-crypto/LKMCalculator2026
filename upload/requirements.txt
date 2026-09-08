@@ -1,6 +1,7 @@
 # Core
 PySide6>=6.6.0
 SQLAlchemy>=2.0.0
+Alembic>=1.13.0
 openpyxl>=3.1.0
 reportlab>=4.0.0
 matplotlib>=3.8.0
