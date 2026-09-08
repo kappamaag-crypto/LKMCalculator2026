@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+FORMULA_VERSION = "3.0"
 
 DILUTION_BASIS_BY_PAINT_VOLUME = "BY_PAINT_VOLUME"
 DILUTION_BASIS_BY_MIX_VOLUME = "BY_MIX_VOLUME"
@@ -56,7 +57,6 @@ def round3(value: float) -> float:
 
 
 def calculate_wft(dft: float, solids_percent: float) -> float:
-    """WFT без разбавителя: DFT / (SV/100), без промежуточного округления."""
     if dft <= 0 or solids_percent <= 0:
         return 0.0
     return dft * 100.0 / solids_percent
@@ -70,7 +70,6 @@ def calculate_wft_with_dilution(
     paint_density: float = 1.0,
     basis: str = DILUTION_BASIS_BY_PAINT_VOLUME,
 ) -> float:
-    """WFT с учётом явно указанной базы разбавления."""
     base_wft = calculate_wft(dft, solids_percent)
     if base_wft <= 0 or thinner_percent <= 0:
         return base_wft
@@ -94,14 +93,12 @@ def calculate_wft_with_dilution(
 
 
 def calculate_theoretical_coverage(wft: float) -> float:
-    """Теоретическая укрывистость по WFT, м²/л, без округления."""
     if wft <= 0:
         return 0.0
     return 1000.0 / wft
 
 
 def calculate_loss_coefficient(losses_percent: float) -> float:
-    """Коэффициент потерь K = 100 / (100 − losses)."""
     if losses_percent < 0 or losses_percent >= 100:
         return 1.0
     return 100.0 / (100.0 - losses_percent)
@@ -139,7 +136,6 @@ def calculate_thinner(
     basis: str = DILUTION_BASIS_BY_PAINT_VOLUME,
     parent_density: float = 1.0,
 ) -> tuple[float, float, float]:
-    """Фактический расход разбавителя на 1 м², без округления."""
     if parent_consumption_l <= 0 or thinner_percent <= 0:
         return 0.0, 0.0, 0.0
     if thinner_density <= 0:
@@ -166,7 +162,6 @@ def calculate_thinner(
 
 
 def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
-    """Полный расчёт одного слоя на 1 м² без промежуточного округления."""
     wft = calculate_wft_with_dilution(
         inp.dry_thickness,
         inp.solids_percent,
@@ -175,17 +170,13 @@ def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
         inp.density,
         inp.thinner_basis,
     )
-
-    # Расход исходного ЛКМ определяется сухим остатком.
     base_wft = calculate_wft(inp.dry_thickness, inp.solids_percent)
     theor_paint_l = 0.0 if base_wft <= 0 else 1000.0 / base_wft
 
     k_loss = calculate_loss_coefficient(inp.losses_percent)
     pract_paint_l = theor_paint_l * k_loss
-
     theor_cov = 0.0 if theor_paint_l <= 0 else 1.0 / theor_paint_l
     pract_cov = 0.0 if pract_paint_l <= 0 else 1.0 / pract_paint_l
-
     theor_kg = calculate_consumption_kg(theor_paint_l, inp.density)
     pract_kg = calculate_consumption_kg(pract_paint_l, inp.density)
     cost = calculate_cost(pract_kg, inp.price_per_kg)
@@ -222,10 +213,8 @@ def scale_to_area(per_m2: float, area_m2: float) -> float:
 
 
 def calculate_packages(required_kg: float, packaging_kg: Optional[float]) -> tuple[int, float, float]:
-    """Расчёт количества упаковок; покупка округляется только здесь."""
     if required_kg <= 0 or not packaging_kg or packaging_kg <= 0:
         return 0, 0.0, 0.0
-
     import math
     packages = math.ceil(required_kg / packaging_kg)
     purchase = packages * packaging_kg
