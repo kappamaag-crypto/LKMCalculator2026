@@ -2,6 +2,7 @@
 Calculation engine — расчёт слоёв и систем.
 
 Все инженерные промежуточные значения сохраняются без округления.
+Закупка, упаковки и остатки не рассчитываются.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from datetime import datetime
 from typing import Optional, Sequence, Callable
 
 from app.domain.models import Material, LayerResult, CoatingSystem, ObjectData, SystemCalculationResult
-from app.domain.formulas import LayerCalcInput, calculate_layer, scale_to_area, calculate_packages, total_area
+from app.domain.formulas import LayerCalcInput, calculate_layer, scale_to_area, total_area
 from app.domain.validation import ValidationResult, validate_before_calculation
 
 
@@ -56,7 +57,6 @@ class LayerCalculator:
             thinner_density = thinner.density
             thinner_price = thinner.price_per_kg or 0.0
         elif material.thinner_name and thinner_percent > 0:
-            # Legacy fallback only. It must not be presented as documented density.
             thinner_density = 0.9
 
         basis = thinner_basis or material.thinner_basis
@@ -97,17 +97,6 @@ class LayerCalculator:
             result.total_consumption_kg = scale_to_area(result.practical_consumption_kg, area_m2)
             result.total_consumption_l = scale_to_area(result.practical_consumption_l, area_m2)
             result.total_cost = scale_to_area(result.cost_per_m2 + result.thinner_cost_per_m2, area_m2)
-
-            packaging = material.packaging_kg
-            if packaging and packaging > 0:
-                packages, purchase, remainder = calculate_packages(result.total_consumption_kg, packaging)
-                result.packages_count = packages
-                result.purchase_kg = purchase
-                result.remainder_kg = remainder
-            else:
-                result.packages_count = 0
-                result.purchase_kg = result.total_consumption_kg
-                result.remainder_kg = 0.0
 
         return result
 
@@ -167,7 +156,6 @@ class SystemCalculator:
         total_cost_m2 = sum(lr.cost_per_m2 + lr.thinner_cost_per_m2 for lr in layer_results)
         total_cost = sum(lr.total_cost for lr in layer_results)
         total_thinner_cost = sum(scale_to_area(lr.thinner_cost_per_m2, area) for lr in layer_results)
-        total_purchase = sum(lr.purchase_kg * (lr.material.price_per_kg or 0) for lr in layer_results)
 
         result = SystemCalculationResult(
             system=system or CoatingSystem(system_name="Пользовательская система"),
@@ -181,7 +169,6 @@ class SystemCalculator:
             total_cost_per_m2=total_cost_m2,
             total_cost=total_cost,
             total_thinner_cost=total_thinner_cost,
-            total_purchase_cost=total_purchase,
             calculated_at=datetime.now(),
         )
         return result, validation
