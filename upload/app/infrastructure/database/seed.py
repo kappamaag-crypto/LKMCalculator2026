@@ -1,8 +1,10 @@
-"""Seed initial data (demonstration materials and systems)."""
+"""Seed initial data and the curated SPKEFFA product catalog."""
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -16,11 +18,15 @@ from app.infrastructure.database.models import (
 from app.domain.enums import MaterialType, BinderType, CompatibilityStatus
 
 
+CATALOG_PATH = Path(__file__).resolve().parents[3] / "data" / "spkeffa_catalog.json"
+
+
 def seed_dictionaries(session: Session) -> None:
     """Заполнение справочников."""
     items = [
         ("manufacturer", "Blank", "Blank"),
         ("manufacturer", "ЭФФА", "ЭФФА"),
+        ("manufacturer", "Veksa", "Veksa"),
         ("manufacturer", "Hempel", "Hempel"),
         ("manufacturer", "Jotun", "Jotun"),
         ("manufacturer", "Tikkurila", "Tikkurila"),
@@ -48,10 +54,7 @@ def seed_dictionaries(session: Session) -> None:
 
 
 def seed_demo_materials(session: Session) -> dict[str, int]:
-    """
-    Демонстрационные материалы (на основе Excel-примера).
-    Возвращает словарь {имя: id}.
-    """
+    """Демонстрационные материалы. Сохраняются для обратной совместимости."""
     demo = [
         {
             "manufacturer": "Blank",
@@ -111,11 +114,7 @@ def seed_demo_materials(session: Session) -> dict[str, int]:
 
     name_to_id: dict[str, int] = {}
     for data in demo:
-        existing = (
-            session.query(MaterialORM)
-            .filter_by(material_name=data["material_name"])
-            .first()
-        )
+        existing = session.query(MaterialORM).filter_by(material_name=data["material_name"]).first()
         if existing:
             name_to_id[data["material_name"]] = existing.id
             continue
@@ -125,6 +124,68 @@ def seed_demo_materials(session: Session) -> dict[str, int]:
         name_to_id[data["material_name"]] = orm.id
 
     return name_to_id
+
+
+def seed_spkeffa_catalog(session: Session) -> dict[str, int]:
+    """Импортирует курируемый каталог из SPKEFFA без изменения исходного репозитория."""
+    if not CATALOG_PATH.exists():
+        return {}
+
+    payload = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+    result: dict[str, int] = {}
+
+    for item in payload.get("materials", []):
+        name = item["material_name"]
+        existing = (
+            session.query(MaterialORM)
+            .filter_by(brand=item.get("brand", ""), material_name=name)
+            .first()
+        )
+
+        fields = {
+            key: value
+            for key, value in item.items()
+            if key in {
+                "manufacturer", "brand", "material_name", "material_type", "binder_type",
+                "density", "solids_percent", "solids_by_volume_percent", "voc", "color", "ral",
+                "price_per_kg", "price_per_liter", "prices_include_vat", "theoretical_coverage",
+                "min_application_temperature", "max_application_temperature", "min_recoat_time_h",
+                "max_recoat_time_h", "drying_time_h", "full_cure_time_h", "pot_life_h",
+                "induction_time_min", "max_relative_humidity", "min_dew_point_margin_c",
+                "recommended_dft_min", "recommended_dft_max", "max_single_layer_dft",
+                "thinner_required", "thinner_name", "thinner_percent_min", "thinner_percent_max",
+                "thinner_basis", "packaging_kg", "packaging_l", "is_two_component",
+                "datasheet", "datasheet_version", "datasheet_date", "safety_data_sheet",
+                "certificate", "certificate_version", "test_protocol",
+            }
+        }
+        fields["is_incomplete"] = bool(
+            item.get("density") is None
+            or item.get("solids_by_volume_percent") is None
+            or not item.get("datasheet")
+        )
+        fields["notes"] = (
+            f"Источник: {item.get('source_url', '')}. "
+            f"{item.get('notes', '')}"
+        ).strip()
+
+        if existing:
+            # Update only catalog-owned fields. User-entered price/packaging data is retained
+            # when the source does not provide a value.
+            for key, value in fields.items():
+                if key in {"price_per_kg", "price_per_liter", "packaging_kg", "packaging_l"} and value is None:
+                    continue
+                setattr(existing, key, value)
+            existing.updated_at = datetime.utcnow()
+            session.flush()
+            result[name] = existing.id
+        else:
+            orm = MaterialORM(**fields, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
+            session.add(orm)
+            session.flush()
+            result[name] = orm.id
+
+    return result
 
 
 def seed_demo_system(session: Session, name_to_id: dict[str, int]) -> None:
@@ -188,28 +249,19 @@ def seed_compatibility(session: Session) -> None:
         ("алкид", "полиуретан", CompatibilityStatus.WARNING.value, "Требуется проверка совместимости"),
     ]
     for from_b, to_b, status, notes in rules:
-        exists = (
-            session.query(LayerCompatibilityORM)
-            .filter_by(from_binder=from_b, to_binder=to_b)
-            .first()
-        )
+        exists = session.query(LayerCompatibilityORM).filter_by(from_binder=from_b, to_binder=to_b).first()
         if not exists:
-            session.add(
-                LayerCompatibilityORM(
-                    from_binder=from_b,
-                    to_binder=to_b,
-                    status=status,
-                    notes=notes,
-                )
-            )
+            session.add(LayerCompatibilityORM(from_binder=from_b, to_binder=to_b, status=status, notes=notes))
     session.flush()
 
 
 def run_seed(session: Session) -> None:
     """Запуск полного seed."""
     seed_dictionaries(session)
-    name_to_id = seed_demo_materials(session)
-    seed_demo_system(session, name_to_id)
+    demo_ids = seed_demo_materials(session)
+    catalog_ids = seed_spkeffa_catalog(session)
+    demo_ids.update(catalog_ids)
+    seed_demo_system(session, demo_ids)
     seed_compatibility(session)
     session.commit()
-    print("Seed completed: dictionaries, demo materials, demo system, compatibility rules.")
+    print(f"Seed completed: dictionaries, {len(catalog_ids)} SPKEFFA materials, demo system, compatibility rules.")
