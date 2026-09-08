@@ -48,14 +48,8 @@ class LayerCalculator:
         if solids is None or solids <= 0:
             raise ValueError(f"Сухой остаток материала «{material.material_name}» неизвестен или некорректен.")
 
-        # Стоимость нельзя считать при неизвестной цене: UNKNOWN не равен 0.
-        if (material.price_per_kg is None or material.price_per_kg < 0) and (
-            material.price_per_liter is None or material.price_per_liter < 0
-        ):
-            raise ValueError(
-                f"Цена материала «{material.material_name}» не указана ни за кг, ни за литр."
-            )
-
+        # Цена нужна только для расчёта стоимости. Расход должен рассчитываться
+        # даже при отсутствии цены: UNKNOWN не равен нулю.
         thinner_density: Optional[float] = None
         thinner_price: Optional[float] = None
         if thinner_percent > 0:
