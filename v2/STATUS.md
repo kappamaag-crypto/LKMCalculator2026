@@ -1,26 +1,28 @@
-# Статус пуша v2.0
+# Статус пуша v2.0 (updated)
 
-## Уже в репозитории (main / v2/)
+## В репозитории
+
+### Готово
 - main.py, requirements.txt, README
-- app/config.py, app/__init__.py
-- domain: enums.py, formulas.py, __init__.py, recommendation/__init__.py
-- infrastructure: logging, database/__init__, export/__init__
-- services: __init__, recommendation_service
-- ui: package inits
-- docs: 01_AUDIT, 02_ARCHITECTURE
-- DOWNLOAD.md, NOTE.md, STATUS.md
+- app/config.py, __init__.py
+- **domain/enums.py, formulas.py, models.py, calculator.py, comparison.py**
+- domain/recommendation/__init__.py
+- services/calculation_service.py, recommendation_service.py
+- infrastructure logging + package inits
+- ui/styles.py + package inits
+- docs: 01, 02, 06, 07
 
-## Ещё не залито (есть в полном архиве)
-- domain: models, calculator, comparison, validation, recommendation/{rules,scorer,recommender}
-- infrastructure: database/{engine,models,repositories,seed}, export/{excel,pdf}
-- services: calculation_service, history_service
-- ui: main_window, styles, views/*, widgets/*
-- tests/*, docs 03–07
+### Ещё нужно (есть в ZIP)
+- domain/validation.py
+- domain/recommendation/{rules,scorer,recommender}.py
+- infrastructure/database/{engine,models,repositories,seed}.py
+- infrastructure/export/{excel,pdf}_exporter.py
+- services/history_service.py
+- ui/main_window.py, views/*, widgets/layer_table.py
+- tests/*
+- docs 03–05
 
 ## Полный исходник
-Архив сессии:
-- `lkm_calculator_v2.zip` (94 KB)
-- `lkm_calculator_v2.tar.gz` (204 KB)
-- папка `lkm_calculator/`
+`lkm_calculator_v2.zip` / `lkm_calculator_v2.tar.gz` в artifacts сессии.
 
 Напишите «продолжи пуш» для следующих пакетов.
