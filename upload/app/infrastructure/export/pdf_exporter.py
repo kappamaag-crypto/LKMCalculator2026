@@ -1,5 +1,4 @@
 """PDF-отчёт инженерного расчёта ЛКМ / АКЗ v3."""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -21,7 +20,6 @@ from app.domain.models import SystemCalculationResult, ComparisonResult, Recomme
 BLUE = colors.HexColor("#1A56DB")
 DARK = colors.HexColor("#1A1A2E")
 GRAY = colors.HexColor("#6B7280")
-LIGHT_GRAY = colors.HexColor("#F3F4F6")
 BORDER = colors.HexColor("#D0D4DC")
 
 
@@ -43,6 +41,20 @@ def _try_register_fonts() -> str:
         except Exception:
             continue
     return "Helvetica"
+
+
+def _area(result: SystemCalculationResult) -> float:
+    return max(float(result.object_data.area_m2 or 0.0), 0.0)
+
+
+def _cost(value: Optional[float], digits: int = 2) -> str:
+    return "—" if value is None else f"{value:.{digits}f}"
+
+
+def _total_cost(material_cost: Optional[float], thinner_cost: Optional[float]) -> Optional[float]:
+    if material_cost is None or thinner_cost is None:
+        return None
+    return material_cost + thinner_cost
 
 
 class PDFExporter:
@@ -85,7 +97,7 @@ class PDFExporter:
 
     def _title(self, result):
         obj = result.object_data
-        area = obj.area_m2 if obj.area_m2 > 0 else obj.area_per_element * obj.elements_count
+        area = _area(result)
         return [
             Paragraph("Расчёт расхода лакокрасочных материалов<br/>и подбор системы АКЗ", self.styles["RuTitle"]),
             HRFlowable(width="100%", thickness=1.5, color=BLUE, spaceAfter=8),
@@ -107,23 +119,21 @@ class PDFExporter:
             ["Поверхность", obj.surface_type.value if obj.surface_type else "—"],
             ["Среда", obj.environment.value if obj.environment else "—"],
             ["T мин / T макс, °C", f"{obj.temperature_min if obj.temperature_min is not None else '—'} / {obj.temperature_max if obj.temperature_max is not None else '—'}"],
-            ["Влажность, %", str(obj.relative_humidity) if obj.relative_humidity is not None else "—"],
-            ["Точка росы, °C", str(obj.dew_point) if obj.dew_point is not None else "—"],
         ]
-        return [Paragraph("1. Исходные условия", self.styles["RuHeading"]), self._table(data, [75 * mm, 95 * mm]), Spacer(1, 3 * mm)]
+        return [Paragraph("1. Исходные параметры", self.styles["RuHeading"]), self._table(data, [75 * mm, 95 * mm]), Spacer(1, 3 * mm)]
 
     def _section_layers(self, result):
         data = [["№", "Материал", "DFT, мкм", "WFT, мкм", "Расход кг/м²", "Расход л/м²", "Стоимость руб/м²", "На объект, кг"]]
         for i, lr in enumerate(result.layers, 1):
+            total_cost = _total_cost(lr.cost_per_m2, lr.thinner_cost_per_m2)
             data.append([
                 str(i), Paragraph(lr.material.material_name[:40], self.styles["RuCell"]),
                 f"{lr.target_dft:.0f}", f"{lr.wft:.1f}", f"{lr.practical_consumption_kg:.3f}",
-                f"{lr.practical_consumption_l:.3f}", f"{lr.cost_per_m2 + lr.thinner_cost_per_m2:.2f}",
-                f"{lr.total_consumption_kg:.2f}",
+                f"{lr.practical_consumption_l:.3f}", _cost(total_cost), f"{lr.total_consumption_kg:.2f}",
             ])
         data.append(["", Paragraph("<b>ИТОГО</b>", self.styles["RuCellBold"]), f"{result.total_dft:.0f}", "",
                      f"{result.total_practical_consumption_kg:.3f}", f"{result.total_practical_consumption_l:.3f}",
-                     f"{result.total_cost_per_m2:.2f}", f"{sum(x.total_consumption_kg for x in result.layers):.2f}"])
+                     _cost(result.total_cost_per_m2), f"{result.total_practical_consumption_kg * _area(result):.2f}"])
         return [Paragraph("2. Состав системы и расчёт слоёв", self.styles["RuHeading"]),
                 self._table(data, [9*mm, 45*mm, 18*mm, 18*mm, 23*mm, 22*mm, 25*mm, 25*mm], highlight_last=True),
                 Spacer(1, 3 * mm)]
@@ -135,9 +145,9 @@ class PDFExporter:
             ["Общая толщина DFT", f"{result.total_dft:.0f} мкм"],
             ["Практический расход", f"{result.total_practical_consumption_kg:.3f} кг/м²"],
             ["Практический расход", f"{result.total_practical_consumption_l:.3f} л/м²"],
-            ["Стоимость материала + разбавителя", f"{result.total_cost_per_m2:.2f} руб/м²"],
-            ["Стоимость выполнения объекта", f"{result.total_cost:,.2f} руб".replace(",", " ")],
-            ["В том числе стоимость разбавителя", f"{result.total_thinner_cost:,.2f} руб".replace(",", " ")],
+            ["Стоимость материала + разбавителя", f"{_cost(result.total_cost_per_m2)} руб/м²" if result.total_cost_per_m2 is not None else "—"],
+            ["Стоимость объекта", f"{result.total_cost:,.2f} руб".replace(",", " ") if result.total_cost is not None else "—"],
+            ["В том числе стоимость разбавителя", f"{result.total_thinner_cost:,.2f} руб".replace(",", " ") if result.total_thinner_cost is not None else "—"],
         ]
         return [Paragraph("3. Итоговые показатели", self.styles["RuHeading"]), self._table(data, [90*mm, 80*mm]), Spacer(1, 3 * mm)]
 
@@ -149,8 +159,8 @@ class PDFExporter:
             ("DFT, мкм", [f"{s.total_dft:.0f}" for s in systems]),
             ("кг/м²", [f"{s.total_practical_consumption_kg:.3f}" for s in systems]),
             ("л/м²", [f"{s.total_practical_consumption_l:.3f}" for s in systems]),
-            ("руб/м²", [f"{s.total_cost_per_m2:.2f}" for s in systems]),
-            ("Объект, руб", [f"{s.total_cost:,.0f}".replace(",", " ") for s in systems]),
+            ("руб/м²", [_cost(s.total_cost_per_m2) for s in systems]),
+            ("Объект, руб", [f"{s.total_cost:,.0f}".replace(",", " ") if s.total_cost is not None else "—" for s in systems]),
         ]:
             data.append([label] + values)
         n = len(systems)
