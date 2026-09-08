@@ -118,38 +118,45 @@ class PDFExporter:
             ["Долговечность", obj.durability.value if obj.durability else "—"],
             ["Поверхность", obj.surface_type.value if obj.surface_type else "—"],
             ["Среда", obj.environment.value if obj.environment else "—"],
-            ["T мин / T макс, °C", f"{obj.temperature_min if obj.temperature_min is not None else '—'} / {obj.temperature_max if obj.temperature_max is not None else '—'}"],
         ]
         return [Paragraph("1. Исходные параметры", self.styles["RuHeading"]), self._table(data, [75 * mm, 95 * mm]), Spacer(1, 3 * mm)]
 
     def _section_layers(self, result):
-        data = [["№", "Материал", "DFT, мкм", "WFT, мкм", "Расход кг/м²", "Расход л/м²", "Стоимость руб/м²", "На объект, кг"]]
+        data = [["№", "Материал", "DFT", "WFT", "ЛКМ кг/м²", "ЛКМ л/м²", "Разб. кг/м²", "Разб. л/м²", "Итого руб/м²"]]
         for i, lr in enumerate(result.layers, 1):
             total_cost = _total_cost(lr.cost_per_m2, lr.thinner_cost_per_m2)
             data.append([
-                str(i), Paragraph(lr.material.material_name[:40], self.styles["RuCell"]),
+                str(i), Paragraph(lr.material.material_name[:32], self.styles["RuCell"]),
                 f"{lr.target_dft:.0f}", f"{lr.wft:.1f}", f"{lr.practical_consumption_kg:.3f}",
-                f"{lr.practical_consumption_l:.3f}", _cost(total_cost), f"{lr.total_consumption_kg:.2f}",
+                f"{lr.practical_consumption_l:.3f}", f"{lr.thinner_consumption_kg:.3f}",
+                f"{lr.thinner_consumption_l:.3f}", _cost(total_cost),
             ])
+        thinner_kg_m2 = sum(lr.thinner_consumption_kg for lr in result.layers)
+        thinner_l_m2 = sum(lr.thinner_consumption_l for lr in result.layers)
         data.append(["", Paragraph("<b>ИТОГО</b>", self.styles["RuCellBold"]), f"{result.total_dft:.0f}", "",
                      f"{result.total_practical_consumption_kg:.3f}", f"{result.total_practical_consumption_l:.3f}",
-                     _cost(result.total_cost_per_m2), f"{result.total_practical_consumption_kg * _area(result):.2f}"])
+                     f"{thinner_kg_m2:.3f}", f"{thinner_l_m2:.3f}", _cost(result.total_cost_per_m2)])
         return [Paragraph("2. Состав системы и расчёт слоёв", self.styles["RuHeading"]),
-                self._table(data, [9*mm, 45*mm, 18*mm, 18*mm, 23*mm, 22*mm, 25*mm, 25*mm], highlight_last=True),
+                self._table(data, [8*mm, 42*mm, 15*mm, 15*mm, 20*mm, 19*mm, 20*mm, 19*mm, 22*mm], highlight_last=True),
                 Spacer(1, 3 * mm)]
 
     def _section_totals(self, result):
+        area = _area(result)
+        thinner_l_m2 = sum(lr.thinner_consumption_l for lr in result.layers)
+        thinner_kg_m2 = sum(lr.thinner_consumption_kg for lr in result.layers)
         data = [
             ["Показатель", "Значение"],
             ["Количество слоёв", str(len(result.layers))],
             ["Общая толщина DFT", f"{result.total_dft:.0f} мкм"],
-            ["Практический расход", f"{result.total_practical_consumption_kg:.3f} кг/м²"],
-            ["Практический расход", f"{result.total_practical_consumption_l:.3f} л/м²"],
+            ["Практический расход ЛКМ", f"{result.total_practical_consumption_kg:.3f} кг/м²"],
+            ["Практический расход ЛКМ", f"{result.total_practical_consumption_l:.3f} л/м²"],
+            ["Расход разбавителя", f"{thinner_kg_m2:.3f} кг/м² ({thinner_l_m2:.3f} л/м²)"],
+            ["Разбавитель на объект", f"{thinner_kg_m2 * area:.2f} кг ({thinner_l_m2 * area:.2f} л)"],
             ["Стоимость материала + разбавителя", f"{_cost(result.total_cost_per_m2)} руб/м²" if result.total_cost_per_m2 is not None else "—"],
             ["Стоимость объекта", f"{result.total_cost:,.2f} руб".replace(",", " ") if result.total_cost is not None else "—"],
             ["В том числе стоимость разбавителя", f"{result.total_thinner_cost:,.2f} руб".replace(",", " ") if result.total_thinner_cost is not None else "—"],
         ]
-        return [Paragraph("3. Итоговые показатели", self.styles["RuHeading"]), self._table(data, [90*mm, 80*mm]), Spacer(1, 3 * mm)]
+        return [Paragraph("3. Итоговые показатели", self.styles["RuHeading"]), self._table(data, [90*mm, 80*mm]), Spacer(1, 3*mm)]
 
     def _section_comparison(self, comparison):
         systems = comparison.systems
