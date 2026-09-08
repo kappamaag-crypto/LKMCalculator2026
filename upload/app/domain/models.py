@@ -146,8 +146,6 @@ class ObjectData:
     project: str = ""
     calculation_number: str = ""
     area_m2: float = 0.0
-    elements_count: int = 1
-    area_per_element: float = 0.0
     structure_type: str = ""
     substrate: str = ""
     application_method: Optional[ApplicationMethod] = None
