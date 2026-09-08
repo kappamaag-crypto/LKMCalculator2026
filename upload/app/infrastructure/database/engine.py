@@ -18,17 +18,11 @@ class Base(DeclarativeBase):
 
 
 def get_engine(db_path: Path | None = None):
-    """Create SQLAlchemy engine."""
     ensure_directories()
     path = db_path or DB_PATH
     url = f"sqlite:///{path}"
-    engine = create_engine(
-        url,
-        echo=False,
-        connect_args={"check_same_thread": False},
-    )
+    engine = create_engine(url, echo=False, connect_args={"check_same_thread": False})
 
-    # Enable foreign keys for SQLite
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
@@ -39,7 +33,6 @@ def get_engine(db_path: Path | None = None):
 
 
 def get_session_factory(engine=None):
-    """Return a sessionmaker bound to the engine."""
     if engine is None:
         engine = get_engine()
     return sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
@@ -47,7 +40,6 @@ def get_session_factory(engine=None):
 
 @contextmanager
 def session_scope(session_factory=None) -> Generator[Session, None, None]:
-    """Provide a transactional scope around a series of operations."""
     if session_factory is None:
         session_factory = get_session_factory()
     session: Session = session_factory()
@@ -62,9 +54,13 @@ def session_scope(session_factory=None) -> Generator[Session, None, None]:
 
 
 def init_db(engine=None) -> None:
-    """Create all tables."""
+    """Create missing tables and apply pending non-destructive migrations."""
     if engine is None:
         engine = get_engine()
-    # Import models so they are registered with Base.metadata
     from app.infrastructure.database import models  # noqa: F401
     Base.metadata.create_all(bind=engine)
+
+    # Existing SQLite databases may already contain the legacy tables. Alembic
+    # performs only additive ALTER/CREATE operations in the v3 migration.
+    from app.infrastructure.database.migrate import upgrade_database
+    upgrade_database()
