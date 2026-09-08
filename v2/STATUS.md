@@ -1,39 +1,29 @@
 # Статус пуша v2.0
 
-## В репозитории (main/v2)
+## В git (v2/)
 
-### Domain
-- enums, formulas, models, calculator, comparison
-- recommendation/recommender.py + __init__.py
+### Domain ✅
+enums, formulas, models, calculator, comparison, recommender
 
-### Services
-- calculation_service, recommendation_service, history_service
+### Services ✅
+calculation_service, recommendation_service, history_service
 
-### Infrastructure
-- database/engine.py
-- logging, package inits
+### UI ✅
+main_window, styles, layer_table
 
-### UI
-- styles, layer_table widget, package inits
+### Infra
+engine, logging
 
-### Docs
-- 01–07 (summary), README, STATUS, DOWNLOAD
+### Docs + tests (partial)
 
-### Tests
-- test_history.py
+## Ещё только в ZIP
+validation, rules, scorer, DB models/repos/seed, excel/pdf exporters, all views, full tests
 
-## Ещё в ZIP (не в git)
-- validation.py, rules.py, scorer.py
-- database models/repositories/seed
-- excel_exporter, pdf_exporter
-- main_window + all views
-- remaining tests
-
-## Полный исходник
+## ZIP
 `/home/workdir/artifacts/lkm_calculator_v2.zip`
 
 ```bash
 unzip lkm_calculator_v2.zip
 cp -r lkm_calculator/* LKMCalculator2026/v2/
-cd LKMCalculator2026 && git add v2 && git commit -m "v2.0 full" && git push
+git add v2 && git commit -m "v2.0 complete" && git push
 ```
