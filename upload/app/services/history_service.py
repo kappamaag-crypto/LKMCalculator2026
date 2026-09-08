@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Sequence
 
 from sqlalchemy.orm import Session
@@ -70,6 +70,7 @@ class HistoryService:
                 "total_cost": lr.total_cost,
             })
 
+        now = datetime.now(timezone.utc)
         calc = CalculationORM(
             calculation_number=obj.calculation_number or "",
             object_name=obj.object_name or "",
@@ -83,8 +84,8 @@ class HistoryService:
             total_consumption_kg=result.total_practical_consumption_kg,
             snapshot_json=json.dumps(snapshot, ensure_ascii=False),
             notes=notes,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=now,
+            updated_at=now,
         )
         for i, lr in enumerate(result.layers):
             calc.layers.append(CalculationLayerORM(
@@ -133,7 +134,7 @@ class HistoryService:
             systems_count=len(comparison.systems),
             snapshot_json=json.dumps(snapshot, ensure_ascii=False),
             notes=notes,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         self.session.add(cmp)
         self.session.flush()
