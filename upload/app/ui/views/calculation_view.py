@@ -19,8 +19,9 @@ from app.domain.enums import (
 from app.domain.calculator import LayerInput
 from app.services.calculation_service import CalculationService
 from app.ui.widgets.layer_table import LayerTableWidget
-from app.infrastructure.export.excel_exporter import ExcelExporter
+from app.infrastructure.export.customer_excel_exporter import CustomerExcelExporter
 from app.infrastructure.export.pdf_exporter import PDFExporter
+from app.config import AppSettings
 from pathlib import Path
 from PySide6.QtWidgets import QFileDialog
 
@@ -42,19 +43,16 @@ class CalculationView(QWidget):
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(10)
 
-        # --- Заголовок ---
         title = QLabel("Расчёт системы покрытия")
         title.setProperty("heading", True)
         root.addWidget(title)
 
         splitter = QSplitter(Qt.Horizontal)
 
-        # ===== Левая панель: исходные данные =====
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Объект
         obj_box = QGroupBox("Объект")
         obj_form = QFormLayout(obj_box)
         self.ed_object = QLineEdit()
@@ -79,7 +77,6 @@ class CalculationView(QWidget):
         obj_form.addRow("Площадь элемента:", self.spin_area_el)
         left_layout.addWidget(obj_box)
 
-        # Условия
         cond_box = QGroupBox("Условия эксплуатации")
         cond_form = QFormLayout(cond_box)
         self.cmb_corrosion = QComboBox()
@@ -122,12 +119,10 @@ class CalculationView(QWidget):
 
         splitter.addWidget(left)
 
-        # ===== Правая панель: слои + результат =====
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Добавление слоя
         add_box = QGroupBox("Слои системы")
         add_layout = QVBoxLayout(add_box)
 
@@ -172,7 +167,6 @@ class CalculationView(QWidget):
         add_layout.addWidget(self.layer_table)
         right_layout.addWidget(add_box)
 
-        # Кнопки расчёта
         btn_row = QHBoxLayout()
         self.btn_calc = QPushButton("Рассчитать")
         self.btn_calc.clicked.connect(self._on_calculate)
@@ -199,7 +193,6 @@ class CalculationView(QWidget):
         btn_row.addStretch()
         right_layout.addLayout(btn_row)
 
-        # Результат
         res_box = QGroupBox("Результат")
         res_layout = QVBoxLayout(res_box)
         self.lbl_summary = QLabel("Выполните расчёт")
@@ -217,7 +210,6 @@ class CalculationView(QWidget):
         splitter.setStretchFactor(1, 2)
         root.addWidget(splitter)
 
-    # ------------------------------------------------------------------
     def set_materials(self, materials: list[Material]) -> None:
         self._materials = [m for m in materials if m.material_type != MaterialType.THINNER]
         self.cmb_material.clear()
@@ -273,7 +265,6 @@ class CalculationView(QWidget):
     def _on_load_demo(self) -> None:
         """Загрузить демо-систему Blank Universal + Finish."""
         if len(self._materials) < 2:
-            # Создаём демо-материалы на лету
             primer = Material(
                 manufacturer="Blank", brand="Blank",
                 material_name="Грунт-Эмаль Blank Universal",
@@ -311,7 +302,6 @@ class CalculationView(QWidget):
             return
 
         obj = self._build_object_data()
-        # Применить потери по умолчанию, если у слоя 0
         default_losses = self.spin_losses.value()
         for li in layers:
             if li.losses_percent == 0 and default_losses > 0:
@@ -329,7 +319,6 @@ class CalculationView(QWidget):
             msgs = "\n".join(f"• {w.message}" for w in validation.warnings)
             QMessageBox.warning(self, "Предупреждения", msgs)
 
-        # Обновить таблицу с результатами
         self.layer_table.set_layers(layers, result.layers)
 
         self.lbl_summary.setText(
@@ -344,7 +333,6 @@ class CalculationView(QWidget):
         self.btn_to_cmp.setEnabled(True)
         self.calculation_done.emit(result)
 
-    # ------------------------------------------------------------------
     def _default_export_name(self, extension: str) -> str:
         """Сформировать безопасное имя файла для экспорта."""
         if not self._last_result:
@@ -356,7 +344,7 @@ class CalculationView(QWidget):
         return f"{name}.{extension}"
 
     def _on_export_excel(self) -> None:
-        """Экспорт последнего расчёта в Excel."""
+        """Экспорт последнего расчёта в рабочий Excel-шаблон заказчика."""
         if self._last_result is None:
             QMessageBox.warning(self, "Внимание", "Сначала выполните расчёт")
             return
@@ -371,8 +359,10 @@ class CalculationView(QWidget):
             return
 
         try:
-            ExcelExporter().export_calculation(self._last_result, Path(path))
-            QMessageBox.information(self, "Экспорт завершён", f"Excel-файл сохранён:\n{path}")
+            settings = AppSettings.load()
+            exporter = CustomerExcelExporter(Path(settings.excel_template_path))
+            exporter.export_calculation(self._last_result, Path(path))
+            QMessageBox.information(self, "Экспорт", "Расчёт успешно сохранён в Excel")
         except Exception as exc:
             QMessageBox.critical(self, "Ошибка экспорта Excel", str(exc))
 
@@ -393,32 +383,10 @@ class CalculationView(QWidget):
 
         try:
             PDFExporter().export_calculation(self._last_result, Path(path))
-            QMessageBox.information(self, "Экспорт завершён", f"PDF-файл сохранён:\n{path}")
+            QMessageBox.information(self, "Экспорт", "Расчёт успешно сохранён в PDF")
         except Exception as exc:
             QMessageBox.critical(self, "Ошибка экспорта PDF", str(exc))
 
     def _on_to_comparison(self) -> None:
-        """Перейти на вкладку сравнения.
-
-        Результат уже автоматически добавляется в ComparisonView через
-        сигнал calculation_done в MainWindow, поэтому здесь не создаём
-        дубликат системы.
-        """
-        if self._last_result is None:
-            QMessageBox.warning(self, "Внимание", "Сначала выполните расчёт")
-            return
-
-        window = self.window()
-        tabs = getattr(window, "tabs", None)
-        comparison_view = getattr(window, "cmp_view", None)
-        if tabs is not None and comparison_view is not None:
-            index = tabs.indexOf(comparison_view)
-            if index >= 0:
-                tabs.setCurrentIndex(index)
-                return
-
-        QMessageBox.information(
-            self,
-            "Сравнение",
-            "Расчёт добавлен в раздел «Сравнение». Откройте вкладку «Сравнение».",
-        )
+        if self._last_result is not None:
+            self.calculation_done.emit(self._last_result)
