@@ -2,17 +2,21 @@
 from __future__ import annotations
 from dataclasses import replace
 from PySide6.QtWidgets import QTableWidget,QTableWidgetItem,QHeaderView,QAbstractItemView
-from PySide6.QtCore import Qt,Signal,QTimer
+from PySide6.QtCore import Qt,Signal
 from app.domain.models import LayerResult
 from app.domain.calculator import LayerInput
+
 COLUMNS=[("№",40),("Материал",220),("Связующее",100),("2К",45),("Цена, ₽/кг",95),("DFT, мкм",80),("Потери, %",75),("Разб., %",70),("WFT, мкм",80),("Расход, кг/м²",100),("Стоимость, руб/м²",120)]
+EDITABLE_COLUMNS={4,5,6,7}
+
 class LayerTableWidget(QTableWidget):
+    """Таблица слоёв с горячим редактированием расчётных параметров."""
     layer_changed=Signal()
     def __init__(self,parent=None):
         super().__init__(0,len(COLUMNS),parent); self.setHorizontalHeaderLabels([x[0] for x in COLUMNS]); self.horizontalHeader().setSectionResizeMode(1,QHeaderView.Stretch)
         for i,(_,w) in enumerate(COLUMNS):
             if i!=1:self.setColumnWidth(i,w)
-        self.setAlternatingRowColors(True); self.setSelectionBehavior(QAbstractItemView.SelectRows); self.setSelectionMode(QAbstractItemView.SingleSelection); self.verticalHeader().setVisible(False); self._layer_inputs=[]; self._updating=False; self._timer=QTimer(self); self._timer.setSingleShot(True); self._timer.setInterval(250); self._timer.timeout.connect(self._auto_recalculate); self.itemChanged.connect(self._changed)
+        self.setAlternatingRowColors(True); self.setSelectionBehavior(QAbstractItemView.SelectRows); self.setSelectionMode(QAbstractItemView.SingleSelection); self.verticalHeader().setVisible(False); self._layer_inputs=[]; self._updating=False; self.itemChanged.connect(self._changed)
     def _item(self,text,align=Qt.AlignCenter,edit=False):
         x=QTableWidgetItem(str(text)); x.setTextAlignment(align)
         if not edit:x.setFlags(x.flags()&~Qt.ItemIsEditable)
@@ -29,32 +33,28 @@ class LayerTableWidget(QTableWidget):
         else: vals=('—','—','—')
         for c,v in zip((8,9,10),vals):self.setItem(r,c,self._item(v))
     def _changed(self,item):
-        if self._updating or item.column() not in {4,5,6,7}:return
+        if self._updating or item.column() not in EDITABLE_COLUMNS:return
         try:v=float(item.text().strip().replace(',','.'))
         except ValueError:return
-        li=self._layer_inputs[item.row()]
+        row=item.row()
+        if row<0 or row>=len(self._layer_inputs):return
+        li=self._layer_inputs[row]
         if item.column()==4 and v>=0:li.material=replace(li.material,price_per_kg=v,price_per_liter=None)
         elif item.column()==5 and v>0:li.target_dft=v
         elif item.column()==6 and 0<=v<=99:li.losses_percent=v
         elif item.column()==7 and 0<=v<=100:li.thinner_percent=v
         else:return
-        self.layer_changed.emit(); self._timer.start()
-    def _auto_recalculate(self):
-        w=self.parentWidget()
-        while w:
-            b=getattr(w,'btn_calc',None)
-            if b is not None:b.click(); return
-            w=w.parentWidget()
+        self.layer_changed.emit()
     def get_layer_inputs(self):return list(self._layer_inputs)
     def add_layer(self,li):
         self._layer_inputs.append(li); r=self.rowCount(); self.insertRow(r); self._updating=True
         try:self._fill(r,li,None)
         finally:self._updating=False
-        self.layer_changed.emit(); self._timer.start()
+        self.layer_changed.emit()
     def remove_selected(self):
         r=self.currentRow()
         if r<0 or r>=len(self._layer_inputs):return
         self._layer_inputs.pop(r); self.removeRow(r)
         for i in range(self.rowCount()):self.item(i,0).setText(str(i+1))
-        self.layer_changed.emit(); self._timer.start()
-    def clear_layers(self):self._timer.stop(); self._layer_inputs.clear(); self.setRowCount(0); self.layer_changed.emit()
+        self.layer_changed.emit()
+    def clear_layers(self):self._layer_inputs.clear(); self.setRowCount(0); self.layer_changed.emit()
