@@ -53,7 +53,6 @@ def test_three_layer_system_totals_and_costs() -> None:
         sum(layer.thinner_cost_per_m2 * 1000.0 for layer in result.layers)
     )
 
-    # Проверяем, что разбавитель учитывается отдельно и не теряется в стоимости слоя.
     assert result.total_thinner_cost > 0
     assert result.total_cost > result.total_thinner_cost
 
@@ -64,9 +63,9 @@ def test_three_layer_system_totals_and_costs() -> None:
     assert not hasattr(result, "warehouse_balance")
 
 
-def test_area_can_be_derived_from_element_count() -> None:
+def test_direct_area_is_the_only_object_area_input() -> None:
     primer = material("Primer", 1.40, 70.0, 500.0)
-    obj = ObjectData(area_m2=0.0, elements_count=5, area_per_element=200.0)
+    obj = ObjectData(area_m2=1000.0)
 
     result, validation = SystemCalculator().calculate(
         obj,
