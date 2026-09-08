@@ -1,28 +1,39 @@
-# Статус пуша v2.0 (updated)
+# Статус пуша v2.0
 
-## В репозитории
+## В репозитории (main/v2)
 
-### Готово
-- main.py, requirements.txt, README
-- app/config.py, __init__.py
-- **domain/enums.py, formulas.py, models.py, calculator.py, comparison.py**
-- domain/recommendation/__init__.py
-- services/calculation_service.py, recommendation_service.py
-- infrastructure logging + package inits
-- ui/styles.py + package inits
-- docs: 01, 02, 06, 07
+### Domain
+- enums, formulas, models, calculator, comparison
+- recommendation/recommender.py + __init__.py
 
-### Ещё нужно (есть в ZIP)
-- domain/validation.py
-- domain/recommendation/{rules,scorer,recommender}.py
-- infrastructure/database/{engine,models,repositories,seed}.py
-- infrastructure/export/{excel,pdf}_exporter.py
-- services/history_service.py
-- ui/main_window.py, views/*, widgets/layer_table.py
-- tests/*
-- docs 03–05
+### Services
+- calculation_service, recommendation_service, history_service
+
+### Infrastructure
+- database/engine.py
+- logging, package inits
+
+### UI
+- styles, layer_table widget, package inits
+
+### Docs
+- 01–07 (summary), README, STATUS, DOWNLOAD
+
+### Tests
+- test_history.py
+
+## Ещё в ZIP (не в git)
+- validation.py, rules.py, scorer.py
+- database models/repositories/seed
+- excel_exporter, pdf_exporter
+- main_window + all views
+- remaining tests
 
 ## Полный исходник
-`lkm_calculator_v2.zip` / `lkm_calculator_v2.tar.gz` в artifacts сессии.
+`/home/workdir/artifacts/lkm_calculator_v2.zip`
 
-Напишите «продолжи пуш» для следующих пакетов.
+```bash
+unzip lkm_calculator_v2.zip
+cp -r lkm_calculator/* LKMCalculator2026/v2/
+cd LKMCalculator2026 && git add v2 && git commit -m "v2.0 full" && git push
+```
