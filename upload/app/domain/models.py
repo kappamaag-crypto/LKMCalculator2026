@@ -31,7 +31,8 @@ class Material:
     description: str = ""
 
     density: float = 0.0                 # кг/л
-    solids_percent: float = 0.0          # % объёмный
+    solids_percent: float = 0.0          # % объёмный сухой остаток
+    solids_by_volume_percent: Optional[float] = None
     voc: Optional[float] = None          # г/л
 
     color: str = ""
@@ -49,13 +50,18 @@ class Material:
     min_recoat_time_h: Optional[float] = None
     max_recoat_time_h: Optional[float] = None
     drying_time_h: Optional[float] = None
+    full_cure_time_h: Optional[float] = None
+    pot_life_h: Optional[float] = None
+    induction_time_min: Optional[float] = None
+    max_relative_humidity: Optional[float] = None
+    min_dew_point_margin_c: Optional[float] = None
 
     surface_types: list[SurfaceType] = field(default_factory=list)
     corrosion_categories: list[CorrosionCategory] = field(default_factory=list)
     durability_levels: list[DurabilityLevel] = field(default_factory=list)
     environments: list[EnvironmentType] = field(default_factory=list)
 
-    recommended_dft_min: Optional[float] = None   # мкм
+    recommended_dft_min: Optional[float] = None
     recommended_dft_max: Optional[float] = None
     max_single_layer_dft: Optional[float] = None
 
@@ -63,15 +69,24 @@ class Material:
     thinner_name: str = ""
     thinner_percent_min: Optional[float] = None
     thinner_percent_max: Optional[float] = None
+    thinner_basis: str = "BY_PAINT_VOLUME"
 
-    packaging_kg: Optional[float] = None          # фасовка, кг
+    packaging_kg: Optional[float] = None
     packaging_l: Optional[float] = None
 
-    is_active: bool = True
-    is_incomplete: bool = False                   # требует доразметки после миграции
-    notes: str = ""
+    # Техническая документация: храним не только ссылку, но и версию/дату,
+    # чтобы расчёт можно было воспроизвести по исходным данным.
     datasheet: str = ""
+    datasheet_version: str = ""
+    datasheet_date: Optional[str] = None
+    safety_data_sheet: str = ""
     certificate: str = ""
+    certificate_version: str = ""
+    test_protocol: str = ""
+
+    is_active: bool = True
+    is_incomplete: bool = False
+    notes: str = ""
 
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -94,6 +109,8 @@ class LayerDefinition:
     target_dft: float = 0.0
     thinner_percent: float = 0.0
     thinner_material_id: Optional[int] = None
+    thinner_basis: Optional[str] = None
+    losses_percent: Optional[float] = None
     notes: str = ""
 
 
@@ -106,21 +123,20 @@ class LayerResult:
     losses_percent: float = 0.0
     thinner_percent: float = 0.0
     thinner: Optional[Material] = None
+    thinner_basis: str = "BY_PAINT_VOLUME"
 
-    # Рассчитанные значения
-    wft: float = 0.0                          # мкм
-    theoretical_coverage: float = 0.0         # м²/л
-    practical_coverage: float = 0.0           # м²/л
-    theoretical_consumption_l: float = 0.0    # л/м²
-    practical_consumption_l: float = 0.0      # л/м²
-    theoretical_consumption_kg: float = 0.0   # кг/м²
-    practical_consumption_kg: float = 0.0     # кг/м²
-    cost_per_m2: float = 0.0                  # руб/м² (материал)
+    wft: float = 0.0
+    theoretical_coverage: float = 0.0
+    practical_coverage: float = 0.0
+    theoretical_consumption_l: float = 0.0
+    practical_consumption_l: float = 0.0
+    theoretical_consumption_kg: float = 0.0
+    practical_consumption_kg: float = 0.0
+    cost_per_m2: float = 0.0
     thinner_consumption_l: float = 0.0
     thinner_consumption_kg: float = 0.0
     thinner_cost_per_m2: float = 0.0
 
-    # Для площади
     total_consumption_kg: float = 0.0
     total_consumption_l: float = 0.0
     total_cost: float = 0.0
@@ -145,6 +161,7 @@ class CoatingSystem:
     substrate: str = ""
 
     total_dft_min: Optional[float] = None
+    total_dft_target: Optional[float] = None
     total_dft_max: Optional[float] = None
     number_of_layers: int = 0
 
@@ -181,7 +198,6 @@ class ObjectData:
     substrate: str = ""
     application_method: Optional[ApplicationMethod] = None
 
-    # Условия эксплуатации
     corrosion_category: Optional[CorrosionCategory] = None
     durability: Optional[DurabilityLevel] = None
     temperature_min: Optional[float] = None
@@ -192,7 +208,6 @@ class ObjectData:
     water_contact: bool = False
     chemical_contact: bool = False
 
-    # Поверхность и подготовка
     surface_type: Optional[SurfaceType] = None
     preparation: Optional[PreparationGrade] = None
     roughness: Optional[float] = None
@@ -200,6 +215,7 @@ class ObjectData:
     air_temperature: Optional[float] = None
     relative_humidity: Optional[float] = None
     dew_point: Optional[float] = None
+    dew_point_margin_c: Optional[float] = None
 
     notes: str = ""
 
@@ -227,27 +243,21 @@ class SystemCalculationResult:
 
 @dataclass
 class ComparisonResult:
-    """Результат сравнения нескольких систем."""
-
     object_data: ObjectData
     systems: list[SystemCalculationResult] = field(default_factory=list)
-
     cheapest_index: Optional[int] = None
     most_expensive_index: Optional[int] = None
     thinnest_index: Optional[int] = None
     thickest_index: Optional[int] = None
     fewest_layers_index: Optional[int] = None
     best_balance_index: Optional[int] = None
-
     created_at: datetime = field(default_factory=datetime.now)
 
 
 @dataclass
 class RecommendationItem:
-    """Одна рекомендованная система с баллом."""
-
     system: CoatingSystem
-    score: float                          # 0–100
+    score: float
     rank: int
     reasons: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -256,8 +266,6 @@ class RecommendationItem:
 
 @dataclass
 class RecommendationResult:
-    """Результат подбора систем."""
-
     object_data: ObjectData
     items: list[RecommendationItem] = field(default_factory=list)
     insufficient_data: bool = False
