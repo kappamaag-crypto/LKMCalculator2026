@@ -15,6 +15,10 @@ DILUTION_BASIS_BY_MIX_VOLUME = "BY_MIX_VOLUME"
 DILUTION_BASIS_BY_MASS = "BY_MASS"
 DILUTION_BASIS_BY_COMPONENT_VOLUME = "BY_COMPONENT_VOLUME"
 
+# Допустимое расхождение между ценой за литр и ценой за кг,
+# пересчитанной через плотность материала.
+PRICE_DENSITY_TOLERANCE = 0.05
+
 
 @dataclass(frozen=True)
 class LayerCalcInput:
@@ -120,16 +124,62 @@ def calculate_cost(consumption_kg: float, price_per_kg: float) -> float:
     return consumption_kg * price_per_kg
 
 
+def validate_price_consistency(
+    density: float,
+    price_per_kg: Optional[float],
+    price_per_liter: Optional[float],
+    tolerance: float = PRICE_DENSITY_TOLERANCE,
+) -> None:
+    """Проверяет соответствие цен за кг и литр через плотность материала.
+
+    Если заданы обе цены, цена за литр должна быть близка к
+    ``цена_за_кг × плотность``. Это контроль исходных данных, а не изменение
+    выбранного ценового базиса: при наличии обеих цен расчёт стоимости
+    выполняется по цене за литр.
+    """
+    if price_per_kg is None or price_per_liter is None:
+        return
+    if density <= 0:
+        raise ValueError("Для проверки соответствия цены за кг и за литр нужна положительная плотность.")
+    if price_per_kg < 0 or price_per_liter < 0:
+        raise ValueError("Цена материала не может быть отрицательной.")
+
+    expected_per_liter = price_per_kg * density
+    if expected_per_liter == 0:
+        if price_per_liter != 0:
+            raise ValueError(
+                "Цена за кг и цена за литр не соответствуют друг другу через указанную плотность."
+            )
+        return
+
+    relative_difference = abs(price_per_liter - expected_per_liter) / expected_per_liter
+    if relative_difference > tolerance:
+        raise ValueError(
+            "Цена за литр не соответствует цене за кг через плотность материала: "
+            f"ожидается около {expected_per_liter:.2f} руб/л, "
+            f"указано {price_per_liter:.2f} руб/л. "
+            f"Допустимое расхождение — {tolerance * 100:.0f}%."
+        )
+
+
 def calculate_cost_by_price(
     consumption_l: float,
     consumption_kg: float,
     price_per_kg: Optional[float],
     price_per_liter: Optional[float],
+    density: Optional[float] = None,
 ) -> float:
-    """Стоимость материала по доступной цене; цена за литр имеет приоритет."""
+    """Стоимость материала; при наличии обеих цен расчёт идёт по цене за литр.
+
+    При наличии обеих цен выполняется контроль их соответствия через плотность.
+    """
     if consumption_l <= 0 and consumption_kg <= 0:
         return 0.0
     if price_per_liter is not None and price_per_liter >= 0:
+        if price_per_kg is not None:
+            if density is None:
+                raise ValueError("Для проверки двух цен необходимо указать плотность материала.")
+            validate_price_consistency(density, price_per_kg, price_per_liter)
         return consumption_l * price_per_liter
     if price_per_kg is not None and price_per_kg >= 0:
         return consumption_kg * price_per_kg
@@ -180,7 +230,13 @@ def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
     pract_cov = 0.0 if pract_paint_l <= 0 else 1.0 / pract_paint_l
     theor_kg = calculate_consumption_kg(theor_paint_l, inp.density)
     pract_kg = calculate_consumption_kg(pract_paint_l, inp.density)
-    cost = calculate_cost_by_price(pract_paint_l, pract_kg, inp.price_per_kg, inp.price_per_liter)
+    cost = calculate_cost_by_price(
+        pract_paint_l,
+        pract_kg,
+        inp.price_per_kg,
+        inp.price_per_liter,
+        density=inp.density,
+    )
     thinner_l, thinner_kg, thinner_cost = calculate_thinner(
         pract_paint_l, inp.thinner_percent, inp.thinner_density,
         inp.thinner_price_per_kg, inp.thinner_basis, inp.density,
@@ -205,15 +261,6 @@ def scale_to_area(per_m2: float, area_m2: float) -> float:
     if area_m2 <= 0:
         return 0.0
     return per_m2 * area_m2
-
-
-def calculate_packages(required_kg: float, packaging_kg: Optional[float]) -> tuple[int, float, float]:
-    if required_kg <= 0 or not packaging_kg or packaging_kg <= 0:
-        return 0, 0.0, 0.0
-    import math
-    packages = math.ceil(required_kg / packaging_kg)
-    purchase = packages * packaging_kg
-    return packages, purchase, purchase - required_kg
 
 
 def total_area(area_per_element: float, elements_count: int) -> float:
