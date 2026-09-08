@@ -4,7 +4,20 @@ from __future__ import annotations
 
 import pytest
 
-from app.domain.formulas import calculate_wft, calculate_theoretical_coverage, calculate_loss_coefficient, calculate_practical_coverage, calculate_thinner, calculate_layer, LayerCalcInput, scale_to_area, calculate_packages, total_area
+from app.domain.formulas import (
+    DILUTION_BASIS_BY_MASS,
+    DILUTION_BASIS_BY_MIX_VOLUME,
+    calculate_wft,
+    calculate_theoretical_coverage,
+    calculate_loss_coefficient,
+    calculate_practical_coverage,
+    calculate_thinner,
+    calculate_layer,
+    LayerCalcInput,
+    scale_to_area,
+    calculate_packages,
+    total_area,
+)
 
 
 class TestBasicFormulas:
@@ -52,6 +65,34 @@ class TestBasicFormulas:
         assert thinner_l == pytest.approx(0.274 * 0.05)
         assert thinner_kg == pytest.approx(0.274 * 0.05 * 0.9)
         assert cost == pytest.approx(0.274 * 0.05 * 0.9 * 100)
+
+    def test_thinner_by_mix_volume(self):
+        thinner_l, thinner_kg, _ = calculate_thinner(
+            1.0, 10.0, 0.8, 100.0, DILUTION_BASIS_BY_MIX_VOLUME
+        )
+        assert thinner_l == pytest.approx(1.0 * 0.10 / 0.90)
+        assert thinner_kg == pytest.approx(thinner_l * 0.8)
+
+    def test_thinner_by_mass(self):
+        thinner_l, thinner_kg, _ = calculate_thinner(
+            1.0, 10.0, 0.8, 100.0, DILUTION_BASIS_BY_MASS, parent_density=1.4
+        )
+        assert thinner_kg == pytest.approx(1.4 * 0.10)
+        assert thinner_l == pytest.approx(thinner_kg / 0.8)
+
+    def test_dilution_changes_wft_but_not_paint_consumption_basis(self):
+        result = calculate_layer(
+            LayerCalcInput(
+                density=1.4,
+                solids_percent=70.0,
+                dry_thickness=100.0,
+                price_per_kg=500.0,
+                thinner_percent=10.0,
+            )
+        )
+        assert result.wft == pytest.approx((100 / 0.70) * 1.10)
+        assert result.theoretical_consumption_l == pytest.approx(100 / 0.70 / 1000)
+        assert result.thinner_consumption_l == pytest.approx(result.practical_consumption_l * 0.10)
 
     def test_scale_to_area(self):
         assert scale_to_area(0.5, 100) == 50.0
