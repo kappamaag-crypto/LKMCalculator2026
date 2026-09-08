@@ -224,3 +224,43 @@ class RecommendationResult:
     message: str = ""
     disclaimer: str = ""
     created_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass(frozen=True)
+class MaterialComponent:
+    id: Optional[int] = None
+    material_id: Optional[int] = None
+    component_code: str = "A"
+    name: str = ""
+    density_kg_l: Optional[float] = None
+    price_per_kg: Optional[float] = None
+    price_per_liter: Optional[float] = None
+    packaging_kg: Optional[float] = None
+    packaging_l: Optional[float] = None
+    active: bool = True
+
+
+@dataclass(frozen=True)
+class MaterialMix:
+    material_id: int
+    mix_ratio_a: float
+    mix_ratio_b: float
+    ratio_basis: str = "mass"
+    working_time_minutes: Optional[float] = None
+    induction_time_minutes: Optional[float] = None
+    temperature_reference: Optional[float] = None
+    notes: str = ""
+
+
+@dataclass(frozen=True)
+class Package:
+    id: Optional[int] = None
+    material_id: Optional[int] = None
+    component_id: Optional[int] = None
+    package_name: str = ""
+    net_weight_kg: Optional[float] = None
+    net_volume_l: Optional[float] = None
+    units_per_set: int = 1
+    package_type: str = "single"
+    is_component_package: bool = False
+    active: bool = True
