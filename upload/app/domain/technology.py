@@ -1,8 +1,8 @@
 """Технологический контроль нанесения ЛКМ.
 
 Сервис не изменяет расчёт расхода и не зависит от UI/ORM. Он оценивает
-фактические условия нанесения и измеренную DFT относительно требований
-материала. Запас до точки росы ниже требуемого является блокирующей ошибкой.
+условия нанесения и фактическую DFT относительно требований материала.
+Запас до точки росы ниже требуемого является блокирующей ошибкой.
 """
 
 from __future__ import annotations
@@ -50,6 +50,41 @@ class TechnologyCheckResult:
         self.add("info", code, message, field)
 
 
+def check_target_dft(material: Material, target_dft: Optional[float]) -> TechnologyCheckResult:
+    """Проверить заданную для расчёта толщину слоя.
+
+    Это отдельная проверка: target DFT нельзя выдавать за фактическую толщину
+    при входном контроле. Отсутствующая DFT остаётся UNKNOWN.
+    """
+    result = TechnologyCheckResult()
+    if target_dft is None:
+        result.add_info("TECH_TARGET_DFT_UNKNOWN", "Целевая DFT не задана — проверка толщины невозможна.", "target_dft")
+        return result
+    if target_dft < 0:
+        result.add_error("TECH_TARGET_DFT_NEGATIVE", "Целевая DFT не может быть отрицательной.", "target_dft")
+        return result
+
+    if material.recommended_dft_min is not None and target_dft < material.recommended_dft_min:
+        result.add_error(
+            "TECH_TARGET_DFT_BELOW_MIN",
+            f"Целевая DFT {target_dft:g} мкм ниже рекомендуемого минимума {material.recommended_dft_min:g} мкм.",
+            "target_dft",
+        )
+    if material.recommended_dft_max is not None and target_dft > material.recommended_dft_max:
+        result.add_warning(
+            "TECH_TARGET_DFT_ABOVE_RECOMMENDED",
+            f"Целевая DFT {target_dft:g} мкм выше рекомендуемого максимума {material.recommended_dft_max:g} мкм.",
+            "target_dft",
+        )
+    if material.max_single_layer_dft is not None and target_dft > material.max_single_layer_dft:
+        result.add_error(
+            "TECH_TARGET_DFT_ABOVE_ABSOLUTE_MAX",
+            f"Целевая DFT {target_dft:g} мкм выше абсолютного максимума {material.max_single_layer_dft:g} мкм.",
+            "target_dft",
+        )
+    return result
+
+
 def check_application_technology(
     obj: ObjectData,
     material: Material,
@@ -67,7 +102,11 @@ def check_application_technology(
     if surface_temperature is None:
         surface_temperature = obj.air_temperature
         if surface_temperature is not None:
-            result.add_info("COND_SURFACE_TEMP_FALLBACK", "Температура поверхности не задана; использована температура воздуха.", "surface_temperature")
+            result.add_info(
+                "COND_SURFACE_TEMP_FALLBACK",
+                "Температура поверхности не задана; использована температура воздуха.",
+                "surface_temperature",
+            )
 
     if surface_temperature is not None:
         if material.min_application_temperature is not None and surface_temperature < material.min_application_temperature:
@@ -105,9 +144,17 @@ def check_application_technology(
                 "dew_point_margin_c",
             )
         else:
-            result.add_info("TECH_DEW_POINT_OK", f"Запас до точки росы {margin:.1f} °C соответствует требованию {required:.1f} °C.", "dew_point_margin_c")
+            result.add_info(
+                "TECH_DEW_POINT_OK",
+                f"Запас до точки росы {margin:.1f} °C соответствует требованию {required:.1f} °C.",
+                "dew_point_margin_c",
+            )
     elif obj.surface_temperature is not None or obj.dew_point is not None:
-        result.add_warning("TECH_DEW_POINT_INCOMPLETE", "Для проверки точки росы нужны одновременно температура поверхности и точка росы.", "dew_point")
+        result.add_warning(
+            "TECH_DEW_POINT_INCOMPLETE",
+            "Для проверки точки росы нужны одновременно температура поверхности и точка росы.",
+            "dew_point",
+        )
 
     if actual_dft is None:
         result.add_info("TECH_DFT_UNKNOWN", "Фактическая DFT не задана — контроль толщины по факту не выполнен.", "actual_dft")
