@@ -1,38 +1,32 @@
-# Статус v2.0
+# Статус v2.0 — почти всё в GitHub
 
-## В GitHub
+## В репозитории ✅
 
-### Domain ✅
-enums, formulas, models, calculator, comparison
-recommendation: rules, scorer, recommender
+| Модуль | Файлы |
+|--------|--------|
+| Domain | enums, formulas, models, calculator, comparison, **validation** |
+| Recommendation | rules, scorer, recommender |
+| Services | calculation, recommendation, history |
+| UI | main_window, styles, layer_table, comparison, recommendation, **history**, **materials** |
+| Infra | engine, seed, logging |
+| Tests | formulas, calculator, recommendations, history, excel, pdf |
+| Docs + main + requirements | ✅ |
 
-### Services ✅
-calculation, recommendation, history
+## Ещё только в ZIP (5 файлов)
+- `database/models.py` (~12 KB)
+- `database/repositories.py` (~12 KB)
+- `excel_exporter.py` (~15 KB)
+- `pdf_exporter.py` (~15 KB)
+- `calculation_view.py` (~14 KB)
 
-### UI ✅
-main_window, styles, layer_table
-comparison_view, recommendation_view
-
-### Infra ✅
-engine, seed, logging
-
-### Tests ✅
-test_formulas, test_history, test_pdf_export
-
-### Docs + main.py + requirements ✅
-
-## Ещё только в ZIP (~6 файлов)
-- validation.py
-- database/models.py, repositories.py
-- excel_exporter.py, pdf_exporter.py
-- calculation_view, history_view, materials_view
-- test_calculator, test_recommendations, test_excel_export
-
-## Полный исходник
+## ZIP
 `/home/workdir/artifacts/lkm_calculator_v2.zip`
 
 ```bash
 unzip lkm_calculator_v2.zip
-cp -r lkm_calculator/* LKMCalculator2026/v2/
-git add v2 && git commit -m "v2.0 remaining large modules" && git push
+cp -r lkm_calculator/app/infrastructure/database/models.py LKMCalculator2026/v2/app/infrastructure/database/
+cp -r lkm_calculator/app/infrastructure/database/repositories.py LKMCalculator2026/v2/app/infrastructure/database/
+cp -r lkm_calculator/app/infrastructure/export/*.py LKMCalculator2026/v2/app/infrastructure/export/
+cp -r lkm_calculator/app/ui/views/calculation_view.py LKMCalculator2026/v2/app/ui/views/
+git add v2 && git commit -m "v2.0 remaining 5 files" && git push
 ```
