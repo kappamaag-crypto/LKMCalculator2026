@@ -14,6 +14,8 @@ from PySide6.QtCore import Qt, Signal
 
 from app.domain.models import Material
 from app.domain.enums import MaterialType, BinderType
+from app.infrastructure.database.engine import get_session_factory
+from app.infrastructure.database.repositories import MaterialRepository
 
 
 class MaterialEditDialog(QDialog):
@@ -110,9 +112,9 @@ class MaterialEditDialog(QDialog):
 
 
 class MaterialsView(QWidget):
-    """База ЛКМ — просмотр и редактирование."""
+    """База ЛКМ — просмотр и редактирование с сохранением в SQLite."""
 
-    materials_changed = Signal(list)  # list[Material]
+    materials_changed = Signal(list)
 
     def __init__(self, materials: list[Material] | None = None, parent=None):
         super().__init__(parent)
@@ -124,18 +126,15 @@ class MaterialsView(QWidget):
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
-
         title = QLabel("База материалов")
         title.setProperty("heading", True)
         root.addWidget(title)
-
         search_row = QHBoxLayout()
         self.ed_search = QLineEdit()
         self.ed_search.setPlaceholderText("Поиск: название, производитель, связующее…")
         self.ed_search.textChanged.connect(self._reload_table)
         search_row.addWidget(self.ed_search)
         root.addLayout(search_row)
-
         btn_row = QHBoxLayout()
         btn_add = QPushButton("Добавить")
         btn_add.clicked.connect(self._on_add)
@@ -145,17 +144,10 @@ class MaterialsView(QWidget):
         btn_del = QPushButton("Удалить")
         btn_del.setProperty("secondary", True)
         btn_del.clicked.connect(self._on_delete)
-        btn_row.addWidget(btn_add)
-        btn_row.addWidget(btn_edit)
-        btn_row.addWidget(btn_del)
-        btn_row.addStretch()
+        btn_row.addWidget(btn_add); btn_row.addWidget(btn_edit); btn_row.addWidget(btn_del); btn_row.addStretch()
         root.addLayout(btn_row)
-
         self.table = QTableWidget(0, 9)
-        self.table.setHorizontalHeaderLabels([
-            "ID", "Название", "Производитель", "Тип", "Связующее",
-            "Плотность", "СО, %", "Цена, руб/кг", "Цена, руб/л",
-        ])
+        self.table.setHorizontalHeaderLabels(["ID", "Название", "Производитель", "Тип", "Связующее", "Плотность", "СО, %", "Цена, руб/кг", "Цена, руб/л"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.verticalHeader().setVisible(False)
@@ -163,7 +155,6 @@ class MaterialsView(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.doubleClicked.connect(self._on_edit)
         root.addWidget(self.table)
-
         self.lbl_count = QLabel()
         root.addWidget(self.lbl_count)
 
@@ -179,33 +170,16 @@ class MaterialsView(QWidget):
         q = self.ed_search.text().strip().lower()
         if not q:
             return self._materials
-        result = []
-        for m in self._materials:
-            hay = f"{m.material_name} {m.manufacturer} {m.brand} {m.binder_type}".lower()
-            if q in hay:
-                result.append(m)
-        return result
+        return [m for m in self._materials if q in f"{m.material_name} {m.manufacturer} {m.brand} {m.binder_type}".lower()]
 
     def _reload_table(self) -> None:
         rows = self._filtered()
         self.table.setRowCount(len(rows))
         for r, m in enumerate(rows):
-            vals = [
-                str(m.id or ""),
-                m.material_name,
-                m.manufacturer or "—",
-                m.material_type.value if hasattr(m.material_type, "value") else str(m.material_type),
-                m.binder_type.value if hasattr(m.binder_type, "value") else str(m.binder_type),
-                f"{m.density:.2f}" if m.density is not None else "—",
-                f"{m.solids_percent:.0f}" if m.solids_percent is not None else "—",
-                f"{m.price_per_kg:.0f}" if m.price_per_kg is not None else "—",
-                f"{m.price_per_liter:.0f}" if m.price_per_liter is not None else "—",
-            ]
+            vals = [str(m.id or ""), m.material_name, m.manufacturer or "—", m.material_type.value if hasattr(m.material_type, "value") else str(m.material_type), m.binder_type.value if hasattr(m.binder_type, "value") else str(m.binder_type), f"{m.density:.2f}" if m.density is not None else "—", f"{m.solids_percent:.0f}" if m.solids_percent is not None else "—", f"{m.price_per_kg:.0f}" if m.price_per_kg is not None else "—", f"{m.price_per_liter:.0f}" if m.price_per_liter is not None else "—"]
             for c, v in enumerate(vals):
-                item = QTableWidgetItem(v)
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                if c == 0:
-                    item.setData(Qt.UserRole, m.id)
+                item = QTableWidgetItem(v); item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                if c == 0: item.setData(Qt.UserRole, m.id)
                 self.table.setItem(r, c, item)
         self.lbl_count.setText(f"Материалов: {len(rows)} (всего {len(self._materials)})")
 
@@ -215,10 +189,18 @@ class MaterialsView(QWidget):
             return None
         item = self.table.item(row, 0)
         mid = item.data(Qt.UserRole) if item else None
-        for m in self._materials:
-            if m.id == mid:
-                return m
-        return None
+        return next((m for m in self._materials if m.id == mid), None)
+
+    @staticmethod
+    def _save_if_missing(material: Material) -> Material:
+        with get_session_factory()() as session:
+            repo = MaterialRepository(session)
+            existing = repo.get_by_name(material.material_name)
+            if existing is not None:
+                return existing
+            saved = repo.add(material)
+            session.commit()
+            return saved
 
     def _on_add(self) -> None:
         dlg = MaterialEditDialog(parent=self)
@@ -228,9 +210,17 @@ class MaterialsView(QWidget):
         if not mat.material_name:
             QMessageBox.warning(self, "Ошибка", "Укажите название")
             return
-        mat.id = self._next_id
-        self._next_id += 1
-        self._materials.append(mat)
+        try:
+            saved = self._save_if_missing(mat)
+        except Exception as exc:
+            QMessageBox.critical(self, "База данных", f"Не удалось сохранить материал:\n{exc}")
+            return
+        existing_idx = next((i for i, m in enumerate(self._materials) if m.material_name.casefold() == saved.material_name.casefold()), None)
+        if existing_idx is None:
+            self._materials.append(saved)
+        else:
+            self._materials[existing_idx] = saved
+        self._next_id = max(self._next_id, (saved.id or 0) + 1)
         self._reload_table()
         self.materials_changed.emit(self.get_materials())
 
@@ -246,10 +236,27 @@ class MaterialsView(QWidget):
         if not updated.material_name:
             QMessageBox.warning(self, "Ошибка", "Укажите название")
             return
+        try:
+            with get_session_factory()() as session:
+                repo = MaterialRepository(session)
+                db_mat = repo.get_by_id(mat.id) if mat.id is not None else None
+                if db_mat is None:
+                    db_mat = repo.get_by_name(mat.material_name)
+                if db_mat is None:
+                    saved = repo.add(updated)
+                else:
+                    updated.id = db_mat.id
+                    saved = repo.update(updated)
+                session.commit()
+        except Exception as exc:
+            QMessageBox.critical(self, "База данных", f"Не удалось сохранить изменения:\n{exc}")
+            return
         for i, m in enumerate(self._materials):
             if m.id == mat.id:
-                self._materials[i] = updated
+                self._materials[i] = saved
                 break
+        else:
+            self._materials.append(saved)
         self._reload_table()
         self.materials_changed.emit(self.get_materials())
 
@@ -257,10 +264,15 @@ class MaterialsView(QWidget):
         mat = self._selected_material()
         if mat is None:
             return
-        if QMessageBox.question(
-            self, "Удаление", f"Удалить «{mat.material_name}»?",
-            QMessageBox.Yes | QMessageBox.No,
-        ) != QMessageBox.Yes:
+        if QMessageBox.question(self, "Удаление", f"Удалить «{mat.material_name}»?", QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        try:
+            if mat.id is not None:
+                with get_session_factory()() as session:
+                    MaterialRepository(session).delete(mat.id, soft=True)
+                    session.commit()
+        except Exception as exc:
+            QMessageBox.critical(self, "База данных", f"Не удалось удалить материал:\n{exc}")
             return
         self._materials = [m for m in self._materials if m.id != mat.id]
         self._reload_table()
