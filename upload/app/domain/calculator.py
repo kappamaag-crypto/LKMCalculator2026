@@ -10,20 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Sequence, Callable
 
-from app.domain.models import (
-    Material,
-    LayerResult,
-    CoatingSystem,
-    ObjectData,
-    SystemCalculationResult,
-)
-from app.domain.formulas import (
-    LayerCalcInput,
-    calculate_layer,
-    scale_to_area,
-    calculate_packages,
-    total_area,
-)
+from app.domain.models import Material, LayerResult, CoatingSystem, ObjectData, SystemCalculationResult
+from app.domain.formulas import LayerCalcInput, calculate_layer, scale_to_area, calculate_packages, total_area
 from app.domain.validation import ValidationResult, validate_before_calculation
 
 
@@ -50,24 +38,31 @@ class LayerCalculator:
         area_m2: float = 1.0,
         thinner_basis: Optional[str] = None,
     ) -> LayerResult:
+        if material.density is None or material.density <= 0:
+            raise ValueError(f"Плотность материала «{material.material_name}» неизвестна или некорректна.")
+
+        solids = material.solids_by_volume_percent
+        if solids is None:
+            solids = material.solids_percent
+        if solids is None or solids <= 0:
+            raise ValueError(f"Сухой остаток материала «{material.material_name}» неизвестен или некорректен.")
+
         price_kg = material.price_per_kg or 0.0
         thinner_density = 1.0
         thinner_price = 0.0
         if thinner is not None:
-            thinner_density = thinner.density if thinner.density > 0 else 1.0
+            if thinner.density is None or thinner.density <= 0:
+                raise ValueError(f"Плотность разбавителя «{thinner.material_name}» неизвестна или некорректна.")
+            thinner_density = thinner.density
             thinner_price = thinner.price_per_kg or 0.0
         elif material.thinner_name and thinner_percent > 0:
-            # Legacy fallback only. It must not be presented as a documented density.
+            # Legacy fallback only. It must not be presented as documented density.
             thinner_density = 0.9
 
         basis = thinner_basis or material.thinner_basis
         inp = LayerCalcInput(
-            density=material.density or 0.0,
-            solids_percent=(
-                material.solids_by_volume_percent
-                if material.solids_by_volume_percent is not None
-                else material.solids_percent or 0.0
-            ),
+            density=material.density,
+            solids_percent=solids,
             dry_thickness=target_dft,
             losses_percent=losses_percent,
             price_per_kg=price_kg,
@@ -120,11 +115,7 @@ class LayerCalculator:
 class SystemCalculator:
     """Расчёт всей системы покрытия."""
 
-    def __init__(
-        self,
-        compatibility_checker: Optional[Callable[[str, str], str]] = None,
-        default_losses: float = 0.0,
-    ):
+    def __init__(self, compatibility_checker: Optional[Callable[[str, str], str]] = None, default_losses: float = 0.0):
         self.compatibility_checker = compatibility_checker
         self.default_losses = default_losses
 
@@ -144,11 +135,8 @@ class SystemCalculator:
     ) -> tuple[SystemCalculationResult, ValidationResult]:
         validation = ValidationResult()
         if not skip_validation:
-            layers_for_val = [
-                (li.material, li.target_dft, li.losses_percent, li.thinner_percent)
-                for li in layer_inputs
-            ]
-            validation = validate_before_calculation(obj, layers_for_val, self.compatibility_checker)
+            layers_for_val = [(li.material, li.target_dft, li.losses_percent, li.thinner_percent) for li in layer_inputs]
+            validation = validate_before_calculation(obj, layers_for_val, self.compatibility_checker, system=system)
             if validation.has_errors:
                 empty = SystemCalculationResult(
                     system=system or CoatingSystem(system_name="Ошибка валидации"),
@@ -161,17 +149,15 @@ class SystemCalculator:
         layer_results: list[LayerResult] = []
         for li in layer_inputs:
             losses = li.losses_percent if li.losses_percent is not None else self.default_losses
-            layer_results.append(
-                LayerCalculator.calculate(
-                    material=li.material,
-                    target_dft=li.target_dft,
-                    losses_percent=losses,
-                    thinner_percent=li.thinner_percent,
-                    thinner=li.thinner,
-                    area_m2=area,
-                    thinner_basis=li.thinner_basis,
-                )
-            )
+            layer_results.append(LayerCalculator.calculate(
+                material=li.material,
+                target_dft=li.target_dft,
+                losses_percent=losses,
+                thinner_percent=li.thinner_percent,
+                thinner=li.thinner,
+                area_m2=area,
+                thinner_basis=li.thinner_basis,
+            ))
 
         total_dft = sum(lr.target_dft for lr in layer_results)
         total_theor_kg = sum(lr.theoretical_consumption_kg for lr in layer_results)
@@ -217,14 +203,12 @@ class SystemCalculator:
             if material is None:
                 continue
             thinner = materials_by_id.get(ld.thinner_material_id) if ld.thinner_material_id else None
-            layer_inputs.append(
-                LayerInput(
-                    material=material,
-                    target_dft=ld.target_dft,
-                    losses_percent=ld.losses_percent if ld.losses_percent is not None else losses,
-                    thinner_percent=ld.thinner_percent,
-                    thinner=thinner,
-                    thinner_basis=ld.thinner_basis,
-                )
-            )
+            layer_inputs.append(LayerInput(
+                material=material,
+                target_dft=ld.target_dft,
+                losses_percent=ld.losses_percent if ld.losses_percent is not None else losses,
+                thinner_percent=ld.thinner_percent,
+                thinner=thinner,
+                thinner_basis=ld.thinner_basis or material.thinner_basis,
+            ))
         return self.calculate(obj, layer_inputs, system=system, skip_validation=skip_validation)
