@@ -1,7 +1,7 @@
 """Расчётные формулы ЛКМ / АКЗ v3.0.
 
 Промежуточные значения не округляются. Округление выполняется только
-при отображении либо на границе закупочной фасовки.
+при отображении. Закупка, фасовка и остатки не рассчитываются.
 """
 
 from __future__ import annotations
@@ -22,7 +22,8 @@ class LayerCalcInput:
     solids_percent: float
     dry_thickness: float
     losses_percent: float = 0.0
-    price_per_kg: float = 0.0
+    price_per_kg: Optional[float] = None
+    price_per_liter: Optional[float] = None
     thinner_percent: float = 0.0
     thinner_density: float = 1.0
     thinner_price_per_kg: float = 0.0
@@ -119,6 +120,22 @@ def calculate_cost(consumption_kg: float, price_per_kg: float) -> float:
     return consumption_kg * price_per_kg
 
 
+def calculate_cost_by_price(
+    consumption_l: float,
+    consumption_kg: float,
+    price_per_kg: Optional[float],
+    price_per_liter: Optional[float],
+) -> float:
+    """Стоимость материала по доступной цене; цена за литр имеет приоритет."""
+    if consumption_l <= 0 and consumption_kg <= 0:
+        return 0.0
+    if price_per_liter is not None and price_per_liter >= 0:
+        return consumption_l * price_per_liter
+    if price_per_kg is not None and price_per_kg >= 0:
+        return consumption_kg * price_per_kg
+    raise ValueError("Не указана цена материала ни за кг, ни за литр.")
+
+
 def calculate_thinner(
     parent_consumption_l: float,
     thinner_percent: float,
@@ -155,7 +172,7 @@ def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
     )
     base_wft = calculate_wft(inp.dry_thickness, inp.solids_percent)
 
-    # 1000 / WFT = m²/l, поэтому l/m² = WFT / 1000.
+    # 1000 / WFT = м²/л, поэтому л/м² = WFT / 1000.
     theor_paint_l = 0.0 if base_wft <= 0 else base_wft / 1000.0
     k_loss = calculate_loss_coefficient(inp.losses_percent)
     pract_paint_l = theor_paint_l * k_loss
@@ -163,7 +180,7 @@ def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
     pract_cov = 0.0 if pract_paint_l <= 0 else 1.0 / pract_paint_l
     theor_kg = calculate_consumption_kg(theor_paint_l, inp.density)
     pract_kg = calculate_consumption_kg(pract_paint_l, inp.density)
-    cost = calculate_cost(pract_kg, inp.price_per_kg)
+    cost = calculate_cost_by_price(pract_paint_l, pract_kg, inp.price_per_kg, inp.price_per_liter)
     thinner_l, thinner_kg, thinner_cost = calculate_thinner(
         pract_paint_l, inp.thinner_percent, inp.thinner_density,
         inp.thinner_price_per_kg, inp.thinner_basis, inp.density,
