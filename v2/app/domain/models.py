@@ -20,6 +20,8 @@ from .enums import (
 
 @dataclass
 class Material:
+    """Лакокрасочный материал или разбавитель."""
+
     id: Optional[int] = None
     manufacturer: str = ""
     brand: str = ""
@@ -27,49 +29,62 @@ class Material:
     material_type: MaterialType = MaterialType.OTHER
     binder_type: BinderType = BinderType.UNKNOWN
     description: str = ""
-    density: float = 0.0
-    solids_percent: float = 0.0
-    voc: Optional[float] = None
+
+    density: float = 0.0                 # кг/л
+    solids_percent: float = 0.0          # % объёмный
+    voc: Optional[float] = None          # г/л
+
     color: str = ""
     ral: str = ""
+
     price_per_kg: Optional[float] = None
     price_per_liter: Optional[float] = None
     prices_include_vat: bool = True
-    theoretical_coverage: Optional[float] = None
+
+    theoretical_coverage: Optional[float] = None  # м²/л (если задано производителем)
+
     application_method: Optional[ApplicationMethod] = None
     min_application_temperature: Optional[float] = None
     max_application_temperature: Optional[float] = None
     min_recoat_time_h: Optional[float] = None
     max_recoat_time_h: Optional[float] = None
     drying_time_h: Optional[float] = None
+
     surface_types: list[SurfaceType] = field(default_factory=list)
     corrosion_categories: list[CorrosionCategory] = field(default_factory=list)
     durability_levels: list[DurabilityLevel] = field(default_factory=list)
     environments: list[EnvironmentType] = field(default_factory=list)
-    recommended_dft_min: Optional[float] = None
+
+    recommended_dft_min: Optional[float] = None   # мкм
     recommended_dft_max: Optional[float] = None
     max_single_layer_dft: Optional[float] = None
+
     thinner_required: bool = False
     thinner_name: str = ""
     thinner_percent_min: Optional[float] = None
     thinner_percent_max: Optional[float] = None
-    packaging_kg: Optional[float] = None
+
+    packaging_kg: Optional[float] = None          # фасовка, кг
     packaging_l: Optional[float] = None
+
     is_active: bool = True
-    is_incomplete: bool = False
+    is_incomplete: bool = False                   # требует доразметки после миграции
     notes: str = ""
     datasheet: str = ""
     certificate: str = ""
+
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     def display_name(self) -> str:
         parts = [p for p in (self.manufacturer, self.brand, self.material_name) if p]
-        return " ".join(parts) if parts else self.material_name or "\u0411\u0435\u0437 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044f"
+        return " ".join(parts) if parts else self.material_name or "Без названия"
 
 
 @dataclass
 class LayerDefinition:
+    """Определение слоя в шаблоне системы (ещё без расчёта)."""
+
     material_id: Optional[int] = None
     material: Optional[Material] = None
     layer_number: int = 1
@@ -84,22 +99,28 @@ class LayerDefinition:
 
 @dataclass
 class LayerResult:
+    """Результат расчёта одного слоя (на 1 м²)."""
+
     material: Material
     target_dft: float
     losses_percent: float = 0.0
     thinner_percent: float = 0.0
     thinner: Optional[Material] = None
-    wft: float = 0.0
-    theoretical_coverage: float = 0.0
-    practical_coverage: float = 0.0
-    theoretical_consumption_l: float = 0.0
-    practical_consumption_l: float = 0.0
-    theoretical_consumption_kg: float = 0.0
-    practical_consumption_kg: float = 0.0
-    cost_per_m2: float = 0.0
+
+    # Рассчитанные значения
+    wft: float = 0.0                          # мкм
+    theoretical_coverage: float = 0.0         # м²/л
+    practical_coverage: float = 0.0           # м²/л
+    theoretical_consumption_l: float = 0.0    # л/м²
+    practical_consumption_l: float = 0.0      # л/м²
+    theoretical_consumption_kg: float = 0.0   # кг/м²
+    practical_consumption_kg: float = 0.0     # кг/м²
+    cost_per_m2: float = 0.0                  # руб/м² (материал)
     thinner_consumption_l: float = 0.0
     thinner_consumption_kg: float = 0.0
     thinner_cost_per_m2: float = 0.0
+
+    # Для площади
     total_consumption_kg: float = 0.0
     total_consumption_l: float = 0.0
     total_cost: float = 0.0
@@ -110,43 +131,57 @@ class LayerResult:
 
 @dataclass
 class CoatingSystem:
+    """Система антикоррозионной защиты."""
+
     id: Optional[int] = None
     system_name: str = ""
     manufacturer: str = ""
     description: str = ""
+
     corrosion_categories: list[CorrosionCategory] = field(default_factory=list)
     durability: Optional[DurabilityLevel] = None
     environments: list[EnvironmentType] = field(default_factory=list)
     surface_types: list[SurfaceType] = field(default_factory=list)
     substrate: str = ""
+
     total_dft_min: Optional[float] = None
     total_dft_max: Optional[float] = None
     number_of_layers: int = 0
+
     temperature_min: Optional[float] = None
     temperature_max: Optional[float] = None
     application_methods: list[ApplicationMethod] = field(default_factory=list)
+
     standards: str = ""
     certificate: str = ""
     technical_document: str = ""
     notes: str = ""
     is_active: bool = True
+
     layers: list[LayerDefinition] = field(default_factory=list)
+
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
 
 @dataclass
 class ObjectData:
+    """Входные данные объекта / расчёта."""
+
     object_name: str = ""
     customer: str = ""
     project: str = ""
     calculation_number: str = ""
+
     area_m2: float = 0.0
     elements_count: int = 1
     area_per_element: float = 0.0
+
     structure_type: str = ""
     substrate: str = ""
     application_method: Optional[ApplicationMethod] = None
+
+    # Условия эксплуатации
     corrosion_category: Optional[CorrosionCategory] = None
     durability: Optional[DurabilityLevel] = None
     temperature_min: Optional[float] = None
@@ -156,6 +191,8 @@ class ObjectData:
     uv_exposure: bool = False
     water_contact: bool = False
     chemical_contact: bool = False
+
+    # Поверхность и подготовка
     surface_type: Optional[SurfaceType] = None
     preparation: Optional[PreparationGrade] = None
     roughness: Optional[float] = None
@@ -163,14 +200,18 @@ class ObjectData:
     air_temperature: Optional[float] = None
     relative_humidity: Optional[float] = None
     dew_point: Optional[float] = None
+
     notes: str = ""
 
 
 @dataclass
 class SystemCalculationResult:
+    """Полный результат расчёта одной системы на заданную площадь."""
+
     system: CoatingSystem
     object_data: ObjectData
     layers: list[LayerResult] = field(default_factory=list)
+
     total_dft: float = 0.0
     total_theoretical_consumption_kg: float = 0.0
     total_practical_consumption_kg: float = 0.0
@@ -180,26 +221,33 @@ class SystemCalculationResult:
     total_cost: float = 0.0
     total_thinner_cost: float = 0.0
     total_purchase_cost: float = 0.0
+
     calculated_at: datetime = field(default_factory=datetime.now)
 
 
 @dataclass
 class ComparisonResult:
+    """Результат сравнения нескольких систем."""
+
     object_data: ObjectData
     systems: list[SystemCalculationResult] = field(default_factory=list)
+
     cheapest_index: Optional[int] = None
     most_expensive_index: Optional[int] = None
     thinnest_index: Optional[int] = None
     thickest_index: Optional[int] = None
     fewest_layers_index: Optional[int] = None
     best_balance_index: Optional[int] = None
+
     created_at: datetime = field(default_factory=datetime.now)
 
 
 @dataclass
 class RecommendationItem:
+    """Одна рекомендованная система с баллом."""
+
     system: CoatingSystem
-    score: float
+    score: float                          # 0–100
     rank: int
     reasons: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -208,13 +256,15 @@ class RecommendationItem:
 
 @dataclass
 class RecommendationResult:
+    """Результат подбора систем."""
+
     object_data: ObjectData
     items: list[RecommendationItem] = field(default_factory=list)
     insufficient_data: bool = False
     message: str = ""
     disclaimer: str = (
-        "\u041f\u0440\u0435\u0434\u0432\u0430\u0440\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0439 \u043f\u043e\u0434\u0431\u043e\u0440 \u0441\u0438\u0441\u0442\u0435\u043c\u044b \u0410\u041a\u0417. \u041e\u043a\u043e\u043d\u0447\u0430\u0442\u0435\u043b\u044c\u043d\u044b\u0439 \u0432\u044b\u0431\u043e\u0440 \u043d\u0435\u043e\u0431\u0445\u043e\u0434\u0438\u043c\u043e "
-        "\u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044c \u0442\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u043e\u0439 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430\u0446\u0438\u0435\u0439 \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044f, \u043f\u0440\u043e\u0435\u043a\u0442\u043d\u044b\u043c\u0438 "
-        "\u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\u044f\u043c\u0438 \u0438 \u043f\u0440\u0438\u043c\u0435\u043d\u0438\u043c\u044b\u043c\u0438 \u043d\u043e\u0440\u043c\u0430\u0442\u0438\u0432\u043d\u044b\u043c\u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430\u043c\u0438."
+        "Предварительный подбор системы АКЗ. Окончательный выбор необходимо "
+        "подтвердить технической документацией производителя, проектными "
+        "требованиями и применимыми нормативными документами."
     )
     created_at: datetime = field(default_factory=datetime.now)

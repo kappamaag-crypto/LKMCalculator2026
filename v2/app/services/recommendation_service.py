@@ -1,4 +1,4 @@
-"""Application service: \u043f\u043e\u0434\u0431\u043e\u0440 \u0441\u0438\u0441\u0442\u0435\u043c \u0410\u041a\u0417."""
+"""Application service: подбор систем АКЗ."""
 
 from __future__ import annotations
 

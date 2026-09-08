@@ -7,12 +7,12 @@ import tempfile
 
 import pytest
 
-sqlalchemy = pytest.importorskip("sqlalchemy")
-from app.services.history_service import HistoryService
 from app.domain.models import Material, ObjectData
 from app.domain.enums import MaterialType, BinderType
 from app.domain.calculator import LayerInput
 from app.services.calculation_service import CalculationService
+sqlalchemy = pytest.importorskip("sqlalchemy")
+from app.services.history_service import HistoryService
 from app.infrastructure.database.engine import get_engine, init_db, get_session_factory, session_scope
 
 
@@ -38,12 +38,22 @@ def test_save_and_list(sample_result):
         engine = get_engine(db)
         init_db(engine)
         sf = get_session_factory(engine)
+
         with session_scope(sf) as session:
             svc = HistoryService(session)
             calc_id = svc.save_calculation(sample_result, notes="unit test")
             assert calc_id > 0
             rows = svc.list_calculations()
             assert len(rows) >= 1
+            assert rows[0].object_name == "Тест истории"
+            assert rows[0].total_dft == sample_result.total_dft
+
+        with session_scope(sf) as session:
+            svc = HistoryService(session)
+            calc = svc.get_calculation(calc_id)
+            assert calc is not None
+            assert len(calc.layers) == 1
+            assert "Грунт" in calc.layers[0].material_name
 
 
 def test_delete(sample_result):
@@ -52,9 +62,12 @@ def test_delete(sample_result):
         engine = get_engine(db)
         init_db(engine)
         sf = get_session_factory(engine)
+
         with session_scope(sf) as session:
             svc = HistoryService(session)
             calc_id = svc.save_calculation(sample_result)
             svc.delete_calculation(calc_id)
+
         with session_scope(sf) as session:
-            assert HistoryService(session).get_calculation(calc_id) is None
+            svc = HistoryService(session)
+            assert svc.get_calculation(calc_id) is None

@@ -7,35 +7,64 @@ import tempfile
 
 import pytest
 
-from app.domain.models import Material, ObjectData, CoatingSystem
-from app.domain.enums import MaterialType, BinderType
+from app.domain.models import Material, ObjectData
+from app.domain.enums import MaterialType, BinderType, CorrosionCategory, DurabilityLevel
 from app.domain.calculator import LayerInput
 from app.services.calculation_service import CalculationService
-
-reportlab = pytest.importorskip("reportlab")
 from app.infrastructure.export.pdf_exporter import PDFExporter
 
 
 @pytest.fixture
 def sample_result():
     primer = Material(
-        material_name="\u0413\u0440\u0443\u043d\u0442 Test",
+        material_name="Грунт-Эмаль Blank Universal",
         material_type=MaterialType.PRIMER_ENAMEL,
         binder_type=BinderType.EPOXY,
         density=1.4, solids_percent=73.0, price_per_kg=552.0, packaging_kg=20.0,
+        manufacturer="Blank",
     )
-    obj = ObjectData(object_name="PDF Test", area_m2=100.0, calculation_number="PDF-001")
-    result, val = CalculationService().calculate_system(
-        obj, [LayerInput(material=primer, target_dft=200)]
+    finish = Material(
+        material_name="Эмаль Blank Finish",
+        material_type=MaterialType.FINISH,
+        binder_type=BinderType.POLYURETHANE,
+        density=1.3, solids_percent=58.0, price_per_kg=892.0, packaging_kg=20.0,
+        manufacturer="Blank",
     )
-    assert not val.has_errors
+    obj = ObjectData(
+        object_name="Тест PDF", customer="Заказчик",
+        area_m2=100.0, calculation_number="PDF-001",
+        corrosion_category=CorrosionCategory.C4,
+        durability=DurabilityLevel.HIGH,
+    )
+    result, validation = CalculationService().calculate_system(obj, [
+        LayerInput(material=primer, target_dft=200),
+        LayerInput(material=finish, target_dft=100),
+    ])
+    assert not validation.has_errors
     return result
 
 
-def test_pdf_export_creates_file(sample_result):
+def test_pdf_creates_file(sample_result):
     with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "report.pdf"
-        exporter = PDFExporter()
-        exporter.export_calculation(sample_result, path)
+        path = Path(tmp) / "test.pdf"
+        PDFExporter().export_calculation(sample_result, path)
         assert path.exists()
-        assert path.stat().st_size > 500
+        assert path.stat().st_size > 1000
+        # PDF magic
+        assert path.read_bytes()[:4] == b"%PDF"
+
+
+def test_pdf_with_comparison(sample_result):
+    from app.domain.comparison import ComparisonEngine
+    primer = sample_result.layers[0].material
+    finish = sample_result.layers[1].material
+    obj = sample_result.object_data
+    comparison = ComparisonEngine().compare(obj, [
+        ("A", [LayerInput(material=primer, target_dft=200), LayerInput(material=finish, target_dft=100)]),
+        ("B", [LayerInput(material=primer, target_dft=150), LayerInput(material=finish, target_dft=80)]),
+    ])
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "cmp.pdf"
+        PDFExporter().export_calculation(sample_result, path, comparison=comparison)
+        assert path.exists()
+        assert path.stat().st_size > 2000

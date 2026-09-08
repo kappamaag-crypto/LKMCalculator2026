@@ -46,10 +46,10 @@ class CorrosionCategory(str, Enum):
 
 
 class DurabilityLevel(str, Enum):
-    LOW = "Low"
-    MEDIUM = "Medium"
-    HIGH = "High"
-    VERY_HIGH = "Very High"
+    LOW = "Low"          # до 7 лет
+    MEDIUM = "Medium"    # 7–15 лет
+    HIGH = "High"        # 15–25 лет
+    VERY_HIGH = "Very High"  # > 25 лет
 
 
 class SurfaceType(str, Enum):

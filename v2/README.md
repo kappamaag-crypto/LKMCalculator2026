@@ -22,7 +22,7 @@
 ## Установка и запуск
 
 ```bash
-cd v2
+cd lkm_calculator
 pip install -r requirements.txt
 python main.py
 ```

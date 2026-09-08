@@ -1,5 +1,58 @@
-# Calculation engine
+# Этап 5. Calculation Engine + Validation
+# Этап 6. Comparison Engine
 
-- LayerCalculator / SystemCalculator
-- Формулы в domain/formulas.py
-- Валидация перед расчётом
+Дата: 2026-09-08
+
+## Реализовано
+
+### domain/formulas.py
+Все формулы 1:1 со старым калькулятором. Покрыты unit-тестами.
+
+### domain/validation.py
+- Валидация материала
+- Валидация слоя (DFT, потери, разбавитель, диапазоны)
+- Валидация объекта (площадь, точка росы, влажность)
+- Валидация системы (совместимость слоёв)
+- Сообщения на русском языке
+- Уровни: error / warning / info
+
+### domain/calculator.py
+- `LayerCalculator` — расчёт одного слоя + масштабирование на площадь + упаковки
+- `SystemCalculator` — расчёт системы, площадь из элементов, валидация перед расчётом
+- `calculate_from_system` — расчёт по шаблону CoatingSystem
+
+### domain/comparison.py
+- Сравнение 2–10 систем
+- Автоматическое выделение:
+  - самая дешёвая / дорогая
+  - самая тонкая / толстая
+  - минимум слоёв
+  - лучший баланс цена/защита
+- Таблица для UI/Excel
+
+### services/calculation_service.py
+Application-сервис, оркестрирующий calculator + comparison.
+
+## Тесты
+
+```
+27 passed
+```
+
+- test_formulas.py — 14 тестов
+- test_calculator.py — 13 тестов (слой, система, валидация, сравнение)
+
+## Пример результата (Blank Universal + Finish, 100 м²)
+
+| Показатель | Значение |
+|------------|----------|
+| Общая DFT | 300 мкм |
+| Расход | ~0.607 кг/м² |
+| Стоимость | ~390 руб/м² |
+| Стоимость объекта | ~39 000 руб |
+
+## Следующие этапы
+
+- Этап 7: Recommendation engine (фильтр + scoring)
+- Этап 8: GUI (PySide6)
+- Этап 9–10: Excel / PDF export

@@ -1,41 +1,56 @@
-"""Профессиональный экспорт расчёта в Excel (openpyxl)."""
+"""
+Профессиональный экспорт расчёта / сравнения в Excel (openpyxl).
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from openpyxl import Workbook
-from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
+from openpyxl.styles import Font, Border, Side, Alignment, PatternFill, NamedStyle
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-from app.domain.models import SystemCalculationResult, ComparisonResult, ObjectData, RecommendationResult
+from app.domain.models import (
+    SystemCalculationResult,
+    ComparisonResult,
+    ObjectData,
+    RecommendationResult,
+)
 from app.config import AppSettings
 
+
+# Стили
 HEADER_FONT = Font(name="Arial", bold=True, size=12, color="FFFFFF")
-TITLE_FONT = Font(name="Arial", bold=True, size=16)
+TITLE_FONT = Font(name="Arial", bold=True, size=16, color="1A1A2E")
+SUBTITLE_FONT = Font(name="Arial", bold=True, size=11, color="374151")
 NORMAL_FONT = Font(name="Arial", size=10)
 BOLD_FONT = Font(name="Arial", bold=True, size=10)
 THIN = Border(
-    left=Side(style="thin", color="D0D4DC"), right=Side(style="thin", color="D0D4DC"),
-    top=Side(style="thin", color="D0D4DC"), bottom=Side(style="thin", color="D0D4DC"),
+    left=Side(style="thin", color="D0D4DC"),
+    right=Side(style="thin", color="D0D4DC"),
+    top=Side(style="thin", color="D0D4DC"),
+    bottom=Side(style="thin", color="D0D4DC"),
 )
 HEADER_FILL = PatternFill("solid", fgColor="1A56DB")
+ALT_FILL = PatternFill("solid", fgColor="F3F4F6")
+GREEN_FILL = PatternFill("solid", fgColor="D1FAE5")
+YELLOW_FILL = PatternFill("solid", fgColor="FEF3C7")
 TOTAL_FILL = PatternFill("solid", fgColor="DBEAFE")
 CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
 LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
 
-def _auto_width(ws: Worksheet, min_w: int = 10, max_w: int = 40) -> None:
+def _auto_width(ws: Worksheet, min_width: int = 10, max_width: int = 40) -> None:
     for col in ws.columns:
         letter = get_column_letter(col[0].column)
-        length = max((len(str(c.value or "")) for c in col), default=min_w)
-        ws.column_dimensions[letter].width = min(max(length + 2, min_w), max_w)
+        length = max((len(str(c.value or "")) for c in col), default=min_width)
+        ws.column_dimensions[letter].width = min(max(length + 2, min_width), max_width)
 
 
-def _header_row(ws: Worksheet, row: int, headers: list[str]) -> None:
+def _write_header_row(ws: Worksheet, row: int, headers: list[str]) -> None:
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=row, column=col, value=h)
         cell.font = HEADER_FONT
@@ -44,7 +59,7 @@ def _header_row(ws: Worksheet, row: int, headers: list[str]) -> None:
         cell.border = THIN
 
 
-def _cell(ws, row, col, value, bold=False, fill=None, align=CENTER):
+def _cell(ws: Worksheet, row: int, col: int, value, bold: bool = False, fill=None, align=CENTER):
     cell = ws.cell(row=row, column=col, value=value)
     cell.font = BOLD_FONT if bold else NORMAL_FONT
     cell.alignment = align
@@ -55,124 +70,301 @@ def _cell(ws, row, col, value, bold=False, fill=None, align=CENTER):
 
 
 class ExcelExporter:
+    """Экспорт в многолистовый Excel-файл."""
+
     def __init__(self, settings: Optional[AppSettings] = None):
         self.settings = settings or AppSettings()
 
     def export_calculation(
-        self, result: SystemCalculationResult, path: str | Path,
+        self,
+        result: SystemCalculationResult,
+        path: str | Path,
         recommendation: Optional[RecommendationResult] = None,
     ) -> Path:
+        """Экспорт одного расчёта."""
         path = Path(path)
         wb = Workbook()
+
         self._sheet_input(wb.active, result)
-        self._sheet_layers(wb.create_sheet("\u0421\u043b\u043e\u0438"), result)
-        self._sheet_materials(wb.create_sheet("\u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u044b"), result)
-        self._sheet_summary(wb.create_sheet("\u0418\u0442\u043e\u0433\u0438"), result)
+        self._sheet_layers(wb.create_sheet("Слои"), result)
+        self._sheet_materials(wb.create_sheet("Материалы"), result)
+        self._sheet_summary(wb.create_sheet("Итоги"), result)
+
         if recommendation and recommendation.items:
-            self._sheet_recommendations(wb.create_sheet("\u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438"), recommendation)
+            self._sheet_recommendations(wb.create_sheet("Рекомендации"), recommendation)
+
         wb.save(path)
         return path
 
-    def export_comparison(self, comparison: ComparisonResult, path: str | Path) -> Path:
+    def export_comparison(
+        self,
+        comparison: ComparisonResult,
+        path: str | Path,
+    ) -> Path:
+        """Экспорт сравнения систем."""
         path = Path(path)
         wb = Workbook()
-        self._sheet_comparison(wb.active, comparison)
+
+        ws = wb.active
+        ws.title = "Сравнение"
+        self._sheet_comparison(ws, comparison)
+
+        # Отдельный лист по каждой системе
+        for i, sys_result in enumerate(comparison.systems):
+            name = (sys_result.system.system_name or f"Система {i+1}")[:28]
+            self._sheet_layers(wb.create_sheet(name), sys_result)
+
         wb.save(path)
         return path
+
+    # ------------------------------------------------------------------
+    def _title_block(self, ws: Worksheet, title: str, obj: ObjectData, start_row: int = 1) -> int:
+        ws.cell(row=start_row, column=1, value=title).font = TITLE_FONT
+        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=6)
+
+        row = start_row + 1
+        ws.cell(row=row, column=1, value=self.settings.organization_name).font = SUBTITLE_FONT
+        row += 1
+        ws.cell(row=row, column=1, value=f"Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}").font = NORMAL_FONT
+        row += 1
+        if obj.calculation_number:
+            ws.cell(row=row, column=1, value=f"№ расчёта: {obj.calculation_number}").font = NORMAL_FONT
+            row += 1
+        if obj.object_name:
+            ws.cell(row=row, column=1, value=f"Объект: {obj.object_name}").font = NORMAL_FONT
+            row += 1
+        if obj.customer:
+            ws.cell(row=row, column=1, value=f"Заказчик: {obj.customer}").font = NORMAL_FONT
+            row += 1
+        area = obj.area_m2
+        if area <= 0 and obj.area_per_element > 0:
+            area = obj.area_per_element * obj.elements_count
+        ws.cell(row=row, column=1, value=f"Площадь: {area:.2f} м²").font = NORMAL_FONT
+        row += 2
+        return row
 
     def _sheet_input(self, ws: Worksheet, result: SystemCalculationResult) -> None:
-        ws.title = "\u0418\u0441\u0445\u043e\u0434\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435"
+        ws.title = "Исходные данные"
         obj = result.object_data
-        ws["A1"] = "\u041a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440 \u041b\u041a\u041c / \u0410\u041a\u0417 — О\u0442\u0447\u0451\u0442 р\u0430\u0441\u0447\u0451\u0442\u0430"
-        ws["A1"].font = TITLE_FONT
-        rows = [
-            ("\u041e\u0431\u044a\u0435\u043a\u0442", obj.object_name),
-            ("\u0417\u0430\u043a\u0430\u0437\u0447\u0438\u043a", obj.customer),
-            ("\u041f\u0440\u043e\u0435\u043a\u0442", obj.project),
-            ("\u2116 р\u0430\u0441\u0447\u0451\u0442\u0430", obj.calculation_number),
-            ("\u041f\u043b\u043e\u0449\u0430\u0434\u044c, \u043c\u00b2", obj.area_m2),
-            ("\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f", str(obj.corrosion_category or "—")),
-            ("\u0414\u043e\u043b\u0433\u043e\u0432\u0435\u0447\u043d\u043e\u0441\u0442\u044c", str(obj.durability or "—")),
-            ("\u0421\u0438\u0441\u0442\u0435\u043c\u0430", result.system.system_name),
-            ("\u0414\u0430\u0442\u0430", datetime.now().strftime("%d.%m.%Y %H:%M")),
+        row = self._title_block(ws, "Расчёт расхода ЛКМ / подбор системы АКЗ", obj)
+
+        ws.cell(row=row, column=1, value="Условия эксплуатации").font = SUBTITLE_FONT
+        row += 1
+        fields = [
+            ("Категория коррозии", obj.corrosion_category.value if obj.corrosion_category else "—"),
+            ("Долговечность", obj.durability.value if obj.durability else "—"),
+            ("Поверхность", obj.surface_type.value if obj.surface_type else "—"),
+            ("Среда", obj.environment.value if obj.environment else "—"),
+            ("T мин, °C", obj.temperature_min if obj.temperature_min is not None else "—"),
+            ("T макс, °C", obj.temperature_max if obj.temperature_max is not None else "—"),
+            ("Система", result.system.system_name or "Пользовательская"),
         ]
-        for i, (k, v) in enumerate(rows, 3):
-            _cell(ws, i, 1, k, bold=True, align=LEFT)
-            _cell(ws, i, 2, v, align=LEFT)
+        for label, val in fields:
+            _cell(ws, row, 1, label, bold=True, align=LEFT)
+            _cell(ws, row, 2, val, align=LEFT)
+            row += 1
+
+        row += 1
+        ws.cell(row=row, column=1, value="Примечание:").font = BOLD_FONT
+        row += 1
+        ws.cell(
+            row=row, column=1,
+            value="Предварительный расчёт. Окончательный выбор системы — по TDS производителя и проектным требованиям."
+        ).font = NORMAL_FONT
         _auto_width(ws)
 
     def _sheet_layers(self, ws: Worksheet, result: SystemCalculationResult) -> None:
-        headers = ["\u2116", "\u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b", "\u0421\u0432\u044f\u0437\u0443\u044e\u0449\u0435\u0435", "DFT, \u043c\u043a\u043c", "WFT, \u043c\u043a\u043c",
-                   "\u0420\u0430\u0441\u0445\u043e\u0434, \u043a\u0433/\u043c\u00b2", "\u0420\u0430\u0441\u0445\u043e\u0434, \u043b/\u043c\u00b2", "\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c, \u0440\u0443\u0431/\u043c\u00b2",
-                   "\u0418\u0442\u043e\u0433\u043e \u043a\u0433", "\u0418\u0442\u043e\u0433\u043e \u0440\u0443\u0431"]
-        _header_row(ws, 1, headers)
-        for i, lr in enumerate(result.layers, 1):
+        if ws.title == "Sheet":
+            ws.title = "Слои"
+        row = 1
+        ws.cell(row=row, column=1, value=f"Слои системы: {result.system.system_name}").font = TITLE_FONT
+        row += 2
+
+        headers = [
+            "№", "Материал", "Связующее", "DFT, мкм", "WFT, мкм",
+            "Потери, %", "Разб., %",
+            "Укрыв. теор., м²/л", "Укрыв. практ., м²/л",
+            "Расход теор., кг/м²", "Расход практ., кг/м²",
+            "Расход практ., л/м²",
+            "Стоимость, руб/м²",
+            "Кол-во на объект, кг", "Стоимость на объект, руб",
+            "Упаковок", "Закупка, кг",
+        ]
+        _write_header_row(ws, row, headers)
+        row += 1
+
+        for i, lr in enumerate(result.layers):
+            fill = ALT_FILL if i % 2 else None
             binder = lr.material.binder_type.value if hasattr(lr.material.binder_type, "value") else str(lr.material.binder_type)
-            vals = [i, lr.material.material_name, binder, lr.target_dft, lr.wft,
-                    lr.practical_consumption_kg, lr.practical_consumption_l, lr.cost_per_m2,
-                    lr.total_consumption_kg, lr.total_cost]
-            for c, v in enumerate(vals, 1):
-                _cell(ws, i + 1, c, v if not isinstance(v, float) else round(v, 3))
-        total_row = len(result.layers) + 2
-        _cell(ws, total_row, 1, "\u0418\u0422\u041e\u0413\u041e", bold=True, fill=TOTAL_FILL)
-        _cell(ws, total_row, 4, result.total_dft, bold=True, fill=TOTAL_FILL)
-        _cell(ws, total_row, 6, result.total_practical_consumption_kg, bold=True, fill=TOTAL_FILL)
-        _cell(ws, total_row, 8, result.total_cost_per_m2, bold=True, fill=TOTAL_FILL)
-        _cell(ws, total_row, 10, result.total_cost, bold=True, fill=TOTAL_FILL)
-        _auto_width(ws)
+            values = [
+                i + 1,
+                lr.material.material_name,
+                binder,
+                lr.target_dft,
+                lr.wft,
+                lr.losses_percent,
+                lr.thinner_percent,
+                lr.theoretical_coverage,
+                lr.practical_coverage,
+                lr.theoretical_consumption_kg,
+                lr.practical_consumption_kg,
+                lr.practical_consumption_l,
+                lr.cost_per_m2,
+                lr.total_consumption_kg,
+                lr.total_cost,
+                lr.packages_count or "",
+                lr.purchase_kg or "",
+            ]
+            for col, v in enumerate(values, 1):
+                _cell(ws, row, col, v, fill=fill)
+            row += 1
+
+        # Итого
+        _cell(ws, row, 1, "", bold=True, fill=TOTAL_FILL)
+        _cell(ws, row, 2, "ИТОГО", bold=True, fill=TOTAL_FILL, align=LEFT)
+        _cell(ws, row, 4, result.total_dft, bold=True, fill=TOTAL_FILL)
+        _cell(ws, row, 11, result.total_practical_consumption_kg, bold=True, fill=TOTAL_FILL)
+        _cell(ws, row, 12, result.total_practical_consumption_l, bold=True, fill=TOTAL_FILL)
+        _cell(ws, row, 13, result.total_cost_per_m2, bold=True, fill=TOTAL_FILL)
+        _cell(ws, row, 15, result.total_cost, bold=True, fill=TOTAL_FILL)
+
+        ws.freeze_panes = "A4"
+        _auto_width(ws, min_width=8, max_width=28)
 
     def _sheet_materials(self, ws: Worksheet, result: SystemCalculationResult) -> None:
-        headers = ["\u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b", "\u041f\u043b\u043e\u0442\u043d\u043e\u0441\u0442\u044c", "\u0421\u041e, %", "\u0426\u0435\u043d\u0430, \u0440\u0443\u0431/\u043a\u0433", "\u0424\u0430\u0441\u043e\u0432\u043a\u0430, \u043a\u0433",
-                   "\u041d\u0443\u0436\u043d\u043e, \u043a\u0433", "\u0423\u043f\u0430\u043a\u043e\u0432\u043e\u043a", "\u0417\u0430\u043a\u0443\u043f\u043a\u0430, \u043a\u0433"]
-        _header_row(ws, 1, headers)
-        for i, lr in enumerate(result.layers, 1):
-            m = lr.material
-            vals = [m.material_name, m.density, m.solids_percent, m.price_per_kg or 0,
-                    m.packaging_kg or 0, lr.total_consumption_kg, lr.packages_count, lr.purchase_kg]
-            for c, v in enumerate(vals, 1):
-                _cell(ws, i + 1, c, v if not isinstance(v, float) else round(v, 3))
+        row = 1
+        ws.cell(row=row, column=1, value="Спецификация материалов").font = TITLE_FONT
+        row += 2
+        headers = [
+            "Материал", "Производитель", "Плотность, кг/л", "Сухой остаток, %",
+            "Цена, руб/кг", "Фасовка, кг", "Кол-во, кг", "Упаковок", "Закупка, кг", "Стоимость, руб",
+        ]
+        _write_header_row(ws, row, headers)
+        row += 1
+
+        for i, lr in enumerate(result.layers):
+            fill = ALT_FILL if i % 2 else None
+            price = lr.material.price_per_kg or 0
+            purchase_cost = (lr.purchase_kg or lr.total_consumption_kg) * price
+            values = [
+                lr.material.material_name,
+                lr.material.manufacturer or "—",
+                lr.material.density,
+                lr.material.solids_percent,
+                price,
+                lr.material.packaging_kg or "—",
+                lr.total_consumption_kg,
+                lr.packages_count or "—",
+                lr.purchase_kg or lr.total_consumption_kg,
+                round(purchase_cost, 2),
+            ]
+            for col, v in enumerate(values, 1):
+                _cell(ws, row, col, v, fill=fill)
+            row += 1
+
         _auto_width(ws)
 
     def _sheet_summary(self, ws: Worksheet, result: SystemCalculationResult) -> None:
-        ws["A1"] = "\u0418\u0442\u043e\u0433\u0438 р\u0430\u0441\u0447\u0451\u0442\u0430"
-        ws["A1"].font = TITLE_FONT
-        rows = [
-            ("\u0421\u043b\u043e\u0451\u0432", len(result.layers)),
-            ("\u041e\u0431\u0449\u0430\u044f DFT, \u043c\u043a\u043c", result.total_dft),
-            ("\u0420\u0430\u0441\u0445\u043e\u0434, \u043a\u0433/\u043c\u00b2", result.total_practical_consumption_kg),
-            ("\u0420\u0430\u0441\u0445\u043e\u0434, \u043b/\u043c\u00b2", result.total_practical_consumption_l),
-            ("\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c, \u0440\u0443\u0431/\u043c\u00b2", result.total_cost_per_m2),
-            ("\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u043e\u0431\u044a\u0435\u043a\u0442\u0430, \u0440\u0443\u0431", result.total_cost),
-            ("\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u0437\u0430\u043a\u0443\u043f\u043a\u0438, \u0440\u0443\u0431", result.total_purchase_cost),
+        row = self._title_block(ws, "Итоговый расчёт", result.object_data)
+        ws.cell(row=row, column=1, value="Сводка").font = SUBTITLE_FONT
+        row += 1
+
+        items = [
+            ("Система", result.system.system_name or "Пользовательская"),
+            ("Количество слоёв", len(result.layers)),
+            ("Общая толщина DFT, мкм", result.total_dft),
+            ("Расход теоретический, кг/м²", result.total_theoretical_consumption_kg),
+            ("Расход практический, кг/м²", result.total_practical_consumption_kg),
+            ("Расход практический, л/м²", result.total_practical_consumption_l),
+            ("Стоимость материала, руб/м²", result.total_cost_per_m2),
+            ("Стоимость объекта, руб", result.total_cost),
+            ("Стоимость закупки (с фасовкой), руб", result.total_purchase_cost),
         ]
-        for i, (k, v) in enumerate(rows, 3):
-            _cell(ws, i, 1, k, bold=True, align=LEFT)
-            _cell(ws, i, 2, round(v, 3) if isinstance(v, float) else v)
+        for label, val in items:
+            _cell(ws, row, 1, label, bold=True, align=LEFT, fill=ALT_FILL)
+            _cell(ws, row, 2, val, align=LEFT)
+            row += 1
+
+        row += 2
+        ws.cell(row=row, column=1, value="Ограничения и примечания").font = SUBTITLE_FONT
+        row += 1
+        ws.cell(
+            row=row, column=1,
+            value=(
+                "1. Расчёт выполнен по формулам теоретического/практического расхода ЛКМ.\n"
+                "2. Коэффициент потерь: K = 100 / (100 − потери%).\n"
+                "3. Предварительный подбор. Окончательный выбор системы — по технической "
+                "документации производителя, проектным требованиям и нормативным документам.\n"
+                "4. Цены указаны согласно данным в базе на момент расчёта."
+            )
+        ).alignment = Alignment(wrap_text=True, vertical="top")
+        ws.merge_cells(start_row=row, start_column=1, end_row=row + 4, end_column=4)
         _auto_width(ws)
 
     def _sheet_comparison(self, ws: Worksheet, comparison: ComparisonResult) -> None:
-        ws.title = "\u0421\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435"
+        row = self._title_block(ws, "Сравнение систем покрытия", comparison.object_data)
         systems = comparison.systems
-        headers = ["\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u044c"] + [(s.system.system_name or f"S{i+1}")[:25] for i, s in enumerate(systems)]
-        _header_row(ws, 1, headers)
-        rows_data = [
-            ("\u0421\u043b\u043e\u0451\u0432", [len(s.layers) for s in systems]),
-            ("DFT, \u043c\u043a\u043c", [s.total_dft for s in systems]),
-            ("\u0420\u0430\u0441\u0445\u043e\u0434, \u043a\u0433/\u043c\u00b2", [s.total_practical_consumption_kg for s in systems]),
-            ("\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c, \u0440\u0443\u0431/\u043c\u00b2", [s.total_cost_per_m2 for s in systems]),
-            ("\u041e\u0431\u044a\u0435\u043a\u0442, \u0440\u0443\u0431", [s.total_cost for s in systems]),
+        n = len(systems)
+
+        headers = ["Показатель"] + [
+            (s.system.system_name or f"Система {i+1}")[:25] for i, s in enumerate(systems)
         ]
-        for r, (label, values) in enumerate(rows_data, 2):
-            _cell(ws, r, 1, label, bold=True, align=LEFT)
-            for c, v in enumerate(values, 2):
-                _cell(ws, r, c, round(v, 2) if isinstance(v, float) else v)
+        _write_header_row(ws, row, headers)
+        row += 1
+
+        rows_data = [
+            ("Количество слоёв", [len(s.layers) for s in systems]),
+            ("Общая толщина, мкм", [s.total_dft for s in systems]),
+            ("Расход, кг/м²", [s.total_practical_consumption_kg for s in systems]),
+            ("Расход, л/м²", [s.total_practical_consumption_l for s in systems]),
+            ("Стоимость, руб/м²", [s.total_cost_per_m2 for s in systems]),
+            ("Стоимость объекта, руб", [s.total_cost for s in systems]),
+        ]
+
+        for label, values in rows_data:
+            _cell(ws, row, 1, label, bold=True, align=LEFT)
+            min_v = min(values) if values else 0
+            for c, v in enumerate(values):
+                fill = GREEN_FILL if v == min_v and label.startswith(("Стоимость", "Расход", "Количество")) else None
+                _cell(ws, row, c + 2, v, fill=fill)
+            row += 1
+
+        row += 2
+        if comparison.cheapest_index is not None:
+            name = systems[comparison.cheapest_index].system.system_name
+            ws.cell(row=row, column=1, value=f"Самая дешёвая: {name}").font = BOLD_FONT
+            row += 1
+        if comparison.best_balance_index is not None:
+            name = systems[comparison.best_balance_index].system.system_name
+            ws.cell(row=row, column=1, value=f"Лучший баланс цена/защита: {name}").font = BOLD_FONT
+
         _auto_width(ws)
 
     def _sheet_recommendations(self, ws: Worksheet, rec: RecommendationResult) -> None:
-        headers = ["\u041c\u0435\u0441\u0442\u043e", "\u0421\u0438\u0441\u0442\u0435\u043c\u0430", "Score", "\u041f\u0440\u0438\u0447\u0438\u043d\u044b"]
-        _header_row(ws, 1, headers)
-        for i, item in enumerate(rec.items, 1):
-            reasons = "; ".join(item.reasons[:3])
-            for c, v in enumerate([item.rank, item.system.system_name, item.score, reasons], 1):
-                _cell(ws, i + 1, c, v, align=LEFT if c in (2, 4) else CENTER)
-        _auto_width(ws)
+        row = 1
+        ws.cell(row=row, column=1, value="Рекомендации по системам АКЗ").font = TITLE_FONT
+        row += 2
+        ws.cell(row=row, column=1, value=rec.message).font = NORMAL_FONT
+        row += 2
+
+        headers = ["Место", "Система", "Score", "Причины", "Предупреждения"]
+        _write_header_row(ws, row, headers)
+        row += 1
+
+        for item in rec.items:
+            values = [
+                item.rank,
+                item.system.system_name,
+                item.score,
+                "; ".join(item.reasons[:5]),
+                "; ".join(item.warnings[:3]) if item.warnings else "—",
+            ]
+            for col, v in enumerate(values, 1):
+                fill = GREEN_FILL if item.rank == 1 else None
+                _cell(ws, row, col, v, fill=fill, align=LEFT if col > 2 else CENTER)
+            row += 1
+
+        row += 2
+        ws.cell(row=row, column=1, value=rec.disclaimer).font = Font(name="Arial", size=9, italic=True, color="92400E")
+        ws.merge_cells(start_row=row, start_column=1, end_row=row + 2, end_column=5)
+        _auto_width(ws, max_width=50)

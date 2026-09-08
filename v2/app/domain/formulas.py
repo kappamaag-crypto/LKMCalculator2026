@@ -17,13 +17,13 @@ from typing import Optional
 class LayerCalcInput:
     """Входные данные для расчёта одного слоя."""
 
-    density: float
-    solids_percent: float
-    dry_thickness: float
-    losses_percent: float = 0.0
-    price_per_kg: float = 0.0
-    thinner_percent: float = 0.0
-    thinner_density: float = 1.0
+    density: float                  # кг/л
+    solids_percent: float           # % (объёмный сухой остаток)
+    dry_thickness: float            # мкм (DFT)
+    losses_percent: float = 0.0     # %
+    price_per_kg: float = 0.0       # руб/кг
+    thinner_percent: float = 0.0    # %
+    thinner_density: float = 1.0    # кг/л
     thinner_price_per_kg: float = 0.0
 
 
@@ -31,15 +31,16 @@ class LayerCalcInput:
 class LayerCalcResult:
     """Результат расчёта одного слоя (на 1 м²)."""
 
-    wft: float
-    theoretical_coverage: float
-    practical_coverage: float
-    theoretical_consumption_l: float
-    practical_consumption_l: float
-    theoretical_consumption_kg: float
-    practical_consumption_kg: float
-    cost_per_m2: float
+    wft: float                          # мкм
+    theoretical_coverage: float         # м²/л
+    practical_coverage: float           # м²/л
+    theoretical_consumption_l: float    # л/м²
+    practical_consumption_l: float      # л/м²
+    theoretical_consumption_kg: float   # кг/м²
+    practical_consumption_kg: float     # кг/м²
+    cost_per_m2: float                  # руб/м² (материал)
     loss_coefficient: float
+
     thinner_consumption_l: float = 0.0
     thinner_consumption_kg: float = 0.0
     thinner_cost_per_m2: float = 0.0

@@ -29,6 +29,8 @@ COLUMNS = [
 
 
 class LayerTableWidget(QTableWidget):
+    """Редактируемая таблица слоёв."""
+
     layer_changed = Signal()
 
     def __init__(self, parent=None):
@@ -73,7 +75,7 @@ class LayerTableWidget(QTableWidget):
             self.setItem(row, 8, item(f"{result.cost_per_m2:.2f}"))
         else:
             for col in (6, 7, 8):
-                self.setItem(row, col, item("\u2014"))
+                self.setItem(row, col, item("—"))
 
     def get_layer_inputs(self) -> list[LayerInput]:
         return list(self._layer_inputs)
@@ -91,6 +93,7 @@ class LayerTableWidget(QTableWidget):
             return
         self._layer_inputs.pop(row)
         self.removeRow(row)
+        # Перенумеровать
         for r in range(self.rowCount()):
             self.item(r, 0).setText(str(r + 1))
         self.layer_changed.emit()

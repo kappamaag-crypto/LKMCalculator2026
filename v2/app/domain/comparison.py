@@ -37,6 +37,11 @@ class ComparisonEngine:
         obj: ObjectData,
         systems: Sequence[tuple[str, Sequence[LayerInput]]],
     ) -> ComparisonResult:
+        """
+        Сравнить несколько систем.
+
+        systems: список (имя_системы, [LayerInput, ...])
+        """
         if len(systems) < 2:
             raise ValueError("Для сравнения требуется не менее 2 систем")
         if len(systems) > 10:
@@ -62,6 +67,7 @@ class ComparisonEngine:
         obj: ObjectData,
         results: Sequence[SystemCalculationResult],
     ) -> ComparisonResult:
+        """Сравнить уже рассчитанные системы."""
         if len(results) < 2:
             raise ValueError("Для сравнения требуется не менее 2 систем")
 
@@ -74,33 +80,47 @@ class ComparisonEngine:
         return comparison
 
     def _annotate(self, comparison: ComparisonResult) -> None:
+        """Выделить лучшие/худшие по ключевым показателям."""
         systems = comparison.systems
         if not systems:
             return
 
+        # Самая дешёвая / дорогая (по руб/м²)
         costs = [s.total_cost_per_m2 for s in systems]
         comparison.cheapest_index = costs.index(min(costs))
         comparison.most_expensive_index = costs.index(max(costs))
 
+        # Самая тонкая / толстая
         dfts = [s.total_dft for s in systems]
         comparison.thinnest_index = dfts.index(min(dfts))
         comparison.thickest_index = dfts.index(max(dfts))
 
+        # Минимум слоёв
         layer_counts = [len(s.layers) for s in systems]
         comparison.fewest_layers_index = layer_counts.index(min(layer_counts))
 
+        # Лучший баланс цена/защита:
+        # score = нормализованная толщина / нормализованная цена
+        # (больше толщина при меньшей цене → лучше)
         max_dft = max(dfts) or 1.0
         max_cost = max(costs) or 1.0
         balance_scores = []
         for s in systems:
             norm_dft = s.total_dft / max_dft
             norm_cost = s.total_cost_per_m2 / max_cost if max_cost else 1.0
+            # Чем выше толщина и ниже цена — тем лучше
             score = norm_dft / norm_cost if norm_cost > 0 else 0.0
             balance_scores.append(score)
         comparison.best_balance_index = balance_scores.index(max(balance_scores))
 
     def to_table(self, comparison: ComparisonResult) -> list[dict]:
+        """
+        Таблица сравнения для UI / Excel.
+
+        Возвращает список строк: [{indicator, sys0, sys1, ...}, ...]
+        """
         systems = comparison.systems
+        n = len(systems)
         names = [s.system.system_name or f"Система {i+1}" for i, s in enumerate(systems)]
 
         def row(label: str, values: list, highlight_min: bool = False, highlight_max: bool = False) -> dict:

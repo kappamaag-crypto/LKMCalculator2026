@@ -1,4 +1,4 @@
-"""Вкладка базы материалов."""
+"""Вкладка базы материалов (просмотр + простой CRUD)."""
 
 from __future__ import annotations
 
@@ -19,10 +19,11 @@ from app.domain.enums import MaterialType, BinderType
 class MaterialEditDialog(QDialog):
     def __init__(self, material: Optional[Material] = None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("\u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b" if material else "\u041d\u043e\u0432\u044b\u0439 \u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b")
+        self.setWindowTitle("Материал" if material else "Новый материал")
         self.setMinimumWidth(400)
         self.material = material
         layout = QFormLayout(self)
+
         self.ed_name = QLineEdit(material.material_name if material else "")
         self.ed_manufacturer = QLineEdit(material.manufacturer if material else "")
         self.ed_brand = QLineEdit(material.brand if material else "")
@@ -50,27 +51,29 @@ class MaterialEditDialog(QDialog):
         self.spin_price = QDoubleSpinBox()
         self.spin_price.setRange(0, 1_000_000)
         self.spin_price.setDecimals(2)
-        self.spin_price.setValue((material.price_per_kg or 0) if material else 0)
+        self.spin_price.setValue(material.price_per_kg or 0 if material else 0)
         self.spin_pack = QDoubleSpinBox()
         self.spin_pack.setRange(0, 1000)
-        self.spin_pack.setValue((material.packaging_kg or 20) if material else 20)
+        self.spin_pack.setValue(material.packaging_kg or 20 if material else 20)
         self.spin_dft_min = QDoubleSpinBox()
         self.spin_dft_min.setRange(0, 2000)
-        self.spin_dft_min.setValue((material.recommended_dft_min or 0) if material else 0)
+        self.spin_dft_min.setValue(material.recommended_dft_min or 0 if material else 0)
         self.spin_dft_max = QDoubleSpinBox()
         self.spin_dft_max.setRange(0, 2000)
-        self.spin_dft_max.setValue((material.recommended_dft_max or 0) if material else 0)
-        layout.addRow("\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435*:", self.ed_name)
-        layout.addRow("\u041f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c:", self.ed_manufacturer)
-        layout.addRow("\u0411\u0440\u0435\u043d\u0434:", self.ed_brand)
-        layout.addRow("\u0422\u0438\u043f:", self.cmb_type)
-        layout.addRow("\u0421\u0432\u044f\u0437\u0443\u044e\u0449\u0435\u0435:", self.cmb_binder)
-        layout.addRow("\u041f\u043b\u043e\u0442\u043d\u043e\u0441\u0442\u044c:", self.spin_density)
-        layout.addRow("\u0421\u041e, %:", self.spin_solids)
-        layout.addRow("\u0426\u0435\u043d\u0430, \u0440\u0443\u0431/\u043a\u0433:", self.spin_price)
-        layout.addRow("\u0424\u0430\u0441\u043e\u0432\u043a\u0430, \u043a\u0433:", self.spin_pack)
-        layout.addRow("DFT min:", self.spin_dft_min)
-        layout.addRow("DFT max:", self.spin_dft_max)
+        self.spin_dft_max.setValue(material.recommended_dft_max or 0 if material else 0)
+
+        layout.addRow("Название*:", self.ed_name)
+        layout.addRow("Производитель:", self.ed_manufacturer)
+        layout.addRow("Бренд:", self.ed_brand)
+        layout.addRow("Тип:", self.cmb_type)
+        layout.addRow("Связующее:", self.cmb_binder)
+        layout.addRow("Плотность, кг/л:", self.spin_density)
+        layout.addRow("Сухой остаток, %:", self.spin_solids)
+        layout.addRow("Цена, руб/кг:", self.spin_price)
+        layout.addRow("Фасовка, кг:", self.spin_pack)
+        layout.addRow("DFT min, мкм:", self.spin_dft_min)
+        layout.addRow("DFT max, мкм:", self.spin_dft_max)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -96,7 +99,9 @@ class MaterialEditDialog(QDialog):
 
 
 class MaterialsView(QWidget):
-    materials_changed = Signal(list)
+    """База ЛКМ — просмотр и редактирование."""
+
+    materials_changed = Signal(list)  # list[Material]
 
     def __init__(self, materials: list[Material] | None = None, parent=None):
         super().__init__(parent)
@@ -108,20 +113,25 @@ class MaterialsView(QWidget):
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
-        title = QLabel("\u0411\u0430\u0437\u0430 \u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u043e\u0432")
+
+        title = QLabel("База материалов")
         title.setProperty("heading", True)
         root.addWidget(title)
+
+        search_row = QHBoxLayout()
         self.ed_search = QLineEdit()
-        self.ed_search.setPlaceholderText("\u041f\u043e\u0438\u0441\u043a…")
+        self.ed_search.setPlaceholderText("Поиск: название, производитель, связующее…")
         self.ed_search.textChanged.connect(self._reload_table)
-        root.addWidget(self.ed_search)
+        search_row.addWidget(self.ed_search)
+        root.addLayout(search_row)
+
         btn_row = QHBoxLayout()
-        btn_add = QPushButton("\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c")
+        btn_add = QPushButton("Добавить")
         btn_add.clicked.connect(self._on_add)
-        btn_edit = QPushButton("\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c")
+        btn_edit = QPushButton("Изменить")
         btn_edit.setProperty("secondary", True)
         btn_edit.clicked.connect(self._on_edit)
-        btn_del = QPushButton("\u0423\u0434\u0430\u043b\u0438\u0442\u044c")
+        btn_del = QPushButton("Удалить")
         btn_del.setProperty("secondary", True)
         btn_del.clicked.connect(self._on_delete)
         btn_row.addWidget(btn_add)
@@ -129,10 +139,11 @@ class MaterialsView(QWidget):
         btn_row.addWidget(btn_del)
         btn_row.addStretch()
         root.addLayout(btn_row)
+
         self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels([
-            "ID", "\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435", "\u041f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c", "\u0422\u0438\u043f", "\u0421\u0432\u044f\u0437\u0443\u044e\u0449\u0435\u0435",
-            "\u041f\u043b\u043e\u0442\u043d\u043e\u0441\u0442\u044c", "\u0421\u041e, %", "\u0426\u0435\u043d\u0430",
+            "ID", "Название", "Производитель", "Тип", "Связующее",
+            "Плотность", "СО, %", "Цена, руб/кг",
         ])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -141,6 +152,7 @@ class MaterialsView(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.doubleClicked.connect(self._on_edit)
         root.addWidget(self.table)
+
         self.lbl_count = QLabel()
         root.addWidget(self.lbl_count)
 
@@ -156,18 +168,26 @@ class MaterialsView(QWidget):
         q = self.ed_search.text().strip().lower()
         if not q:
             return self._materials
-        return [m for m in self._materials if q in f"{m.material_name} {m.manufacturer} {m.brand} {m.binder_type}".lower()]
+        result = []
+        for m in self._materials:
+            hay = f"{m.material_name} {m.manufacturer} {m.brand} {m.binder_type}".lower()
+            if q in hay:
+                result.append(m)
+        return result
 
     def _reload_table(self) -> None:
         rows = self._filtered()
         self.table.setRowCount(len(rows))
         for r, m in enumerate(rows):
             vals = [
-                str(m.id or ""), m.material_name, m.manufacturer or "\u2014",
+                str(m.id or ""),
+                m.material_name,
+                m.manufacturer or "—",
                 m.material_type.value if hasattr(m.material_type, "value") else str(m.material_type),
                 m.binder_type.value if hasattr(m.binder_type, "value") else str(m.binder_type),
-                f"{m.density:.2f}", f"{m.solids_percent:.0f}",
-                f"{m.price_per_kg:.0f}" if m.price_per_kg else "\u2014",
+                f"{m.density:.2f}",
+                f"{m.solids_percent:.0f}",
+                f"{m.price_per_kg:.0f}" if m.price_per_kg else "—",
             ]
             for c, v in enumerate(vals):
                 item = QTableWidgetItem(v)
@@ -175,7 +195,7 @@ class MaterialsView(QWidget):
                 if c == 0:
                     item.setData(Qt.UserRole, m.id)
                 self.table.setItem(r, c, item)
-        self.lbl_count.setText(f"\u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u043e\u0432: {len(rows)} (\u0432\u0441\u0435\u0433\u043e {len(self._materials)})")
+        self.lbl_count.setText(f"Материалов: {len(rows)} (всего {len(self._materials)})")
 
     def _selected_material(self) -> Optional[Material]:
         row = self.table.currentRow()
@@ -194,7 +214,7 @@ class MaterialsView(QWidget):
             return
         mat = dlg.get_material()
         if not mat.material_name:
-            QMessageBox.warning(self, "\u041e\u0448\u0438\u0431\u043a\u0430", "\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435")
+            QMessageBox.warning(self, "Ошибка", "Укажите название")
             return
         mat.id = self._next_id
         self._next_id += 1
@@ -205,14 +225,14 @@ class MaterialsView(QWidget):
     def _on_edit(self) -> None:
         mat = self._selected_material()
         if mat is None:
-            QMessageBox.information(self, "\u0411\u0430\u0437\u0430", "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b")
+            QMessageBox.information(self, "База", "Выберите материал")
             return
         dlg = MaterialEditDialog(mat, parent=self)
         if dlg.exec() != QDialog.Accepted:
             return
         updated = dlg.get_material()
         if not updated.material_name:
-            QMessageBox.warning(self, "\u041e\u0448\u0438\u0431\u043a\u0430", "\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435")
+            QMessageBox.warning(self, "Ошибка", "Укажите название")
             return
         for i, m in enumerate(self._materials):
             if m.id == mat.id:
@@ -225,7 +245,10 @@ class MaterialsView(QWidget):
         mat = self._selected_material()
         if mat is None:
             return
-        if QMessageBox.question(self, "\u0423\u0434\u0430\u043b\u0435\u043d\u0438\u0435", f"\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u00ab{mat.material_name}\u00bb?", QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+        if QMessageBox.question(
+            self, "Удаление", f"Удалить «{mat.material_name}»?",
+            QMessageBox.Yes | QMessageBox.No,
+        ) != QMessageBox.Yes:
             return
         self._materials = [m for m in self._materials if m.id != mat.id]
         self._reload_table()

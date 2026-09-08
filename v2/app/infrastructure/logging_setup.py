@@ -20,14 +20,16 @@ def setup_logging(level: int = logging.INFO) -> None:
     root = logging.getLogger()
     root.setLevel(level)
 
+    # Файл
     fh = logging.FileHandler(log_file, encoding="utf-8")
     fh.setFormatter(fmt)
     fh.setLevel(level)
     root.addHandler(fh)
 
+    # Консоль
     ch = logging.StreamHandler()
     ch.setFormatter(fmt)
     ch.setLevel(logging.WARNING)
     root.addHandler(ch)
 
-    logging.getLogger("app").info("Logging initialized \u2192 %s", log_file)
+    logging.getLogger("app").info("Logging initialized → %s", log_file)

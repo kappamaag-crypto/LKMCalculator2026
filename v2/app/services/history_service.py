@@ -19,6 +19,7 @@ class HistoryService:
         self.repo = CalculationRepository(session)
 
     def save_calculation(self, result: SystemCalculationResult, notes: str = "") -> int:
+        """Сохранить расчёт. Возвращает id."""
         obj = result.object_data
         snapshot = {
             "object": {
@@ -85,10 +86,10 @@ class HistoryService:
         self.session.flush()
         return calc.id
 
-    def list_calculations(self, limit: int = 100) -> Sequence:
+    def list_calculations(self, limit: int = 100) -> Sequence[CalculationORM]:
         return self.repo.list_recent(limit=limit)
 
-    def get_calculation(self, calc_id: int):
+    def get_calculation(self, calc_id: int) -> Optional[CalculationORM]:
         return self.repo.get_by_id(calc_id)
 
     def delete_calculation(self, calc_id: int) -> None:
@@ -123,7 +124,7 @@ class HistoryService:
         self.session.flush()
         return cmp.id
 
-    def list_comparisons(self, limit: int = 50) -> Sequence:
+    def list_comparisons(self, limit: int = 50) -> Sequence[ComparisonORM]:
         from sqlalchemy import select
         stmt = (
             select(ComparisonORM)
