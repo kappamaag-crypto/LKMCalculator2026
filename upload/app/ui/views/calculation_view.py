@@ -7,7 +7,7 @@ from typing import Optional
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
     QLabel, QLineEdit, QDoubleSpinBox, QSpinBox, QComboBox,
-    QPushButton, QMessageBox, QTextEdit, QSplitter, QFrame,
+    QPushButton, QMessageBox, QTextEdit, QSplitter,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -29,7 +29,7 @@ from PySide6.QtWidgets import QFileDialog
 class CalculationView(QWidget):
     """Вкладка «Расчёт»."""
 
-    calculation_done = Signal(object)  # SystemCalculationResult
+    calculation_done = Signal(object)
 
     def __init__(self, service: CalculationService, parent=None):
         super().__init__(parent)
@@ -125,7 +125,6 @@ class CalculationView(QWidget):
 
         add_box = QGroupBox("Слои системы")
         add_layout = QVBoxLayout(add_box)
-
         row_add = QHBoxLayout()
         self.cmb_material = QComboBox()
         self.cmb_material.setMinimumWidth(200)
@@ -149,7 +148,6 @@ class CalculationView(QWidget):
         btn_clear = QPushButton("Очистить")
         btn_clear.setProperty("secondary", True)
         btn_clear.clicked.connect(self._on_clear_layers)
-
         row_add.addWidget(QLabel("Материал:"))
         row_add.addWidget(self.cmb_material, 1)
         row_add.addWidget(QLabel("DFT:"))
@@ -162,7 +160,6 @@ class CalculationView(QWidget):
         row_add.addWidget(btn_remove)
         row_add.addWidget(btn_clear)
         add_layout.addLayout(row_add)
-
         self.layer_table = LayerTableWidget()
         add_layout.addWidget(self.layer_table)
         right_layout.addWidget(add_box)
@@ -300,27 +297,21 @@ class CalculationView(QWidget):
         if not layers:
             QMessageBox.warning(self, "Внимание", "Добавьте хотя бы один слой")
             return
-
         obj = self._build_object_data()
         default_losses = self.spin_losses.value()
         for li in layers:
             if li.losses_percent == 0 and default_losses > 0:
                 li.losses_percent = default_losses
-
         result, validation = self.service.calculate_system(obj, layers)
         self._last_result = result
-
         if validation.has_errors:
             msgs = "\n".join(f"• {e.message}" for e in validation.errors)
             QMessageBox.critical(self, "Ошибки валидации", msgs)
             return
-
         if validation.has_warnings:
             msgs = "\n".join(f"• {w.message}" for w in validation.warnings)
             QMessageBox.warning(self, "Предупреждения", msgs)
-
         self.layer_table.set_layers(layers, result.layers)
-
         self.lbl_summary.setText(
             f"Толщина: {result.total_dft:.0f} мкм  |  "
             f"Расход: {result.total_practical_consumption_kg:.3f} кг/м²  |  "
@@ -348,20 +339,14 @@ class CalculationView(QWidget):
         if self._last_result is None:
             QMessageBox.warning(self, "Внимание", "Сначала выполните расчёт")
             return
-
         path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Сохранить расчёт в Excel",
-            self._default_export_name("xlsx"),
-            "Excel (*.xlsx)",
+            self, "Сохранить расчёт в Excel", self._default_export_name("xlsx"), "Excel (*.xlsx)"
         )
         if not path:
             return
-
         try:
             settings = AppSettings.load()
-            exporter = CustomerExcelExporter(Path(settings.excel_template_path))
-            exporter.export_calculation(self._last_result, Path(path))
+            CustomerExcelExporter(settings).export_calculation(self._last_result, Path(path))
             QMessageBox.information(self, "Экспорт", "Расчёт успешно сохранён в Excel")
         except Exception as exc:
             QMessageBox.critical(self, "Ошибка экспорта Excel", str(exc))
@@ -371,16 +356,11 @@ class CalculationView(QWidget):
         if self._last_result is None:
             QMessageBox.warning(self, "Внимание", "Сначала выполните расчёт")
             return
-
         path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Сохранить расчёт в PDF",
-            self._default_export_name("pdf"),
-            "PDF (*.pdf)",
+            self, "Сохранить расчёт в PDF", self._default_export_name("pdf"), "PDF (*.pdf)"
         )
         if not path:
             return
-
         try:
             PDFExporter().export_calculation(self._last_result, Path(path))
             QMessageBox.information(self, "Экспорт", "Расчёт успешно сохранён в PDF")
