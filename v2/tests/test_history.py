@@ -1,0 +1,60 @@
+"""Тесты HistoryService (SQLite)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+import tempfile
+
+import pytest
+
+sqlalchemy = pytest.importorskip("sqlalchemy")
+from app.services.history_service import HistoryService
+from app.domain.models import Material, ObjectData
+from app.domain.enums import MaterialType, BinderType
+from app.domain.calculator import LayerInput
+from app.services.calculation_service import CalculationService
+from app.infrastructure.database.engine import get_engine, init_db, get_session_factory, session_scope
+
+
+@pytest.fixture
+def sample_result():
+    primer = Material(
+        material_name="Грунт Test",
+        material_type=MaterialType.PRIMER_ENAMEL,
+        binder_type=BinderType.EPOXY,
+        density=1.4, solids_percent=73.0, price_per_kg=500.0, packaging_kg=20.0,
+    )
+    obj = ObjectData(object_name="Тест истории", area_m2=50.0, calculation_number="H-001")
+    result, val = CalculationService().calculate_system(
+        obj, [LayerInput(material=primer, target_dft=100)]
+    )
+    assert not val.has_errors
+    return result
+
+
+def test_save_and_list(sample_result):
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "hist.sqlite"
+        engine = get_engine(db)
+        init_db(engine)
+        sf = get_session_factory(engine)
+        with session_scope(sf) as session:
+            svc = HistoryService(session)
+            calc_id = svc.save_calculation(sample_result, notes="unit test")
+            assert calc_id > 0
+            rows = svc.list_calculations()
+            assert len(rows) >= 1
+
+
+def test_delete(sample_result):
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "hist2.sqlite"
+        engine = get_engine(db)
+        init_db(engine)
+        sf = get_session_factory(engine)
+        with session_scope(sf) as session:
+            svc = HistoryService(session)
+            calc_id = svc.save_calculation(sample_result)
+            svc.delete_calculation(calc_id)
+        with session_scope(sf) as session:
+            assert HistoryService(session).get_calculation(calc_id) is None
