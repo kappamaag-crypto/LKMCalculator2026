@@ -1,372 +1,92 @@
-"""Экран быстрого / инженерного расчёта."""
-
+"""Экран расчёта системы покрытия."""
 from __future__ import annotations
-
+from pathlib import Path
 from typing import Optional
-
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
-    QLabel, QLineEdit, QDoubleSpinBox, QSpinBox, QComboBox,
-    QPushButton, QMessageBox, QTextEdit, QSplitter,
-)
-from PySide6.QtCore import Qt, Signal
-
-from app.domain.models import Material, ObjectData
-from app.domain.enums import (
-    CorrosionCategory, DurabilityLevel, SurfaceType,
-    EnvironmentType, MaterialType, BinderType,
-)
+from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QGroupBox,QLabel,QLineEdit,QDoubleSpinBox,QSpinBox,QComboBox,QPushButton,QMessageBox,QTextEdit,QSplitter,QFileDialog
+from PySide6.QtCore import Qt,Signal,QTimer
+from app.domain.models import Material,ObjectData
+from app.domain.enums import MaterialType,BinderType
 from app.domain.calculator import LayerInput
 from app.services.calculation_service import CalculationService
 from app.ui.widgets.layer_table import LayerTableWidget
 from app.infrastructure.export.customer_excel_exporter import CustomerExcelExporter
 from app.infrastructure.export.pdf_exporter import PDFExporter
 from app.config import AppSettings
-from pathlib import Path
-from PySide6.QtWidgets import QFileDialog
-
-
 class CalculationView(QWidget):
-    """Вкладка «Расчёт»."""
-
-    calculation_done = Signal(object)
-
-    def __init__(self, service: CalculationService, parent=None):
-        super().__init__(parent)
-        self.service = service
-        self._materials: list[Material] = []
-        self._last_result = None
-        self._build_ui()
-
-    def _build_ui(self) -> None:
-        root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(10)
-
-        title = QLabel("Расчёт системы покрытия")
-        title.setProperty("heading", True)
-        root.addWidget(title)
-
-        splitter = QSplitter(Qt.Horizontal)
-
-        left = QWidget()
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-
-        obj_box = QGroupBox("Объект")
-        obj_form = QFormLayout(obj_box)
-        self.ed_object = QLineEdit()
-        self.ed_object.setPlaceholderText("Название объекта")
-        self.ed_customer = QLineEdit()
-        self.ed_customer.setPlaceholderText("Заказчик")
-        self.spin_area = QDoubleSpinBox()
-        self.spin_area.setRange(0, 1_000_000)
-        self.spin_area.setValue(100.0)
-        self.spin_area.setSuffix(" м²")
-        self.spin_area.setDecimals(2)
-        self.spin_elements = QSpinBox()
-        self.spin_elements.setRange(1, 10_000)
-        self.spin_elements.setValue(1)
-        self.spin_area_el = QDoubleSpinBox()
-        self.spin_area_el.setRange(0, 100_000)
-        self.spin_area_el.setSuffix(" м²")
-        obj_form.addRow("Объект:", self.ed_object)
-        obj_form.addRow("Заказчик:", self.ed_customer)
-        obj_form.addRow("Площадь:", self.spin_area)
-        obj_form.addRow("Кол-во элементов:", self.spin_elements)
-        obj_form.addRow("Площадь элемента:", self.spin_area_el)
-        left_layout.addWidget(obj_box)
-
-        cond_box = QGroupBox("Условия эксплуатации")
-        cond_form = QFormLayout(cond_box)
-        self.cmb_corrosion = QComboBox()
-        self.cmb_corrosion.addItem("— не задано —", None)
-        for c in CorrosionCategory:
-            self.cmb_corrosion.addItem(c.value, c)
-        self.cmb_durability = QComboBox()
-        self.cmb_durability.addItem("— не задано —", None)
-        for d in DurabilityLevel:
-            self.cmb_durability.addItem(d.value, d)
-        self.cmb_surface = QComboBox()
-        self.cmb_surface.addItem("— не задано —", None)
-        for s in SurfaceType:
-            self.cmb_surface.addItem(s.value, s)
-        self.cmb_environment = QComboBox()
-        self.cmb_environment.addItem("— не задано —", None)
-        for e in EnvironmentType:
-            self.cmb_environment.addItem(e.value, e)
-        self.spin_tmin = QDoubleSpinBox()
-        self.spin_tmin.setRange(-100, 200)
-        self.spin_tmin.setValue(-40)
-        self.spin_tmin.setSuffix(" °C")
-        self.spin_tmax = QDoubleSpinBox()
-        self.spin_tmax.setRange(-100, 300)
-        self.spin_tmax.setValue(60)
-        self.spin_tmax.setSuffix(" °C")
-        self.spin_losses = QDoubleSpinBox()
-        self.spin_losses.setRange(0, 99)
-        self.spin_losses.setValue(0)
-        self.spin_losses.setSuffix(" %")
-        cond_form.addRow("Категория:", self.cmb_corrosion)
-        cond_form.addRow("Долговечность:", self.cmb_durability)
-        cond_form.addRow("Поверхность:", self.cmb_surface)
-        cond_form.addRow("Среда:", self.cmb_environment)
-        cond_form.addRow("T мин:", self.spin_tmin)
-        cond_form.addRow("T макс:", self.spin_tmax)
-        cond_form.addRow("Потери по умолч.:", self.spin_losses)
-        left_layout.addWidget(cond_box)
-        left_layout.addStretch()
-
-        splitter.addWidget(left)
-
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-
-        add_box = QGroupBox("Слои системы")
-        add_layout = QVBoxLayout(add_box)
-        row_add = QHBoxLayout()
-        self.cmb_material = QComboBox()
-        self.cmb_material.setMinimumWidth(200)
-        self.spin_dft = QDoubleSpinBox()
-        self.spin_dft.setRange(1, 2000)
-        self.spin_dft.setValue(100)
-        self.spin_dft.setSuffix(" мкм")
-        self.spin_layer_losses = QDoubleSpinBox()
-        self.spin_layer_losses.setRange(0, 99)
-        self.spin_layer_losses.setValue(0)
-        self.spin_layer_losses.setSuffix(" %")
-        self.spin_thinner = QDoubleSpinBox()
-        self.spin_thinner.setRange(0, 100)
-        self.spin_thinner.setValue(0)
-        self.spin_thinner.setSuffix(" %")
-        btn_add = QPushButton("Добавить слой")
-        btn_add.clicked.connect(self._on_add_layer)
-        btn_remove = QPushButton("Удалить")
-        btn_remove.setProperty("secondary", True)
-        btn_remove.clicked.connect(self._on_remove_layer)
-        btn_clear = QPushButton("Очистить")
-        btn_clear.setProperty("secondary", True)
-        btn_clear.clicked.connect(self._on_clear_layers)
-        row_add.addWidget(QLabel("Материал:"))
-        row_add.addWidget(self.cmb_material, 1)
-        row_add.addWidget(QLabel("DFT:"))
-        row_add.addWidget(self.spin_dft)
-        row_add.addWidget(QLabel("Потери:"))
-        row_add.addWidget(self.spin_layer_losses)
-        row_add.addWidget(QLabel("Разб.:"))
-        row_add.addWidget(self.spin_thinner)
-        row_add.addWidget(btn_add)
-        row_add.addWidget(btn_remove)
-        row_add.addWidget(btn_clear)
-        add_layout.addLayout(row_add)
-        self.layer_table = LayerTableWidget()
-        add_layout.addWidget(self.layer_table)
-        right_layout.addWidget(add_box)
-
-        btn_row = QHBoxLayout()
-        self.btn_calc = QPushButton("Рассчитать")
-        self.btn_calc.clicked.connect(self._on_calculate)
-        self.btn_demo = QPushButton("Демо-система")
-        self.btn_demo.setProperty("secondary", True)
-        self.btn_demo.clicked.connect(self._on_load_demo)
-        self.btn_excel = QPushButton("Excel")
-        self.btn_excel.setProperty("secondary", True)
-        self.btn_excel.clicked.connect(self._on_export_excel)
-        self.btn_excel.setEnabled(False)
-        self.btn_pdf = QPushButton("PDF")
-        self.btn_pdf.setProperty("secondary", True)
-        self.btn_pdf.clicked.connect(self._on_export_pdf)
-        self.btn_pdf.setEnabled(False)
-        self.btn_to_cmp = QPushButton("В сравнение")
-        self.btn_to_cmp.setProperty("secondary", True)
-        self.btn_to_cmp.clicked.connect(self._on_to_comparison)
-        self.btn_to_cmp.setEnabled(False)
-        btn_row.addWidget(self.btn_calc)
-        btn_row.addWidget(self.btn_demo)
-        btn_row.addWidget(self.btn_excel)
-        btn_row.addWidget(self.btn_pdf)
-        btn_row.addWidget(self.btn_to_cmp)
-        btn_row.addStretch()
-        right_layout.addLayout(btn_row)
-
-        res_box = QGroupBox("Результат")
-        res_layout = QVBoxLayout(res_box)
-        self.lbl_summary = QLabel("Выполните расчёт")
-        self.lbl_summary.setProperty("subheading", True)
-        self.lbl_summary.setWordWrap(True)
-        self.txt_details = QTextEdit()
-        self.txt_details.setReadOnly(True)
-        self.txt_details.setMaximumHeight(180)
-        res_layout.addWidget(self.lbl_summary)
-        res_layout.addWidget(self.txt_details)
-        right_layout.addWidget(res_box)
-
-        splitter.addWidget(right)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
-        root.addWidget(splitter)
-
-    def set_materials(self, materials: list[Material]) -> None:
-        self._materials = [m for m in materials if m.material_type != MaterialType.THINNER]
-        self.cmb_material.clear()
-        for m in self._materials:
-            self.cmb_material.addItem(m.display_name(), m)
-
-    def _current_material(self) -> Optional[Material]:
-        return self.cmb_material.currentData()
-
-    def _build_object_data(self) -> ObjectData:
-        area = self.spin_area.value()
-        if area <= 0 and self.spin_area_el.value() > 0:
-            area = self.spin_area_el.value() * self.spin_elements.value()
-        return ObjectData(
-            object_name=self.ed_object.text().strip(),
-            customer=self.ed_customer.text().strip(),
-            area_m2=area,
-            elements_count=self.spin_elements.value(),
-            area_per_element=self.spin_area_el.value(),
-            corrosion_category=self.cmb_corrosion.currentData(),
-            durability=self.cmb_durability.currentData(),
-            surface_type=self.cmb_surface.currentData(),
-            environment=self.cmb_environment.currentData(),
-            temperature_min=self.spin_tmin.value(),
-            temperature_max=self.spin_tmax.value(),
-        )
-
-    def _on_add_layer(self) -> None:
-        mat = self._current_material()
-        if mat is None:
-            QMessageBox.warning(self, "Внимание", "Выберите материал")
-            return
-        li = LayerInput(
-            material=mat,
-            target_dft=self.spin_dft.value(),
-            losses_percent=self.spin_layer_losses.value(),
-            thinner_percent=self.spin_thinner.value(),
-        )
-        self.layer_table.add_layer(li)
-
-    def _on_remove_layer(self) -> None:
-        self.layer_table.remove_selected()
-
-    def _on_clear_layers(self) -> None:
-        self.layer_table.clear_layers()
-        self.lbl_summary.setText("Выполните расчёт")
-        self.txt_details.clear()
-        self._last_result = None
-        self.btn_excel.setEnabled(False)
-        self.btn_pdf.setEnabled(False)
-        self.btn_to_cmp.setEnabled(False)
-
-    def _on_load_demo(self) -> None:
-        """Загрузить демо-систему Blank Universal + Finish."""
-        if len(self._materials) < 2:
-            primer = Material(
-                manufacturer="Blank", brand="Blank",
-                material_name="Грунт-Эмаль Blank Universal",
-                material_type=MaterialType.PRIMER_ENAMEL,
-                binder_type=BinderType.EPOXY,
-                density=1.4, solids_percent=73.0, price_per_kg=552.0,
-                recommended_dft_min=100, recommended_dft_max=200, packaging_kg=20.0,
-            )
-            finish = Material(
-                manufacturer="Blank", brand="Blank",
-                material_name="Эмаль Blank Finish",
-                material_type=MaterialType.FINISH,
-                binder_type=BinderType.POLYURETHANE,
-                density=1.3, solids_percent=58.0, price_per_kg=892.0,
-                recommended_dft_min=60, recommended_dft_max=100, packaging_kg=20.0,
-            )
-            self.set_materials([primer, finish])
-        else:
-            primer = self._materials[0]
-            finish = self._materials[1] if len(self._materials) > 1 else self._materials[0]
-
-        self.layer_table.clear_layers()
-        self.layer_table.add_layer(LayerInput(material=primer, target_dft=200, losses_percent=5, thinner_percent=5))
-        self.layer_table.add_layer(LayerInput(material=finish, target_dft=80, losses_percent=5, thinner_percent=5))
-        self.ed_object.setText("Резервуар РВС-1000 (демо)")
-        self.ed_customer.setText("ООО Пример")
-        self.spin_area.setValue(1250)
-        self.cmb_corrosion.setCurrentIndex(self.cmb_corrosion.findData(CorrosionCategory.C4))
-        self.cmb_durability.setCurrentIndex(self.cmb_durability.findData(DurabilityLevel.HIGH))
-
-    def _on_calculate(self) -> None:
-        layers = self.layer_table.get_layer_inputs()
+    calculation_done=Signal(object)
+    def __init__(self,service:CalculationService,parent=None):
+        super().__init__(parent); self.service=service; self._materials=[]; self._last_result=None; self._timer=QTimer(self); self._timer.setSingleShot(True); self._timer.setInterval(220); self._timer.timeout.connect(self._on_live_recalculate); self._build_ui()
+    def _build_ui(self):
+        root=QVBoxLayout(self); root.setContentsMargins(12,12,12,12); root.setSpacing(10); t=QLabel('Расчёт системы покрытия'); t.setProperty('heading',True); root.addWidget(t); sp=QSplitter(Qt.Horizontal)
+        left=QWidget(); ll=QVBoxLayout(left); b=QGroupBox('Объект'); f=QFormLayout(b); self.ed_object=QLineEdit(); self.ed_object.setPlaceholderText('Название объекта'); self.ed_customer=QLineEdit(); self.ed_customer.setPlaceholderText('Заказчик'); self.spin_area=QDoubleSpinBox(); self.spin_area.setRange(0,1000000); self.spin_area.setValue(100); self.spin_area.setDecimals(2); self.spin_area.setSuffix(' м²'); self.spin_elements=QSpinBox(); self.spin_elements.setRange(1,10000); self.spin_elements.setValue(1); self.spin_area_el=QDoubleSpinBox(); self.spin_area_el.setRange(0,100000); self.spin_area_el.setSuffix(' м²');
+        for x,y in [('Объект:',self.ed_object),('Заказчик:',self.ed_customer),('Площадь:',self.spin_area),('Кол-во элементов:',self.spin_elements),('Площадь элемента:',self.spin_area_el)]:f.addRow(x,y)
+        ll.addWidget(b); ll.addStretch(); sp.addWidget(left)
+        right=QWidget(); rl=QVBoxLayout(right); lb=QGroupBox('Слои системы'); al=QVBoxLayout(lb); row=QHBoxLayout(); self.cmb_material=QComboBox(); self.cmb_material.setMinimumWidth(200); self.spin_dft=QDoubleSpinBox(); self.spin_dft.setRange(1,2000); self.spin_dft.setValue(100); self.spin_dft.setSuffix(' мкм'); self.spin_layer_losses=QDoubleSpinBox(); self.spin_layer_losses.setRange(0,99); self.spin_layer_losses.setSuffix(' %'); self.spin_thinner=QDoubleSpinBox(); self.spin_thinner.setRange(0,100); self.spin_thinner.setSuffix(' %'); add=QPushButton('Добавить слой'); add.clicked.connect(self._on_add_layer); rem=QPushButton('Удалить'); rem.setProperty('secondary',True); rem.clicked.connect(self._on_remove_layer); clr=QPushButton('Очистить'); clr.setProperty('secondary',True); clr.clicked.connect(self._on_clear_layers)
+        for x in (QLabel('Материал:'),self.cmb_material,QLabel('DFT:'),self.spin_dft,QLabel('Потери:'),self.spin_layer_losses,QLabel('Разб.:'),self.spin_thinner,add,rem,clr):row.addWidget(x)
+        al.addLayout(row); h=QLabel('Цена, DFT, потери и разбавитель редактируются прямо в таблице. Результат обновляется автоматически.'); h.setWordWrap(True); h.setProperty('subheading',True); al.addWidget(h); self.layer_table=LayerTableWidget(); self.layer_table.layer_changed.connect(self._schedule_live_recalculate); al.addWidget(self.layer_table); rl.addWidget(lb)
+        buttons=QHBoxLayout(); self.btn_calc=QPushButton('Рассчитать'); self.btn_calc.clicked.connect(self._on_calculate); self.btn_demo=QPushButton('Демо-система'); self.btn_demo.setProperty('secondary',True); self.btn_demo.clicked.connect(self._on_load_demo); self.btn_excel=QPushButton('Excel'); self.btn_excel.setProperty('secondary',True); self.btn_excel.clicked.connect(self._on_export_excel); self.btn_excel.setEnabled(False); self.btn_pdf=QPushButton('PDF'); self.btn_pdf.setProperty('secondary',True); self.btn_pdf.clicked.connect(self._on_export_pdf); self.btn_pdf.setEnabled(False); self.btn_to_cmp=QPushButton('В сравнение'); self.btn_to_cmp.setProperty('secondary',True); self.btn_to_cmp.clicked.connect(self._on_to_comparison); self.btn_to_cmp.setEnabled(False)
+        for x in (self.btn_calc,self.btn_demo,self.btn_excel,self.btn_pdf,self.btn_to_cmp):buttons.addWidget(x)
+        buttons.addStretch(); rl.addLayout(buttons); rb=QGroupBox('Результат'); rr=QVBoxLayout(rb); self.lbl_summary=QLabel('Выполните расчёт'); self.lbl_summary.setProperty('subheading',True); self.lbl_summary.setWordWrap(True); self.txt_details=QTextEdit(); self.txt_details.setReadOnly(True); self.txt_details.setMaximumHeight(180); rr.addWidget(self.lbl_summary); rr.addWidget(self.txt_details); rl.addWidget(rb); sp.addWidget(right); sp.setStretchFactor(0,1); sp.setStretchFactor(1,2); root.addWidget(sp)
+    def set_materials(self,materials:list[Material]):
+        self._materials=[m for m in materials if m.material_type!=MaterialType.THINNER]; self.cmb_material.clear()
+        for m in self._materials:self.cmb_material.addItem(m.display_name(),m)
+    def _current_material(self)->Optional[Material]:return self.cmb_material.currentData()
+    def _build_object_data(self):
+        area=self.spin_area.value() or self.spin_area_el.value()*self.spin_elements.value(); return ObjectData(object_name=self.ed_object.text().strip(),customer=self.ed_customer.text().strip(),area_m2=area,elements_count=self.spin_elements.value(),area_per_element=self.spin_area_el.value())
+    def _on_add_layer(self):
+        m=self._current_material()
+        if m is None:QMessageBox.warning(self,'Внимание','Выберите материал'); return
+        self.layer_table.add_layer(LayerInput(material=m,target_dft=self.spin_dft.value(),losses_percent=self.spin_layer_losses.value(),thinner_percent=self.spin_thinner.value()))
+    def _on_remove_layer(self):self.layer_table.remove_selected()
+    def _on_clear_layers(self):
+        self._timer.stop(); self.layer_table.clear_layers(); self.lbl_summary.setText('Выполните расчёт'); self.txt_details.clear(); self._last_result=None
+        for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp):b.setEnabled(False)
+    def _on_load_demo(self):
+        if len(self._materials)<2:
+            p=Material(manufacturer='Blank',brand='Blank',material_name='Грунт-Эмаль Blank Universal',material_type=MaterialType.PRIMER_ENAMEL,binder_type=BinderType.EPOXY,density=1.4,solids_percent=73,price_per_kg=552,recommended_dft_min=100,recommended_dft_max=200); f=Material(manufacturer='Blank',brand='Blank',material_name='Эмаль Blank Finish',material_type=MaterialType.FINISH,binder_type=BinderType.POLYURETHANE,density=1.3,solids_percent=58,price_per_kg=892,recommended_dft_min=60,recommended_dft_max=100); self.set_materials([p,f])
+        else:p=self._materials[0]; f=self._materials[1] if len(self._materials)>1 else p
+        self.layer_table.clear_layers(); self.layer_table.add_layer(LayerInput(material=p,target_dft=200,losses_percent=5)); self.layer_table.add_layer(LayerInput(material=f,target_dft=80,losses_percent=5)); self.ed_object.setText('Резервуар РВС-1000 (демо)'); self.ed_customer.setText('ООО Пример'); self.spin_area.setValue(1250)
+    def _schedule_live_recalculate(self):
+        if self.layer_table.rowCount():self._timer.start()
+    @staticmethod
+    def _money(v,dec=2):return '—' if v is None else f'{v:,.{dec}f}'.replace(',',' ')
+    def _recalculate(self,dialogs=False):
+        layers=self.layer_table.get_layer_inputs()
         if not layers:
-            QMessageBox.warning(self, "Внимание", "Добавьте хотя бы один слой")
-            return
-        obj = self._build_object_data()
-        default_losses = self.spin_losses.value()
-        for li in layers:
-            if li.losses_percent == 0 and default_losses > 0:
-                li.losses_percent = default_losses
-        result, validation = self.service.calculate_system(obj, layers)
-        self._last_result = result
+            if dialogs:QMessageBox.warning(self,'Внимание','Добавьте хотя бы один слой')
+            return False
+        try:result,validation=self.service.calculate_system(self._build_object_data(),layers)
+        except (ValueError,TypeError) as e:
+            self.lbl_summary.setText(f'Ошибка расчёта: {e}'); self.txt_details.clear()
+            if dialogs:QMessageBox.critical(self,'Ошибка расчёта',str(e))
+            return False
         if validation.has_errors:
-            msgs = "\n".join(f"• {e.message}" for e in validation.errors)
-            QMessageBox.critical(self, "Ошибки валидации", msgs)
-            return
-        if validation.has_warnings:
-            msgs = "\n".join(f"• {w.message}" for w in validation.warnings)
-            QMessageBox.warning(self, "Предупреждения", msgs)
-        self.layer_table.set_layers(layers, result.layers)
-        self.lbl_summary.setText(
-            f"Толщина: {result.total_dft:.0f} мкм  |  "
-            f"Расход: {result.total_practical_consumption_kg:.3f} кг/м²  |  "
-            f"Стоимость: {result.total_cost_per_m2:.2f} руб/м²  |  "
-            f"Объект: {result.total_cost:,.0f} руб".replace(",", " ")
-        )
-        self.txt_details.setPlainText(self.service.format_summary(result))
-        self.btn_excel.setEnabled(True)
-        self.btn_pdf.setEnabled(True)
-        self.btn_to_cmp.setEnabled(True)
+            msg='\n'.join(f'• {e.message}' for e in validation.errors); self.lbl_summary.setText('Расчёт требует исправления входных данных'); self.txt_details.setPlainText(msg)
+            for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp):b.setEnabled(False)
+            if dialogs:QMessageBox.critical(self,'Ошибки валидации',msg)
+            return False
+        self._last_result=result; self.layer_table.set_layers(layers,result.layers); self.lbl_summary.setText(f'Толщина: {result.total_dft:.0f} мкм  |  Расход: {result.total_practical_consumption_kg:.3f} кг/м²  |  Стоимость: {self._money(result.total_cost_per_m2)} руб/м²  |  Объект: {self._money(result.total_cost,0)} руб'); self.txt_details.setPlainText(self.service.format_summary(result))
+        for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp):b.setEnabled(True)
         self.calculation_done.emit(result)
-
-    def _default_export_name(self, extension: str) -> str:
-        """Сформировать безопасное имя файла для экспорта."""
-        if not self._last_result:
-            return f"Расчёт_ЛКМ_АКЗ.{extension}"
-        name = self._last_result.object_data.object_name.strip() or "Расчёт_ЛКМ_АКЗ"
-        invalid = '<>:"/\\|?*'
-        for ch in invalid:
-            name = name.replace(ch, "_")
-        return f"{name}.{extension}"
-
-    def _on_export_excel(self) -> None:
-        """Экспорт последнего расчёта в рабочий Excel-шаблон заказчика."""
-        if self._last_result is None:
-            QMessageBox.warning(self, "Внимание", "Сначала выполните расчёт")
-            return
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Сохранить расчёт в Excel", self._default_export_name("xlsx"), "Excel (*.xlsx)"
-        )
-        if not path:
-            return
-        try:
-            settings = AppSettings.load()
-            CustomerExcelExporter(settings).export_calculation(self._last_result, Path(path))
-            QMessageBox.information(self, "Экспорт", "Расчёт успешно сохранён в Excel")
-        except Exception as exc:
-            QMessageBox.critical(self, "Ошибка экспорта Excel", str(exc))
-
-    def _on_export_pdf(self) -> None:
-        """Экспорт последнего расчёта в PDF."""
-        if self._last_result is None:
-            QMessageBox.warning(self, "Внимание", "Сначала выполните расчёт")
-            return
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Сохранить расчёт в PDF", self._default_export_name("pdf"), "PDF (*.pdf)"
-        )
-        if not path:
-            return
-        try:
-            PDFExporter().export_calculation(self._last_result, Path(path))
-            QMessageBox.information(self, "Экспорт", "Расчёт успешно сохранён в PDF")
-        except Exception as exc:
-            QMessageBox.critical(self, "Ошибка экспорта PDF", str(exc))
-
-    def _on_to_comparison(self) -> None:
-        if self._last_result is not None:
-            self.calculation_done.emit(self._last_result)
+        if validation.has_warnings and dialogs:QMessageBox.warning(self,'Предупреждения','\n'.join(f'• {w.message}' for w in validation.warnings))
+        return True
+    def _on_live_recalculate(self):self._recalculate(False)
+    def _on_calculate(self):self._recalculate(True)
+    def _default_export_name(self,ext):
+        name=self._last_result.object_data.object_name.strip() if self._last_result else 'Расчёт_ЛКМ_АКЗ'
+        for ch in '<>:"/\\|?*':name=name.replace(ch,'_')
+        return f'{name}.{ext}'
+    def _on_export_excel(self):
+        if self._last_result is None:QMessageBox.warning(self,'Внимание','Сначала выполните расчёт'); return
+        path,_=QFileDialog.getSaveFileName(self,'Сохранить расчёт в Excel',self._default_export_name('xlsx'),'Excel (*.xlsx)')
+        if not path:return
+        try:CustomerExcelExporter(AppSettings.load()).export_calculation(self._last_result,Path(path)); QMessageBox.information(self,'Экспорт','Расчёт успешно сохранён в Excel')
+        except Exception as e:QMessageBox.critical(self,'Ошибка экспорта Excel',str(e))
+    def _on_export_pdf(self):
+        if self._last_result is None:QMessageBox.warning(self,'Внимание','Сначала выполните расчёт'); return
+        path,_=QFileDialog.getSaveFileName(self,'Сохранить расчёт в PDF',self._default_export_name('pdf'),'PDF (*.pdf)')
+        if not path:return
+        try:PDFExporter().export_calculation(self._last_result,Path(path)); QMessageBox.information(self,'Экспорт','Расчёт успешно сохранён в PDF')
+        except Exception as e:QMessageBox.critical(self,'Ошибка экспорта PDF',str(e))
+    def _on_to_comparison(self):
+        if self._last_result is not None:self.calculation_done.emit(self._last_result)
