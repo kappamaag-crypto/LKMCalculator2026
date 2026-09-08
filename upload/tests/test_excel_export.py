@@ -72,9 +72,7 @@ def test_layers_sheet_has_data(sample_result):
         ExcelExporter().export_calculation(sample_result, path)
         wb = load_workbook(path)
         ws = wb["Слои"]
-        # Должны быть заголовки и минимум 2 строки данных + итого
         assert ws.max_row >= 4
-        # Проверяем наличие названия материала
         found = False
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=3):
             for cell in row:
@@ -83,9 +81,20 @@ def test_layers_sheet_has_data(sample_result):
         assert found
 
 
+def test_layers_sheet_has_thinner_consumption_columns(sample_result):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "test.xlsx"
+        ExcelExporter().export_calculation(sample_result, path)
+        wb = load_workbook(path)
+        ws = wb["Слои"]
+        headers = [ws.cell(3, col).value for col in range(1, ws.max_column + 1)]
+        assert "Разбавитель, кг/м²" in headers
+        assert "Разбавитель, л/м²" in headers
+        assert "Разбавитель, руб/м²" in headers
+
+
 def test_export_comparison(sample_result):
     from app.domain.comparison import ComparisonEngine
-    from app.domain.calculator import LayerInput
 
     primer = sample_result.layers[0].material
     finish = sample_result.layers[1].material
