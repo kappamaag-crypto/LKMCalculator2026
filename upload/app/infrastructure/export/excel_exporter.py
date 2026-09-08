@@ -50,8 +50,16 @@ def _cell(ws:Worksheet,row:int,col:int,value,bold:bool=False,fill=None,align=CEN
     return cell
 
 
+def _area(obj:ObjectData)->float:
+    if obj.area_m2 > 0:
+        return obj.area_m2
+    if obj.area_per_element > 0 and obj.elements_count > 0:
+        return obj.area_per_element * obj.elements_count
+    return 0.0
+
+
 class ExcelExporter:
-    """Экспорт инженерного расчёта без складской и закупочной логики."""
+    """Экспорт инженерного расчёта без закупочной и складской логики."""
 
     def __init__(self,settings:Optional[AppSettings]=None):
         self.settings=settings or AppSettings()
@@ -91,8 +99,7 @@ class ExcelExporter:
             if value:
                 ws.cell(row,1,f"{label}: {value}").font=NORMAL_FONT
                 row+=1
-        area=obj.area_m2 if obj.area_m2>0 else obj.area_per_element*obj.elements_count
-        ws.cell(row,1,f"Площадь: {area:.2f} м²").font=NORMAL_FONT
+        ws.cell(row,1,f"Площадь: {_area(obj):.2f} м²").font=NORMAL_FONT
         return row+2
 
     def _sheet_input(self,ws:Worksheet,result:SystemCalculationResult)->None:
@@ -123,7 +130,7 @@ class ExcelExporter:
             "№","Материал","Связующее","DFT, мкм","WFT, мкм","Потери, %","Разб., %",
             "Укрыв. теор., м²/л","Укрыв. практ., м²/л","Расход теор., кг/м²",
             "Расход практ., кг/м²","Расход практ., л/м²","Стоимость материала, руб/м²",
-            "Разбавитель, руб/м²","Итого, руб/м²","Количество на объект, кг","Стоимость на объект, руб"
+            "Разбавитель, руб/м²","Итого, руб/м²","Расход на объект, кг","Стоимость на объект, руб"
         ]
         _write_header_row(ws,row,headers)
         row+=1
@@ -140,15 +147,17 @@ class ExcelExporter:
             for col,value in enumerate(values,1):
                 _cell(ws,row,col,value,fill=fill)
             row+=1
+        area=_area(result.object_data)
+        material_cost=result.total_cost_per_m2-(result.total_thinner_cost/area if area else 0.0)
+        thinner_cost_m2=result.total_thinner_cost/area if area else 0.0
         _cell(ws,row,2,"ИТОГО",True,TOTAL_FILL,LEFT)
         _cell(ws,row,4,result.total_dft,True,TOTAL_FILL)
         _cell(ws,row,11,result.total_practical_consumption_kg,True,TOTAL_FILL)
         _cell(ws,row,12,result.total_practical_consumption_l,True,TOTAL_FILL)
-        material_cost=result.total_cost_per_m2-result.total_thinner_cost / (result.object_data.area_m2 or 1)
         _cell(ws,row,13,material_cost,True,TOTAL_FILL)
-        _cell(ws,row,14,result.total_thinner_cost / (result.object_data.area_m2 or 1),True,TOTAL_FILL)
+        _cell(ws,row,14,thinner_cost_m2,True,TOTAL_FILL)
         _cell(ws,row,15,result.total_cost_per_m2,True,TOTAL_FILL)
-        _cell(ws,row,16,result.total_practical_consumption_kg*(result.object_data.area_m2 or 0),True,TOTAL_FILL)
+        _cell(ws,row,16,result.total_practical_consumption_kg*area,True,TOTAL_FILL)
         _cell(ws,row,17,result.total_cost,True,TOTAL_FILL)
         ws.freeze_panes="A4"
         _auto_width(ws,8,28)
@@ -161,14 +170,15 @@ class ExcelExporter:
             "Цена, руб/л","Расход, кг","Расход, л","Стоимость материала, руб","Разбавитель, руб"
         ])
         row+=1
+        area=_area(result.object_data)
         for i,lr in enumerate(result.layers):
             fill=ALT_FILL if i%2 else None
             values=[
                 lr.material.material_name,lr.material.manufacturer or "—",lr.material.density,
                 lr.material.solids_by_volume_percent if lr.material.solids_by_volume_percent is not None else lr.material.solids_percent,
                 lr.material.price_per_kg,lr.material.price_per_liter,lr.total_consumption_kg,lr.total_consumption_l,
-                lr.cost_per_m2 * (result.object_data.area_m2 or 0),
-                lr.thinner_cost_per_m2 * (result.object_data.area_m2 or 0)
+                lr.cost_per_m2 * area,
+                lr.thinner_cost_per_m2 * area
             ]
             for col,value in enumerate(values,1):
                 _cell(ws,row,col,value,fill=fill)
@@ -179,6 +189,8 @@ class ExcelExporter:
         row=self._title_block(ws,"Итоговый расчёт",result.object_data)
         ws.cell(row,1,"Сводка").font=SUBTITLE_FONT
         row+=1
+        area=_area(result.object_data)
+        thinner_cost_m2=result.total_thinner_cost/area if area else 0.0
         items=[
             ("Система",result.system.system_name or "Пользовательская"),
             ("Количество слоёв",len(result.layers)),
@@ -186,8 +198,8 @@ class ExcelExporter:
             ("Расход теоретический, кг/м²",result.total_theoretical_consumption_kg),
             ("Расход практический, кг/м²",result.total_practical_consumption_kg),
             ("Расход практический, л/м²",result.total_practical_consumption_l),
-            ("Стоимость ЛКМ, руб/м²",result.total_cost_per_m2-(result.total_thinner_cost/(result.object_data.area_m2 or 1))),
-            ("Стоимость разбавителя, руб/м²",result.total_thinner_cost/(result.object_data.area_m2 or 1)),
+            ("Стоимость ЛКМ, руб/м²",result.total_cost_per_m2-thinner_cost_m2),
+            ("Стоимость разбавителя, руб/м²",thinner_cost_m2),
             ("Итого, руб/м²",result.total_cost_per_m2),
             ("Стоимость объекта, руб",result.total_cost),
             ("В т.ч. разбавитель, руб",result.total_thinner_cost),
