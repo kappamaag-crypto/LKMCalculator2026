@@ -1,12 +1,7 @@
-"""
-Расчётные формулы ЛКМ / АКЗ.
+"""Расчётные формулы ЛКМ / АКЗ v3.0.
 
-Формулы разделяют сухую плёнку, мокрую плёнку, разбавление и потери.
-Критически важно: процент разбавления не может трактоваться одинаково
-для всех производителей, поэтому basis задаётся явно.
-
-Инженерное правило v3: промежуточные значения НЕ округляются. Округление
-выполняется только на уровне представления результата пользователю.
+Промежуточные значения не округляются. Округление выполняется только
+при отображении либо на границе закупочной фасовки.
 """
 
 from __future__ import annotations
@@ -15,7 +10,6 @@ from dataclasses import dataclass
 from typing import Optional
 
 FORMULA_VERSION = "3.0"
-
 DILUTION_BASIS_BY_PAINT_VOLUME = "BY_PAINT_VOLUME"
 DILUTION_BASIS_BY_MIX_VOLUME = "BY_MIX_VOLUME"
 DILUTION_BASIS_BY_MASS = "BY_MASS"
@@ -52,7 +46,7 @@ class LayerCalcResult:
 
 
 def round3(value: float) -> float:
-    """Округление только для отображения/совместимости старого API."""
+    """Legacy/display helper; never used for intermediate engineering math."""
     return round(float(value), 3)
 
 
@@ -73,11 +67,9 @@ def calculate_wft_with_dilution(
     base_wft = calculate_wft(dft, solids_percent)
     if base_wft <= 0 or thinner_percent <= 0:
         return base_wft
-
     p = thinner_percent / 100.0
     if p >= 1.0:
         raise ValueError("Процент разбавления должен быть меньше 100%.")
-
     if basis in (DILUTION_BASIS_BY_PAINT_VOLUME, DILUTION_BASIS_BY_COMPONENT_VOLUME):
         added_volume_ratio = p
     elif basis == DILUTION_BASIS_BY_MIX_VOLUME:
@@ -88,7 +80,6 @@ def calculate_wft_with_dilution(
         added_volume_ratio = paint_density * p / thinner_density
     else:
         raise ValueError(f"Неизвестное основание разбавления: {basis}")
-
     return base_wft * (1.0 + added_volume_ratio)
 
 
@@ -140,11 +131,9 @@ def calculate_thinner(
         return 0.0, 0.0, 0.0
     if thinner_density <= 0:
         raise ValueError("Плотность разбавителя должна быть положительной.")
-
     p = thinner_percent / 100.0
     if p >= 1.0:
         raise ValueError("Процент разбавления должен быть меньше 100%.")
-
     if basis in (DILUTION_BASIS_BY_PAINT_VOLUME, DILUTION_BASIS_BY_COMPONENT_VOLUME):
         thinner_l = parent_consumption_l * p
     elif basis == DILUTION_BASIS_BY_MIX_VOLUME:
@@ -155,24 +144,19 @@ def calculate_thinner(
         thinner_l = parent_consumption_l * parent_density * p / thinner_density
     else:
         raise ValueError(f"Неизвестное основание разбавления: {basis}")
-
     thinner_kg = thinner_l * thinner_density
-    cost = calculate_cost(thinner_kg, thinner_price_per_kg)
-    return thinner_l, thinner_kg, cost
+    return thinner_l, thinner_kg, calculate_cost(thinner_kg, thinner_price_per_kg)
 
 
 def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
     wft = calculate_wft_with_dilution(
-        inp.dry_thickness,
-        inp.solids_percent,
-        inp.thinner_percent,
-        inp.thinner_density,
-        inp.density,
-        inp.thinner_basis,
+        inp.dry_thickness, inp.solids_percent, inp.thinner_percent,
+        inp.thinner_density, inp.density, inp.thinner_basis,
     )
     base_wft = calculate_wft(inp.dry_thickness, inp.solids_percent)
-    theor_paint_l = 0.0 if base_wft <= 0 else 1000.0 / base_wft
 
+    # 1000 / WFT = m²/l, поэтому l/m² = WFT / 1000.
+    theor_paint_l = 0.0 if base_wft <= 0 else base_wft / 1000.0
     k_loss = calculate_loss_coefficient(inp.losses_percent)
     pract_paint_l = theor_paint_l * k_loss
     theor_cov = 0.0 if theor_paint_l <= 0 else 1.0 / theor_paint_l
@@ -180,16 +164,10 @@ def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
     theor_kg = calculate_consumption_kg(theor_paint_l, inp.density)
     pract_kg = calculate_consumption_kg(pract_paint_l, inp.density)
     cost = calculate_cost(pract_kg, inp.price_per_kg)
-
     thinner_l, thinner_kg, thinner_cost = calculate_thinner(
-        parent_consumption_l=pract_paint_l,
-        thinner_percent=inp.thinner_percent,
-        thinner_density=inp.thinner_density,
-        thinner_price_per_kg=inp.thinner_price_per_kg,
-        basis=inp.thinner_basis,
-        parent_density=inp.density,
+        pract_paint_l, inp.thinner_percent, inp.thinner_density,
+        inp.thinner_price_per_kg, inp.thinner_basis, inp.density,
     )
-
     return LayerCalcResult(
         wft=wft,
         theoretical_coverage=theor_cov,
@@ -218,8 +196,7 @@ def calculate_packages(required_kg: float, packaging_kg: Optional[float]) -> tup
     import math
     packages = math.ceil(required_kg / packaging_kg)
     purchase = packages * packaging_kg
-    remainder = purchase - required_kg
-    return packages, purchase, remainder
+    return packages, purchase, purchase - required_kg
 
 
 def total_area(area_per_element: float, elements_count: int) -> float:
