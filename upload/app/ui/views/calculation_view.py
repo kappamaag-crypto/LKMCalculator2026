@@ -265,6 +265,10 @@ class CalculationView(QWidget):
         self.layer_table.clear_layers()
         self.lbl_summary.setText("Выполните расчёт")
         self.txt_details.clear()
+        self._last_result = None
+        self.btn_excel.setEnabled(False)
+        self.btn_pdf.setEnabled(False)
+        self.btn_to_cmp.setEnabled(False)
 
     def _on_load_demo(self) -> None:
         """Загрузить демо-систему Blank Universal + Finish."""
@@ -339,3 +343,82 @@ class CalculationView(QWidget):
         self.btn_pdf.setEnabled(True)
         self.btn_to_cmp.setEnabled(True)
         self.calculation_done.emit(result)
+
+    # ------------------------------------------------------------------
+    def _default_export_name(self, extension: str) -> str:
+        """Сформировать безопасное имя файла для экспорта."""
+        if not self._last_result:
+            return f"Расчёт_ЛКМ_АКЗ.{extension}"
+        name = self._last_result.object_data.object_name.strip() or "Расчёт_ЛКМ_АКЗ"
+        invalid = '<>:"/\\|?*'
+        for ch in invalid:
+            name = name.replace(ch, "_")
+        return f"{name}.{extension}"
+
+    def _on_export_excel(self) -> None:
+        """Экспорт последнего расчёта в Excel."""
+        if self._last_result is None:
+            QMessageBox.warning(self, "Внимание", "Сначала выполните расчёт")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Сохранить расчёт в Excel",
+            self._default_export_name("xlsx"),
+            "Excel (*.xlsx)",
+        )
+        if not path:
+            return
+
+        try:
+            ExcelExporter().export_calculation(self._last_result, Path(path))
+            QMessageBox.information(self, "Экспорт завершён", f"Excel-файл сохранён:\n{path}")
+        except Exception as exc:
+            QMessageBox.critical(self, "Ошибка экспорта Excel", str(exc))
+
+    def _on_export_pdf(self) -> None:
+        """Экспорт последнего расчёта в PDF."""
+        if self._last_result is None:
+            QMessageBox.warning(self, "Внимание", "Сначала выполните расчёт")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Сохранить расчёт в PDF",
+            self._default_export_name("pdf"),
+            "PDF (*.pdf)",
+        )
+        if not path:
+            return
+
+        try:
+            PDFExporter().export_calculation(self._last_result, Path(path))
+            QMessageBox.information(self, "Экспорт завершён", f"PDF-файл сохранён:\n{path}")
+        except Exception as exc:
+            QMessageBox.critical(self, "Ошибка экспорта PDF", str(exc))
+
+    def _on_to_comparison(self) -> None:
+        """Перейти на вкладку сравнения.
+
+        Результат уже автоматически добавляется в ComparisonView через
+        сигнал calculation_done в MainWindow, поэтому здесь не создаём
+        дубликат системы.
+        """
+        if self._last_result is None:
+            QMessageBox.warning(self, "Внимание", "Сначала выполните расчёт")
+            return
+
+        window = self.window()
+        tabs = getattr(window, "tabs", None)
+        comparison_view = getattr(window, "cmp_view", None)
+        if tabs is not None and comparison_view is not None:
+            index = tabs.indexOf(comparison_view)
+            if index >= 0:
+                tabs.setCurrentIndex(index)
+                return
+
+        QMessageBox.information(
+            self,
+            "Сравнение",
+            "Расчёт добавлен в раздел «Сравнение». Откройте вкладку «Сравнение».",
+        )
