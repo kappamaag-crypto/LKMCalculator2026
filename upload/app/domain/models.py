@@ -109,9 +109,6 @@ class LayerResult:
     total_consumption_kg: float = 0.0
     total_consumption_l: float = 0.0
     total_cost: float = 0.0
-    packages_count: int = 0
-    purchase_kg: float = 0.0
-    remainder_kg: float = 0.0
 
 
 @dataclass
@@ -187,7 +184,6 @@ class SystemCalculationResult:
     total_cost_per_m2: float = 0.0
     total_cost: float = 0.0
     total_thinner_cost: float = 0.0
-    total_purchase_cost: float = 0.0
     calculated_at: datetime = field(default_factory=datetime.now)
 
 
