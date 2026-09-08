@@ -102,13 +102,13 @@ class LayerResult:
     practical_consumption_l: float = 0.0
     theoretical_consumption_kg: float = 0.0
     practical_consumption_kg: float = 0.0
-    cost_per_m2: float = 0.0
+    cost_per_m2: Optional[float] = None
     thinner_consumption_l: float = 0.0
     thinner_consumption_kg: float = 0.0
-    thinner_cost_per_m2: float = 0.0
+    thinner_cost_per_m2: Optional[float] = None
     total_consumption_kg: float = 0.0
     total_consumption_l: float = 0.0
-    total_cost: float = 0.0
+    total_cost: Optional[float] = None
 
 
 @dataclass
@@ -181,9 +181,9 @@ class SystemCalculationResult:
     total_practical_consumption_kg: float = 0.0
     total_theoretical_consumption_l: float = 0.0
     total_practical_consumption_l: float = 0.0
-    total_cost_per_m2: float = 0.0
-    total_cost: float = 0.0
-    total_thinner_cost: float = 0.0
+    total_cost_per_m2: Optional[float] = None
+    total_cost: Optional[float] = None
+    total_thinner_cost: Optional[float] = None
     calculated_at: datetime = field(default_factory=datetime.now)
 
 
