@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox, QLab
 
 from app.infrastructure.database.engine import init_db, get_session_factory
 from app.infrastructure.database.models import MaterialORM
+from app.infrastructure.database.seed import seed_spkeffa_catalog
 from app.services.two_component_service import TwoComponentService
 
 
@@ -65,6 +66,12 @@ class TwoComponentView(QWidget):
                     MaterialORM.is_two_component.is_(True),
                     MaterialORM.is_active.is_(True),
                 ).order_by(MaterialORM.material_name).all()
+                if not rows:
+                    seed_spkeffa_catalog(session)
+                    rows = session.query(MaterialORM).filter(
+                        MaterialORM.is_two_component.is_(True),
+                        MaterialORM.is_active.is_(True),
+                    ).order_by(MaterialORM.material_name).all()
                 self._materials = [(row.id, row.material_name) for row in rows]
         except Exception as exc:
             self.cmb_material.addItem("Ошибка загрузки 2К-справочника")
