@@ -14,7 +14,6 @@ from .enums import (
     PreparationGrade,
     ApplicationMethod,
     EnvironmentType,
-    CompatibilityStatus,
 )
 
 
@@ -30,10 +29,10 @@ class Material:
     binder_type: BinderType = BinderType.UNKNOWN
     description: str = ""
 
-    density: float = 0.0                 # кг/л
-    solids_percent: float = 0.0          # % объёмный сухой остаток
+    density: float = 0.0
+    solids_percent: float = 0.0
     solids_by_volume_percent: Optional[float] = None
-    voc: Optional[float] = None          # г/л
+    voc: Optional[float] = None
 
     color: str = ""
     ral: str = ""
@@ -42,7 +41,7 @@ class Material:
     price_per_liter: Optional[float] = None
     prices_include_vat: bool = True
 
-    theoretical_coverage: Optional[float] = None  # м²/л (если задано производителем)
+    theoretical_coverage: Optional[float] = None
 
     application_method: Optional[ApplicationMethod] = None
     min_application_temperature: Optional[float] = None
@@ -74,8 +73,10 @@ class Material:
     packaging_kg: Optional[float] = None
     packaging_l: Optional[float] = None
 
-    # Техническая документация: храним не только ссылку, но и версию/дату,
-    # чтобы расчёт можно было воспроизвести по исходным данным.
+    # Для продаж/ТУ достаточно знать, что материал 2К.
+    # Расчёт A+B, соотношения компонентов и комплектов здесь намеренно не выполняется.
+    is_two_component: bool = False
+
     datasheet: str = ""
     datasheet_version: str = ""
     datasheet_date: Optional[str] = None
@@ -98,7 +99,7 @@ class Material:
 
 @dataclass
 class LayerDefinition:
-    """Определение слоя в шаблоне системы (ещё без расчёта)."""
+    """Определение слоя в шаблоне системы."""
 
     material_id: Optional[int] = None
     material: Optional[Material] = None
@@ -222,7 +223,7 @@ class ObjectData:
 
 @dataclass
 class SystemCalculationResult:
-    """Полный результат расчёта одной системы на заданную площадь."""
+    """Полный результат расчёта одной системы."""
 
     system: CoatingSystem
     object_data: ObjectData
@@ -258,21 +259,15 @@ class ComparisonResult:
 class RecommendationItem:
     system: CoatingSystem
     score: float
-    rank: int
+    breakdown: object | None = None
+    rank: int = 0
+    status: str = ""
     reasons: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
-    limitations: list[str] = field(default_factory=list)
 
 
 @dataclass
 class RecommendationResult:
     object_data: ObjectData
     items: list[RecommendationItem] = field(default_factory=list)
-    insufficient_data: bool = False
-    message: str = ""
-    disclaimer: str = (
-        "Предварительный подбор системы АКЗ. Окончательный выбор необходимо "
-        "подтвердить технической документацией производителя, проектными "
-        "требованиями и применимыми нормативными документами."
-    )
     created_at: datetime = field(default_factory=datetime.now)
