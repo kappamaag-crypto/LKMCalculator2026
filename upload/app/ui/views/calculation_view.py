@@ -52,7 +52,7 @@ class CalculationView(QWidget):
         if self.layer_table.rowCount():self._timer.start()
     @staticmethod
     def _money(v,dec=2):return '—' if v is None else f'{v:,.{dec}f}'.replace(',',' ')
-    def _recalculate(self,dialogs=False):
+    def _recalculate(self,dialogs=False,notify=False):
         layers=self.layer_table.get_layer_inputs()
         if not layers:
             if dialogs:QMessageBox.warning(self,'Внимание','Добавьте хотя бы один слой')
@@ -69,11 +69,11 @@ class CalculationView(QWidget):
             return False
         self._last_result=result; self.layer_table.set_layers(layers,result.layers); self.lbl_summary.setText(f'Толщина: {result.total_dft:.0f} мкм  |  Расход: {result.total_practical_consumption_kg:.3f} кг/м²  |  Стоимость: {self._money(result.total_cost_per_m2)} руб/м²  |  Объект: {self._money(result.total_cost,0)} руб'); self.txt_details.setPlainText(self.service.format_summary(result))
         for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp):b.setEnabled(True)
-        self.calculation_done.emit(result)
+        if notify:self.calculation_done.emit(result)
         if validation.has_warnings and dialogs:QMessageBox.warning(self,'Предупреждения','\n'.join(f'• {w.message}' for w in validation.warnings))
         return True
-    def _on_live_recalculate(self):self._recalculate(False)
-    def _on_calculate(self):self._recalculate(True)
+    def _on_live_recalculate(self):self._recalculate(False,False)
+    def _on_calculate(self):self._recalculate(True,True)
     def _default_export_name(self,ext):
         name=self._last_result.object_data.object_name.strip() if self._last_result else 'Расчёт_ЛКМ_АКЗ'
         for ch in '<>:"/\\|?*':name=name.replace(ch,'_')
