@@ -1,5 +1,4 @@
 """Профессиональный экспорт расчёта / сравнения в Excel."""
-
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
@@ -45,15 +44,17 @@ def _cell(ws:Worksheet,row:int,col:int,value,bold:bool=False,fill=None,align=CEN
 
 
 def _area(obj:ObjectData)->float:
-    if obj.area_m2 > 0: return obj.area_m2
-    if obj.area_per_element > 0 and obj.elements_count > 0: return obj.area_per_element * obj.elements_count
-    return 0.0
+    """Площадь расчёта задаётся непосредственно пользователем, в м²."""
+    return max(float(obj.area_m2 or 0.0), 0.0)
 
 
 def _cost_add(*values: Optional[float]) -> Optional[float]:
-    """Суммирует стоимость только если все компоненты известны."""
     if any(value is None for value in values): return None
     return sum(values)
+
+
+def _display(value, digits:int=2):
+    return "—" if value is None else round(value, digits)
 
 
 class ExcelExporter:
@@ -89,30 +90,30 @@ class ExcelExporter:
         _write_header_row(ws,row,headers); row+=1
         for i,lr in enumerate(result.layers):
             fill=ALT_FILL if i%2 else None; binder=lr.material.binder_type.value if hasattr(lr.material.binder_type,"value") else str(lr.material.binder_type); total_m2=_cost_add(lr.cost_per_m2,lr.thinner_cost_per_m2)
-            values=[i+1,lr.material.material_name,binder,lr.target_dft,lr.wft,lr.losses_percent,lr.thinner_percent,lr.theoretical_coverage,lr.practical_coverage,lr.theoretical_consumption_kg,lr.practical_consumption_kg,lr.practical_consumption_l,lr.cost_per_m2,lr.thinner_cost_per_m2,total_m2,lr.total_consumption_kg,lr.total_cost]
+            values=[i+1,lr.material.material_name,binder,lr.target_dft,lr.wft,lr.losses_percent,lr.thinner_percent,lr.theoretical_coverage,lr.practical_coverage,lr.theoretical_consumption_kg,lr.practical_consumption_kg,lr.practical_consumption_l,_display(lr.cost_per_m2),_display(lr.thinner_cost_per_m2),_display(total_m2),lr.total_consumption_kg,_display(lr.total_cost)]
             for col,value in enumerate(values,1): _cell(ws,row,col,value,fill=fill)
             row+=1
         area=_area(result.object_data); thinner_cost_m2=result.total_thinner_cost/area if area and result.total_thinner_cost is not None else None; material_cost=_cost_add(result.total_cost_per_m2, -thinner_cost_m2) if result.total_cost_per_m2 is not None and thinner_cost_m2 is not None else None
-        _cell(ws,row,2,"ИТОГО",True,TOTAL_FILL,LEFT); _cell(ws,row,4,result.total_dft,True,TOTAL_FILL); _cell(ws,row,11,result.total_practical_consumption_kg,True,TOTAL_FILL); _cell(ws,row,12,result.total_practical_consumption_l,True,TOTAL_FILL); _cell(ws,row,13,material_cost,True,TOTAL_FILL); _cell(ws,row,14,thinner_cost_m2,True,TOTAL_FILL); _cell(ws,row,15,result.total_cost_per_m2,True,TOTAL_FILL); _cell(ws,row,16,result.total_practical_consumption_kg*area,True,TOTAL_FILL); _cell(ws,row,17,result.total_cost,True,TOTAL_FILL); ws.freeze_panes="A4"; _auto_width(ws,8,28)
+        _cell(ws,row,2,"ИТОГО",True,TOTAL_FILL,LEFT); _cell(ws,row,4,result.total_dft,True,TOTAL_FILL); _cell(ws,row,11,result.total_practical_consumption_kg,True,TOTAL_FILL); _cell(ws,row,12,result.total_practical_consumption_l,True,TOTAL_FILL); _cell(ws,row,13,_display(material_cost),True,TOTAL_FILL); _cell(ws,row,14,_display(thinner_cost_m2),True,TOTAL_FILL); _cell(ws,row,15,_display(result.total_cost_per_m2),True,TOTAL_FILL); _cell(ws,row,16,result.total_practical_consumption_kg*area,True,TOTAL_FILL); _cell(ws,row,17,_display(result.total_cost),True,TOTAL_FILL); ws.freeze_panes="A4"; _auto_width(ws,8,28)
 
     def _sheet_materials(self,ws:Worksheet,result:SystemCalculationResult)->None:
         ws.cell(1,1,"Спецификация материалов").font=TITLE_FONT; row=3; _write_header_row(ws,row,["Материал","Производитель","Плотность, кг/л","Сухой остаток, %","Цена, руб/кг","Цена, руб/л","Расход, кг","Расход, л","Стоимость материала, руб","Разбавитель, руб"]); row+=1; area=_area(result.object_data)
         for i,lr in enumerate(result.layers):
             fill=ALT_FILL if i%2 else None; material_total=lr.cost_per_m2*area if lr.cost_per_m2 is not None else None; thinner_total=lr.thinner_cost_per_m2*area if lr.thinner_cost_per_m2 is not None else None
-            values=[lr.material.material_name,lr.material.manufacturer or "—",lr.material.density,lr.material.solids_by_volume_percent if lr.material.solids_by_volume_percent is not None else lr.material.solids_percent,lr.material.price_per_kg,lr.material.price_per_liter,lr.total_consumption_kg,lr.total_consumption_l,material_total,thinner_total]
+            values=[lr.material.material_name,lr.material.manufacturer or "—",_display(lr.material.density),_display(lr.material.solids_by_volume_percent if lr.material.solids_by_volume_percent is not None else lr.material.solids_percent),_display(lr.material.price_per_kg),_display(lr.material.price_per_liter),lr.total_consumption_kg,lr.total_consumption_l,_display(material_total),_display(thinner_total)]
             for col,value in enumerate(values,1): _cell(ws,row,col,value,fill=fill)
             row+=1
         _auto_width(ws)
 
     def _sheet_summary(self,ws:Worksheet,result:SystemCalculationResult)->None:
         row=self._title_block(ws,"Итоговый расчёт",result.object_data); ws.cell(row,1,"Сводка").font=SUBTITLE_FONT; row+=1; area=_area(result.object_data); thinner_cost_m2=result.total_thinner_cost/area if area and result.total_thinner_cost is not None else None; material_cost_m2=_cost_add(result.total_cost_per_m2,-thinner_cost_m2) if result.total_cost_per_m2 is not None and thinner_cost_m2 is not None else None
-        items=[("Система",result.system.system_name or "Пользовательская"),("Количество слоёв",len(result.layers)),("Общая толщина DFT, мкм",result.total_dft),("Расход теоретический, кг/м²",result.total_theoretical_consumption_kg),("Расход практический, кг/м²",result.total_practical_consumption_kg),("Расход практический, л/м²",result.total_practical_consumption_l),("Стоимость ЛКМ, руб/м²",material_cost_m2),("Стоимость разбавителя, руб/м²",thinner_cost_m2),("Итого, руб/м²",result.total_cost_per_m2),("Стоимость объекта, руб",result.total_cost),("В т.ч. разбавитель, руб",result.total_thinner_cost)]
+        items=[("Система",result.system.system_name or "Пользовательская"),("Количество слоёв",len(result.layers)),("Общая толщина DFT, мкм",result.total_dft),("Расход теоретический, кг/м²",result.total_theoretical_consumption_kg),("Расход практический, кг/м²",result.total_practical_consumption_kg),("Расход практический, л/м²",result.total_practical_consumption_l),("Стоимость ЛКМ, руб/м²",_display(material_cost_m2)),("Стоимость разбавителя, руб/м²",_display(thinner_cost_m2)),("Итого, руб/м²",_display(result.total_cost_per_m2)),("Стоимость объекта, руб",_display(result.total_cost)),("В т.ч. разбавитель, руб",_display(result.total_thinner_cost))]
         for label,value in items: _cell(ws,row,1,label,True,ALT_FILL,LEFT); _cell(ws,row,2,value,align=LEFT); row+=1
         _auto_width(ws)
 
     def _sheet_comparison(self,ws:Worksheet,comparison:ComparisonResult)->None:
         row=self._title_block(ws,"Сравнение систем покрытия",comparison.object_data); systems=comparison.systems; _write_header_row(ws,row,["Показатель"]+[(s.system.system_name or f"Система {i+1}")[:25] for i,s in enumerate(systems)]); row+=1
-        rows=[("Количество слоёв",[len(s.layers) for s in systems]),("Общая толщина, мкм",[s.total_dft for s in systems]),("Практический расход, кг/м²",[s.total_practical_consumption_kg for s in systems]),("Практический расход, л/м²",[s.total_practical_consumption_l for s in systems]),("Стоимость, руб/м²",[s.total_cost_per_m2 for s in systems]),("Стоимость объекта, руб",[s.total_cost for s in systems])]
+        rows=[("Количество слоёв",[len(s.layers) for s in systems]),("Общая толщина, мкм",[s.total_dft for s in systems]),("Практический расход, кг/м²",[s.total_practical_consumption_kg for s in systems]),("Практический расход, л/м²",[s.total_practical_consumption_l for s in systems]),("Стоимость, руб/м²",[_display(s.total_cost_per_m2) for s in systems]),("Стоимость объекта, руб",[_display(s.total_cost,0) for s in systems])]
         for label,values in rows:
             _cell(ws,row,1,label,True,align=LEFT)
             for col,value in enumerate(values,2): _cell(ws,row,col,value)
