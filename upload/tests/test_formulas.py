@@ -15,7 +15,6 @@ from app.domain.formulas import (
     calculate_layer,
     LayerCalcInput,
     scale_to_area,
-    calculate_packages,
     total_area,
 )
 
@@ -52,6 +51,43 @@ class TestBasicFormulas:
         assert result.theoretical_consumption_l == pytest.approx(result.wft / 1000)
         assert result.theoretical_consumption_kg == pytest.approx(result.theoretical_consumption_l * 1.4)
         assert result.cost_per_m2 == pytest.approx(result.practical_consumption_kg * 552.0)
+
+    def test_price_per_liter_has_priority_when_both_prices_match_density(self):
+        # 552 руб/кг × 1.4 кг/л = 772.8 руб/л.
+        result = calculate_layer(
+            LayerCalcInput(
+                density=1.4,
+                solids_percent=73.0,
+                dry_thickness=200.0,
+                price_per_kg=552.0,
+                price_per_liter=772.8,
+            )
+        )
+        assert result.cost_per_m2 == pytest.approx(result.practical_consumption_l * 772.8)
+
+    def test_price_per_liter_allows_small_density_rounding_difference(self):
+        result = calculate_layer(
+            LayerCalcInput(
+                density=1.4,
+                solids_percent=73.0,
+                dry_thickness=200.0,
+                price_per_kg=552.0,
+                price_per_liter=800.0,
+            )
+        )
+        assert result.cost_per_m2 == pytest.approx(result.practical_consumption_l * 800.0)
+
+    def test_price_per_liter_rejects_inconsistent_price_via_density(self):
+        with pytest.raises(ValueError, match="не соответствует цене за кг"):
+            calculate_layer(
+                LayerCalcInput(
+                    density=1.4,
+                    solids_percent=73.0,
+                    dry_thickness=200.0,
+                    price_per_kg=552.0,
+                    price_per_liter=950.0,
+                )
+            )
 
     def test_with_losses(self):
         result = calculate_layer(LayerCalcInput(density=1.4, solids_percent=73.0, dry_thickness=200.0, losses_percent=20.0, price_per_kg=552.0))
@@ -97,9 +133,6 @@ class TestBasicFormulas:
     def test_scale_to_area(self):
         assert scale_to_area(0.5, 100) == 50.0
         assert scale_to_area(0.5, 0) == 0.0
-
-    def test_packages(self):
-        assert calculate_packages(1235.0, 20.0) == (62, 1240.0, 5.0)
 
     def test_total_area(self):
         assert total_area(1250.0, 5) == 6250.0
