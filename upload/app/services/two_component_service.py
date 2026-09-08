@@ -8,8 +8,11 @@ from __future__ import annotations
 
 from typing import Optional
 
+from sqlalchemy.orm import Session
+
 from app.domain.models import MaterialComponent, MaterialMix
 from app.domain.two_component import TwoComponentResult
+from app.infrastructure.database.two_component_repository import TwoComponentRepository
 
 
 class TwoComponentService:
@@ -37,3 +40,15 @@ class TwoComponentService:
             temperature_reference=mix.temperature_reference,
             notes=mix.notes,
         )
+
+    @classmethod
+    def describe_from_database(cls, session: Session, material_id: int) -> Optional[TwoComponentResult]:
+        """Получить карточку 2К из БД. Если подтверждённых данных нет — вернуть None."""
+        repository = TwoComponentRepository(session)
+        mix = repository.get_mix(material_id)
+        if mix is None:
+            return None
+        components = repository.get_components(material_id)
+        component_a = next((c for c in components if c.component_code.upper() == "A"), None)
+        component_b = next((c for c in components if c.component_code.upper() == "B"), None)
+        return cls.describe(mix, component_a, component_b)
