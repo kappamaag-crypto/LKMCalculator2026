@@ -49,7 +49,6 @@ def test_dew_point_violation_blocks_recommendation_filter():
         make_object(surface_temperature=17, dew_point=15),
     )
     assert not result.passed
-    assert any("TECH_DEW_POINT_MARGIN" not in reason for reason in [])
     assert any("Запас до точки росы" in reason for reason in result.reasons_fail)
 
 
