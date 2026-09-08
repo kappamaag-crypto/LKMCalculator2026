@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.infrastructure.database.models import (
     MaterialORM,
+    MaterialComponentORM,
+    MaterialMixORM,
     CoatingSystemORM,
     CoatingSystemLayerORM,
     LayerCompatibilityORM,
@@ -57,61 +59,32 @@ def seed_demo_materials(session: Session) -> dict[str, int]:
     """Демонстрационные материалы. Сохраняются для обратной совместимости."""
     demo = [
         {
-            "manufacturer": "Blank",
-            "brand": "Blank",
-            "material_name": "Грунт-Эмаль Blank Universal",
-            "material_type": MaterialType.PRIMER_ENAMEL.value,
-            "binder_type": BinderType.EPOXY.value,
-            "density": 1.4,
-            "solids_percent": 73.0,
-            "price_per_kg": 552.0,
-            "recommended_dft_min": 100,
-            "recommended_dft_max": 200,
-            "ral": "-",
-            "notes": "Демонстрационный материал (из старого Excel)",
-            "is_incomplete": True,
+            "manufacturer": "Blank", "brand": "Blank", "material_name": "Грунт-Эмаль Blank Universal",
+            "material_type": MaterialType.PRIMER_ENAMEL.value, "binder_type": BinderType.EPOXY.value,
+            "density": 1.4, "solids_percent": 73.0, "price_per_kg": 552.0,
+            "recommended_dft_min": 100, "recommended_dft_max": 200, "ral": "-",
+            "notes": "Демонстрационный материал (из старого Excel)", "is_incomplete": True,
         },
         {
-            "manufacturer": "Blank",
-            "brand": "Blank",
-            "material_name": "Эмаль Blank Finish",
-            "material_type": MaterialType.FINISH.value,
-            "binder_type": BinderType.POLYURETHANE.value,
-            "density": 1.3,
-            "solids_percent": 58.0,
-            "price_per_kg": 892.0,
-            "recommended_dft_min": 60,
-            "recommended_dft_max": 100,
-            "ral": "9003",
-            "notes": "Демонстрационный материал (из старого Excel)",
-            "is_incomplete": True,
+            "manufacturer": "Blank", "brand": "Blank", "material_name": "Эмаль Blank Finish",
+            "material_type": MaterialType.FINISH.value, "binder_type": BinderType.POLYURETHANE.value,
+            "density": 1.3, "solids_percent": 58.0, "price_per_kg": 892.0,
+            "recommended_dft_min": 60, "recommended_dft_max": 100, "ral": "9003",
+            "notes": "Демонстрационный материал (из старого Excel)", "is_incomplete": True,
         },
         {
-            "manufacturer": "Blank",
-            "brand": "Blank",
-            "material_name": "Разбавитель для грунта",
-            "material_type": MaterialType.THINNER.value,
-            "binder_type": BinderType.OTHER.value,
-            "density": 0.9,
-            "solids_percent": 0.0,
-            "price_per_kg": 0.0,
-            "notes": "Демонстрационный разбавитель",
-            "is_incomplete": True,
+            "manufacturer": "Blank", "brand": "Blank", "material_name": "Разбавитель для грунта",
+            "material_type": MaterialType.THINNER.value, "binder_type": BinderType.OTHER.value,
+            "density": 0.9, "solids_percent": 0.0, "price_per_kg": 0.0,
+            "notes": "Демонстрационный разбавитель", "is_incomplete": True,
         },
         {
-            "manufacturer": "Blank",
-            "brand": "Blank",
-            "material_name": "Растворитель для эмали",
-            "material_type": MaterialType.THINNER.value,
-            "binder_type": BinderType.OTHER.value,
-            "density": 0.9,
-            "solids_percent": 0.0,
-            "price_per_kg": 0.0,
-            "notes": "Демонстрационный растворитель",
-            "is_incomplete": True,
+            "manufacturer": "Blank", "brand": "Blank", "material_name": "Растворитель для эмали",
+            "material_type": MaterialType.THINNER.value, "binder_type": BinderType.OTHER.value,
+            "density": 0.9, "solids_percent": 0.0, "price_per_kg": 0.0,
+            "notes": "Демонстрационный растворитель", "is_incomplete": True,
         },
     ]
-
     name_to_id: dict[str, int] = {}
     for data in demo:
         existing = session.query(MaterialORM).filter_by(material_name=data["material_name"]).first()
@@ -122,8 +95,32 @@ def seed_demo_materials(session: Session) -> dict[str, int]:
         session.add(orm)
         session.flush()
         name_to_id[data["material_name"]] = orm.id
-
     return name_to_id
+
+
+def _seed_verified_2k_metadata(session: Session, material_name: str, material_id: int) -> None:
+    """Создаёт только подтверждённые данные о смеси; неизвестные фасовки не выдумываются."""
+    if material_name != "VEKSA PP 11":
+        return
+
+    mix = session.query(MaterialMixORM).filter_by(material_id=material_id).first()
+    if not mix:
+        session.add(MaterialMixORM(
+            material_id=material_id,
+            mix_ratio_a=4.7,
+            mix_ratio_b=1.0,
+            ratio_basis="mass",
+            working_time_minutes=40.0,
+            notes="Источник SPKEFFA: TDS/карточка VEKSA PP 11."
+        ))
+
+    existing_a = session.query(MaterialComponentORM).filter_by(material_id=material_id, component_code="A").first()
+    if not existing_a:
+        session.add(MaterialComponentORM(material_id=material_id, component_code="A", name="Компонент A", active=True))
+    existing_b = session.query(MaterialComponentORM).filter_by(material_id=material_id, component_code="B").first()
+    if not existing_b:
+        session.add(MaterialComponentORM(material_id=material_id, component_code="B", name="Компонент B", active=True))
+    session.flush()
 
 
 def seed_spkeffa_catalog(session: Session) -> dict[str, int]:
@@ -136,15 +133,10 @@ def seed_spkeffa_catalog(session: Session) -> dict[str, int]:
 
     for item in payload.get("materials", []):
         name = item["material_name"]
-        existing = (
-            session.query(MaterialORM)
-            .filter_by(brand=item.get("brand", ""), material_name=name)
-            .first()
-        )
+        existing = session.query(MaterialORM).filter_by(brand=item.get("brand", ""), material_name=name).first()
 
         fields = {
-            key: value
-            for key, value in item.items()
+            key: value for key, value in item.items()
             if key in {
                 "manufacturer", "brand", "material_name", "material_type", "binder_type",
                 "density", "solids_percent", "solids_by_volume_percent", "voc", "color", "ral",
@@ -165,26 +157,26 @@ def seed_spkeffa_catalog(session: Session) -> dict[str, int]:
             or not item.get("datasheet")
         )
         fields["notes"] = (
-            f"Источник: {item.get('source_url', '')}. "
-            f"{item.get('notes', '')}"
+            f"Источник: {item.get('source_url', '')}. {item.get('notes', '')}"
         ).strip()
 
         if existing:
-            # Update only catalog-owned fields. User-entered price/packaging data is retained
-            # when the source does not provide a value.
             for key, value in fields.items():
                 if key in {"price_per_kg", "price_per_liter", "packaging_kg", "packaging_l"} and value is None:
                     continue
                 setattr(existing, key, value)
             existing.updated_at = datetime.utcnow()
             session.flush()
-            result[name] = existing.id
+            material_id = existing.id
         else:
             orm = MaterialORM(**fields, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
             session.add(orm)
             session.flush()
-            result[name] = orm.id
+            material_id = orm.id
+        result[name] = material_id
+        _seed_verified_2k_metadata(session, name, material_id)
 
+    session.flush()
     return result
 
 
@@ -196,43 +188,21 @@ def seed_demo_system(session: Session, name_to_id: dict[str, int]) -> None:
         return
 
     system = CoatingSystemORM(
-        system_name=system_name,
-        manufacturer="Blank",
+        system_name=system_name, manufacturer="Blank",
         description="Демонстрационная двухслойная система из старого Excel-калькулятора",
-        durability="Medium",
-        total_dft_min=160,
-        total_dft_max=300,
-        number_of_layers=2,
-        notes="Демонстрационные данные. Требуется подтверждение TDS.",
-        is_active=True,
+        durability="Medium", total_dft_min=160, total_dft_max=300, number_of_layers=2,
+        notes="Демонстрационные данные. Требуется подтверждение TDS.", is_active=True,
     )
     session.add(system)
     session.flush()
 
     primer_id = name_to_id.get("Грунт-Эмаль Blank Universal")
     finish_id = name_to_id.get("Эмаль Blank Finish")
-
     layers = [
-        CoatingSystemLayerORM(
-            system_id=system.id,
-            layer_number=1,
-            material_id=primer_id,
-            layer_type=MaterialType.PRIMER_ENAMEL.value,
-            target_dft=200.0,
-            dft_min=100,
-            dft_max=200,
-            thinner_percent=5.0,
-        ),
-        CoatingSystemLayerORM(
-            system_id=system.id,
-            layer_number=2,
-            material_id=finish_id,
-            layer_type=MaterialType.FINISH.value,
-            target_dft=100.0,
-            dft_min=60,
-            dft_max=100,
-            thinner_percent=5.0,
-        ),
+        CoatingSystemLayerORM(system_id=system.id, layer_number=1, material_id=primer_id,
+            layer_type=MaterialType.PRIMER_ENAMEL.value, target_dft=200.0, dft_min=100, dft_max=200, thinner_percent=5.0),
+        CoatingSystemLayerORM(system_id=system.id, layer_number=2, material_id=finish_id,
+            layer_type=MaterialType.FINISH.value, target_dft=100.0, dft_min=60, dft_max=100, thinner_percent=5.0),
     ]
     for layer in layers:
         session.add(layer)
