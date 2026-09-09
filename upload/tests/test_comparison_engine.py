@@ -49,11 +49,12 @@ def test_compare_results_preserves_exact_multi_layer_results():
 
 
 def test_compare_supports_two_three_four_and_five_layers():
+    engine = ComparisonEngine()
     results = [_result(n, str(n)) for n in (2, 3, 4, 5)]
-    comparison = ComparisonEngine().compare_results(results[0].object_data, results)
+    comparison = engine.compare_results(results[0].object_data, results)
 
     assert [len(s.layers) for s in comparison.systems] == [2, 3, 4, 5]
-    rows = comparison.to_table(comparison)
+    rows = engine.to_table(comparison)
     indicators = [row["indicator"] for row in rows]
     assert "Слой 5: материал" in indicators
     assert "Слой 5: DFT, мкм" in indicators
