@@ -74,10 +74,18 @@ class TestValidation:
     def test_negative_area(self): assert validate_object_data(ObjectData(area_m2=-10)).has_errors
     def test_zero_area_is_not_a_valid_object_calculation_area(self):
         result=validate_object_data(ObjectData(area_m2=0)); assert result.has_warnings and not result.has_errors
+    def test_unknown_area_is_clear_error(self):
+        result=validate_object_data(ObjectData(area_m2=None)); assert any(i.code=="OBJ_AREA_UNKNOWN" for i in result.errors)
     def test_dft_above_max(self): assert validate_layer_input(make_primer(),250).has_warnings
+    def test_unknown_dft_is_clear_error(self):
+        result=validate_layer_input(make_primer(),None); assert any(i.code=="LAYER_DFT_UNKNOWN" for i in result.errors)
     def test_solids_over_100(self):
         m=make_primer(); m.solids_by_volume_percent=120; assert validate_layer_input(m,100).has_errors
     def test_losses_ge_100(self): assert validate_layer_input(make_primer(),100,100).has_errors
+    def test_unknown_losses_is_clear_error(self):
+        result=validate_layer_input(make_primer(),100,None); assert any(i.code=="LAYER_LOSSES_UNKNOWN" for i in result.errors)
+    def test_unknown_thinner_percent_is_clear_error(self):
+        result=validate_layer_input(make_primer(),100,0,None); assert any(i.code=="LAYER_THINNER_UNKNOWN" for i in result.errors)
     def test_dew_point(self): assert validate_object_data(ObjectData(area_m2=10,surface_temperature=5,dew_point=8)).has_errors
     def test_before_calculation_blocks_on_error(self):
         m=make_primer(); m.density=-1; assert validate_before_calculation(ObjectData(area_m2=10),[(m,200,0,0)]).has_errors
