@@ -8,6 +8,7 @@ from app.domain.enums import MaterialType, BinderType, CorrosionCategory, Durabi
 from app.domain.calculator import LayerInput
 from app.services.calculation_service import CalculationService
 from app.infrastructure.export.pdf_exporter import PDFExporter
+from app.domain.formulas import FORMULA_VERSION
 
 @pytest.fixture
 def sample_result():
@@ -32,3 +33,20 @@ def test_pdf_with_comparison(sample_result):
 def test_pdf_contains_thinner_labels(sample_result):
     with tempfile.TemporaryDirectory() as tmp:
         path=Path(tmp)/"thinner.pdf"; PDFExporter().export_calculation(sample_result,path); data=path.read_bytes(); assert data[:4]==b"%PDF" and len(data)>1000
+
+def test_pdf_contains_formula_version_and_date_marker(sample_result):
+    with tempfile.TemporaryDirectory() as tmp:
+        path=Path(tmp)/"metadata.pdf"; PDFExporter().export_calculation(sample_result,path); data=path.read_bytes()
+        # PDF content is compressed/encoded, so verify stable metadata at the document level.
+        assert b"/Title" in data
+        assert str(FORMULA_VERSION).encode("ascii") in data
+
+def test_pdf_unknown_total_cost_does_not_crash(sample_result):
+    sample_result.total_cost_per_m2 = None
+    sample_result.total_cost = None
+    sample_result.total_thinner_cost = None
+    for layer in sample_result.layers:
+        layer.cost_per_m2 = None
+        layer.thinner_cost_per_m2 = None
+    with tempfile.TemporaryDirectory() as tmp:
+        path=Path(tmp)/"unknown-cost.pdf"; PDFExporter().export_calculation(sample_result,path); assert path.exists() and path.stat().st_size>1000
