@@ -20,6 +20,20 @@ class TestFilter:
     def test_fail_low_durability(self): assert not filter_system(make_system("Sys Low",[CorrosionCategory.C4],"Low"),ObjectData(corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.HIGH)).passed
     def test_insufficient_data(self):
         sys=make_system("Empty",[],None); sys.layers=[]; fr=filter_system(sys,ObjectData(corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.HIGH),require_corrosion=True,require_durability=True); assert not fr.passed; assert fr.insufficient_data
+    def test_optional_corrosion_filter_is_really_skipped(self):
+        sys=make_system("No corrosion metadata",[],"High")
+        obj=ObjectData(corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.HIGH)
+        fr=filter_system(sys,obj,require_corrosion=False,require_durability=True)
+        assert fr.passed
+        assert not fr.insufficient_data
+        assert any("исключена" in r for r in fr.reasons_pass)
+    def test_optional_durability_filter_is_really_skipped(self):
+        sys=make_system("No durability metadata",[CorrosionCategory.C4],None)
+        obj=ObjectData(corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.HIGH)
+        fr=filter_system(sys,obj,require_corrosion=True,require_durability=False)
+        assert fr.passed
+        assert not fr.insufficient_data
+        assert any("исключена" in r for r in fr.reasons_pass)
     def test_temperature_fail(self):
         fr=filter_system(make_system("Temp",[CorrosionCategory.C3],"Medium",t_min=-20,t_max=40),ObjectData(corrosion_category=CorrosionCategory.C3,durability=DurabilityLevel.MEDIUM,temperature_min=-40,temperature_max=60)); assert not fr.passed
 class TestScorer:
