@@ -35,6 +35,10 @@ def test_layers_sheet_has_thinner_consumption_columns(sample_result):
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "test.xlsx"; ExcelExporter().export_calculation(sample_result, path); ws = load_workbook(path)["Слои"]; headers = [ws.cell(3, col).value for col in range(1, ws.max_column + 1)]; assert "Разбавитель, кг/м²" in headers; assert "Разбавитель, л/м²" in headers; assert "Разбавитель, руб/м²" in headers
 
+def test_materials_sheet_labels_volume_solids(sample_result):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "test.xlsx"; ExcelExporter().export_calculation(sample_result, path); ws = load_workbook(path)["Материалы"]; headers = [ws.cell(3, col).value for col in range(1, ws.max_column + 1)]; assert "Сухой остаток по объёму, %" in headers; assert "Сухой остаток, %" not in headers
+
 def test_export_comparison(sample_result):
     from app.domain.comparison import ComparisonEngine
     primer, finish, obj = sample_result.layers[0].material, sample_result.layers[1].material, sample_result.object_data
