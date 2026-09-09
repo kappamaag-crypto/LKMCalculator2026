@@ -37,7 +37,9 @@ class ComparisonEngine:
             if highlight_min and numeric: result["_min_idx"]=values.index(min(numeric))
             if highlight_max and numeric: result["_max_idx"]=values.index(max(numeric))
             return result
-        rows=[row("Название",names),row("Количество слоёв",[len(s.layers) for s in systems],True),row("Общая толщина DFT, мкм",[s.total_dft for s in systems],True,True),row("Расход ЛКМ, кг/м²",[s.total_practical_consumption_kg for s in systems],True),row("Расход ЛКМ, л/м²",[s.total_practical_consumption_l for s in systems],True),row("Стоимость ЛКМ + разбавителя, руб/м²",[s.total_cost_per_m2 for s in systems],True,True),row("Стоимость объекта, руб",[s.total_cost for s in systems],True)]
+        thinner_m2=[sum(layer.thinner_cost_per_m2 or 0 for layer in s.layers) if s.total_cost_per_m2 is not None else None for s in systems]
+        paint_m2=[s.total_cost_per_m2-t if s.total_cost_per_m2 is not None and t is not None else None for s,t in zip(systems,thinner_m2)]
+        rows=[row("Название",names),row("Количество слоёв",[len(s.layers) for s in systems],True),row("Общая толщина DFT, мкм",[s.total_dft for s in systems],True,True),row("Расход ЛКМ, кг/м²",[s.total_practical_consumption_kg for s in systems],True),row("Расход ЛКМ, л/м²",[s.total_practical_consumption_l for s in systems],True),row("Стоимость ЛКМ, руб/м²",paint_m2,True),row("Стоимость разбавителя, руб/м²",thinner_m2,True),row("Стоимость ЛКМ + разбавителя, руб/м²",[s.total_cost_per_m2 for s in systems],True,True),row("Стоимость объекта, руб",[s.total_cost for s in systems],True)]
         max_layers=max((len(s.layers) for s in systems),default=0)
         for n in range(max_layers):
             materials=[]; dfts=[]; consumptions=[]; costs=[]
