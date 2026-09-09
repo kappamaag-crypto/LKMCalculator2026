@@ -24,13 +24,21 @@ class LayerInput:
 class LayerCalculator:
     @staticmethod
     def calculate(material: Material, target_dft: float, losses_percent: float = 0.0, thinner_percent: float = 0.0, thinner: Optional[Material] = None, area_m2: float = 1.0, thinner_basis: Optional[str] = None) -> LayerResult:
+        if target_dft is None:
+            raise ValueError("Толщина сухого слоя (DFT) не задана.")
+        if losses_percent is None:
+            raise ValueError("Процент технологических потерь не задан.")
+        if thinner_percent is None:
+            raise ValueError("Процент разбавления не задан.")
+        if area_m2 is None:
+            raise ValueError("Площадь объекта не задана.")
+        if area_m2 <= 0:
+            raise ValueError("Площадь объекта должна быть больше нуля.")
         if material.density is None or material.density <= 0:
             raise ValueError(f"Плотность материала «{material.material_name}» неизвестна или некорректна.")
         solids = material.solids_by_volume_percent
         if solids is None or solids <= 0 or solids > 100:
             raise ValueError(f"Объёмный сухой остаток материала «{material.material_name}» неизвестен или некорректен. Для расчёта DFT/WFT требуется solids_by_volume_percent в диапазоне 0–100 %.")
-        if area_m2 < 0:
-            raise ValueError("Площадь объекта не может быть отрицательной.")
         thinner_density, thinner_price = 1.0, None
         if thinner_percent > 0:
             if thinner is None:
@@ -41,10 +49,9 @@ class LayerCalculator:
         basis = thinner_basis or material.thinner_basis
         calc = calculate_layer(LayerCalcInput(density=material.density, solids_by_volume_percent=solids, dry_thickness=target_dft, losses_percent=losses_percent, price_per_kg=material.price_per_kg, price_per_liter=material.price_per_liter, thinner_percent=thinner_percent, thinner_density=thinner_density, thinner_price_per_kg=thinner_price, thinner_basis=basis))
         result = LayerResult(material=material,target_dft=target_dft,losses_percent=losses_percent,thinner_percent=thinner_percent,thinner=thinner,thinner_basis=basis,wft=calc.wft,theoretical_coverage=calc.theoretical_coverage,practical_coverage=calc.practical_coverage,theoretical_consumption_l=calc.theoretical_consumption_l,practical_consumption_l=calc.practical_consumption_l,theoretical_consumption_kg=calc.theoretical_consumption_kg,practical_consumption_kg=calc.practical_consumption_kg,cost_per_m2=calc.cost_per_m2,thinner_consumption_l=calc.thinner_consumption_l,thinner_consumption_kg=calc.thinner_consumption_kg,thinner_cost_per_m2=calc.thinner_cost_per_m2)
-        if area_m2 > 0:
-            result.total_consumption_kg = scale_to_area(result.practical_consumption_kg, area_m2)
-            result.total_consumption_l = scale_to_area(result.practical_consumption_l, area_m2)
-            result.total_cost = scale_to_area(result.cost_per_m2 + result.thinner_cost_per_m2, area_m2) if result.cost_per_m2 is not None and result.thinner_cost_per_m2 is not None else None
+        result.total_consumption_kg = scale_to_area(result.practical_consumption_kg, area_m2)
+        result.total_consumption_l = scale_to_area(result.practical_consumption_l, area_m2)
+        result.total_cost = scale_to_area(result.cost_per_m2 + result.thinner_cost_per_m2, area_m2) if result.cost_per_m2 is not None and result.thinner_cost_per_m2 is not None else None
         return result
 
 class SystemCalculator:
@@ -53,6 +60,8 @@ class SystemCalculator:
 
     @staticmethod
     def resolve_area(obj: ObjectData) -> float:
+        if obj.area_m2 is None:
+            return 0.0
         return obj.area_m2 if obj.area_m2 > 0 else 0.0
 
     def calculate(self, obj: ObjectData, layer_inputs: Sequence[LayerInput], system: Optional[CoatingSystem] = None, skip_validation: bool = False) -> tuple[SystemCalculationResult, ValidationResult]:
