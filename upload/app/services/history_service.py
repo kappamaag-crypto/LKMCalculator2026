@@ -20,10 +20,10 @@ class HistoryService:
         self.repo = CalculationRepository(session)
 
     def save_calculation(self, result: SystemCalculationResult, notes: str = "") -> int:
-        """Сохранить расчёт как редактируемый снимок исходных данных."""
+        """Сохранить расчёт как неизменяемый снимок входных данных и результата."""
         obj = result.object_data
         snapshot = {
-            "snapshot_version": 2,
+            "snapshot_version": 3,
             "object": {
                 "object_name": obj.object_name,
                 "customer": obj.customer,
@@ -32,6 +32,14 @@ class HistoryService:
                 "area_m2": obj.area_m2,
                 "corrosion_category": obj.corrosion_category.value if obj.corrosion_category else None,
                 "durability": obj.durability.value if obj.durability else None,
+            },
+            "system": {
+                "name": result.system.system_name,
+                "manufacturer": result.system.manufacturer,
+                "description": result.system.description,
+                "total_dft_min": result.system.total_dft_min,
+                "total_dft_target": result.system.total_dft_target,
+                "total_dft_max": result.system.total_dft_max,
             },
             "system_name": result.system.system_name,
             "total_dft": result.total_dft,
@@ -44,6 +52,9 @@ class HistoryService:
             snapshot["layers"].append({
                 "material_id": lr.material.id,
                 "material_name": lr.material.material_name,
+                "manufacturer": lr.material.manufacturer,
+                "brand": lr.material.brand,
+                "material_type": lr.material.material_type.value if hasattr(lr.material.material_type, "value") else str(lr.material.material_type),
                 "binder": lr.material.binder_type.value if hasattr(lr.material.binder_type, "value") else str(lr.material.binder_type),
                 "density": lr.material.density,
                 "solids_percent": lr.material.solids_percent,
@@ -114,6 +125,7 @@ class HistoryService:
 
     def save_comparison(self, comparison: ComparisonResult, notes: str = "") -> int:
         snapshot = {
+            "snapshot_version": 1,
             "object_name": comparison.object_data.object_name,
             "area_m2": comparison.object_data.area_m2,
             "systems": [
