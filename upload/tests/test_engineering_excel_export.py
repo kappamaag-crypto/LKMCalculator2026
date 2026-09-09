@@ -6,6 +6,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from app.domain.calculator import LayerInput
+from app.domain.comparison import ComparisonEngine
 from app.domain.enums import BinderType, MaterialType
 from app.domain.models import Material, ObjectData
 from app.infrastructure.export.engineering_excel_exporter import EngineeringExcelExporter
@@ -71,3 +72,46 @@ def test_engineering_excel_supports_two_layers(tmp_path: Path):
     EngineeringExcelExporter().export_system(_result(2), output)
     ws = load_workbook(output, data_only=False)["Инженерный расчёт"]
     assert [ws.cell(row, 2).value for row in (6, 7)] == ["Blank Инженерный слой 1", "Blank Инженерный слой 2"]
+
+
+def test_comparison_excel_matches_ui_and_preserves_all_layers(tmp_path: Path):
+    obj = ObjectData(object_name="Объект сравнения", area_m2=100.0)
+    engine = ComparisonEngine()
+    results = [
+        engine.compare(obj, [("Система 4 слоя", _layers_for_export(4))]).systems[0],
+        engine.compare(obj, [("Система 5 слоёв", _layers_for_export(5))]).systems[0],
+    ]
+    comparison = engine.compare_results(obj, results)
+    output = tmp_path / "comparison.xlsx"
+
+    EngineeringExcelExporter().export_comparison(comparison, output)
+    ws = load_workbook(output, data_only=False)["Сравнение систем"]
+    values = [cell.value for row in ws.iter_rows() for cell in row]
+
+    assert ws["A4"].value == "Показатель"
+    assert ws["B4"].value == "Система 4 слоя"
+    assert ws["C4"].value == "Система 5 слоёв"
+    for layer_no in range(1, 6):
+        assert f"Слой {layer_no}: материал" in values
+    assert "Слой 5: разбавитель, л/м²" in values
+    assert "Стоимость ЛКМ, руб/м²" in values
+    assert "Разбавитель, руб/м²" in values
+    assert "ЛКМ + разбавитель, руб/м²" in values
+    assert ws.print_area == "'Сравнение систем'!$A$1:$C$48"
+    assert ws.sheet_properties.pageSetUpPr.fitToPage is True
+
+
+def _layers_for_export(count: int) -> list[LayerInput]:
+    materials = [
+        Material(
+            manufacturer="Blank",
+            material_name=f"Слой {i}",
+            material_type=MaterialType.PRIMER_ENAMEL,
+            binder_type=BinderType.EPOXY,
+            density=1.4,
+            solids_by_volume_percent=70.0,
+            price_per_kg=100.0 + i,
+        )
+        for i in range(1, count + 1)
+    ]
+    return [LayerInput(material=m, target_dft=100 + i * 10, losses_percent=5.0) for i, m in enumerate(materials, 1)]
