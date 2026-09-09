@@ -22,12 +22,7 @@ from app.infrastructure.export.excel_exporter import ExcelExporter
 
 
 class CustomerExcelExporter(ExcelExporter):
-    """Заполняет знакомую заказчику форму ``База``.
-
-    Старый шаблон рассчитан на два слоя. Для 3+ слоёв форма расширяется
-    программно: добавляются строки слоёв и строк разбавителей, стили/границы
-    наследуются от исходных строк, итоговая строка переносится вниз.
-    """
+    """Заполняет знакомую заказчику форму ``База``."""
 
     _SECTION_1 = {"layer_start": 7, "thinner_start": 9, "total_row": 11}
     _SECTION_2 = {"layer_start": 21, "thinner_start": 23, "total_row": 25}
@@ -61,45 +56,30 @@ class CustomerExcelExporter(ExcelExporter):
             dst.border = copy(src.border)
 
     @staticmethod
-    def _restore_merged_fills(ws) -> None:
-        """Восстанавливает заливку внутри merged cells после unmerge/merge.
+    def _snapshot_fills(ws):
+        return {(cell.row, cell.column): copy(cell.fill) for row in ws.iter_rows() for cell in row}
 
-        openpyxl хранит стиль преимущественно на верхней-левой ячейке
-        объединения. После повторного merge внутренние MergedCell могут
-        потерять fill, хотя визуально исходный шаблон предполагал единую
-        заливку всего диапазона. Копируем только fill, не затрагивая границы,
-        шрифт и числовые форматы.
-        """
-        for merged in ws.merged_cells.ranges:
-            min_col, min_row, max_col, max_row = range_boundaries(str(merged))
-            source = ws.cell(min_row, min_col)
-            if source.fill is None:
-                continue
-            for row in range(min_row, max_row + 1):
-                for col in range(min_col, max_col + 1):
-                    ws.cell(row, col).fill = copy(source.fill)
+    @staticmethod
+    def _restore_fills(ws, snapshot) -> None:
+        for (row, col), fill in snapshot.items():
+            ws.cell(row, col).fill = copy(fill)
 
     def _expand_section(self, ws, layer_start: int, thinner_start: int, total_row: int, layer_count: int) -> int:
-        """Расширяет один 2-слойный блок до ``layer_count`` слоёв.
-
-        Возвращает число добавленных строк в блоке (2 на каждый дополнительный
-        слой: одна строка слоя + одна строка разбавителя).
-        """
         extra = max(layer_count - 2, 0)
         if not extra:
             return 0
 
+        # Unmerge/merge can discard fills on former interior cells. Preserve
+        # the complete fill map before structural changes and restore it after.
+        fill_snapshot = self._snapshot_fills(ws)
         original_merges = list(ws.merged_cells.ranges)
         for merged in original_merges:
             ws.unmerge_cells(str(merged))
 
-        # Дополнительные строки слоёв вставляются перед строками разбавителей.
         ws.insert_rows(thinner_start, extra)
         shifted_total = total_row + extra
-        # Дополнительные строки разбавителей вставляются перед итогом.
         ws.insert_rows(shifted_total, extra)
 
-        # Восстанавливаем все исходные объединения с учётом обеих вставок.
         for merged in original_merges:
             min_col, min_row, max_col, max_row = range_boundaries(str(merged))
             for idx, amount in ((thinner_start, extra), (shifted_total, extra)):
@@ -110,14 +90,24 @@ class CustomerExcelExporter(ExcelExporter):
                     max_row += amount
             ws.merge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
 
-        self._restore_merged_fills(ws)
+        # Restore fills for the unchanged cells first; then explicitly copy the
+        # template's layer/thinner row styles into the newly inserted rows.
+        self._restore_fills(ws, fill_snapshot)
 
-        # Новые строки наследуют оформление соседних строк шаблона.
         for row in range(layer_start + 2, layer_start + 2 + extra):
             self._copy_row_style(ws, layer_start + 1, row)
         new_thinner_start = thinner_start + extra
         for row in range(new_thinner_start + 2, new_thinner_start + 2 + extra):
             self._copy_row_style(ws, new_thinner_start + 1, row)
+
+        # The rows that were shifted out of the merged area must retain their
+        # original fills as well (notably the thinner rows in the 4-layer case).
+        for offset in range(extra):
+            old_row = thinner_start + offset
+            new_row = thinner_start + extra + offset
+            if old_row in range(1, ws.max_row + 1) and new_row in range(1, ws.max_row + 1):
+                for col in range(2, 19):
+                    ws.cell(new_row, col).fill = copy(ws.cell(old_row, col).fill)
 
         return 2 * extra
 
@@ -127,24 +117,10 @@ class CustomerExcelExporter(ExcelExporter):
         ws = wb["База"]
         if layer_count <= 2:
             return ws, 0
-
         extra = layer_count - 2
-        # Верхний блок сдвигает весь нижний блок на 2*extra строк.
-        self._expand_section(
-            ws,
-            self._SECTION_1["layer_start"],
-            self._SECTION_1["thinner_start"],
-            self._SECTION_1["total_row"],
-            layer_count,
-        )
+        self._expand_section(ws, self._SECTION_1["layer_start"], self._SECTION_1["thinner_start"], self._SECTION_1["total_row"], layer_count)
         shift = 2 * extra
-        self._expand_section(
-            ws,
-            self._SECTION_2["layer_start"] + shift,
-            self._SECTION_2["thinner_start"] + shift,
-            self._SECTION_2["total_row"] + shift,
-            layer_count,
-        )
+        self._expand_section(ws, self._SECTION_2["layer_start"] + shift, self._SECTION_2["thinner_start"] + shift, self._SECTION_2["total_row"] + shift, layer_count)
         return ws, shift
 
     @staticmethod
@@ -162,25 +138,7 @@ class CustomerExcelExporter(ExcelExporter):
 
     def _write_layer_row(self, ws, row: int, layer, area: float) -> None:
         material = layer.material
-        values = [
-            area,
-            material.display_name(),
-            self._binder(material.binder_type),
-            material.ral or material.color or "-",
-            material.density,
-            material.solids_by_volume_percent,
-            layer.wft,
-            layer.target_dft,
-            layer.theoretical_coverage,
-            layer.losses_percent,
-            layer.practical_coverage,
-            material.price_per_kg if self.report_mode != "engineering" else None,
-            material.price_per_liter if self.report_mode != "engineering" else None,
-            layer.theoretical_consumption_l,
-            layer.theoretical_consumption_kg,
-            layer.practical_consumption_kg,
-            self._layer_total_cost(layer),
-        ]
+        values = [area, material.display_name(), self._binder(material.binder_type), material.ral or material.color or "-", material.density, material.solids_by_volume_percent, layer.wft, layer.target_dft, layer.theoretical_coverage, layer.losses_percent, layer.practical_coverage, material.price_per_kg if self.report_mode != "engineering" else None, material.price_per_liter if self.report_mode != "engineering" else None, layer.theoretical_consumption_l, layer.theoretical_consumption_kg, layer.practical_consumption_kg, self._layer_total_cost(layer)]
         for col, value in enumerate(values, 2):
             ws.cell(row, col).value = value
 
@@ -212,13 +170,10 @@ class CustomerExcelExporter(ExcelExporter):
     def _write_block(self, ws, result, layer_start: int, thinner_start: int, total_row: int) -> None:
         area = max(float(result.object_data.area_m2 or 0.0), 0.0)
         for i, layer in enumerate(result.layers):
-            layer_row = layer_start + i
-            self._clear_row(ws, layer_row)
-            self._write_layer_row(ws, layer_row, layer, area)
-
+            self._clear_row(ws, layer_start + i)
+            self._write_layer_row(ws, layer_start + i, layer, area)
         for i, layer in enumerate(result.layers):
             self._write_thinner_row(ws, thinner_start + i, layer)
-
         self._write_totals(ws, total_row, result)
 
     def _write_metadata(self, ws, result, section2_header_row: int = 16) -> None:
@@ -229,27 +184,19 @@ class CustomerExcelExporter(ExcelExporter):
         ws.cell(section2_header_row, 2).value = f"Система АКЗ: {result.system.system_name or 'Пользовательская система'}"
         ws.cell(section2_header_row, 18).value = f"Дата: {datetime.now():%d.%m.%Y} | {FORMULA_VERSION}"
 
-    def export_calculation(
-        self,
-        result: SystemCalculationResult,
-        path: str | Path,
-        recommendation: Optional[RecommendationResult] = None,
-    ) -> Path:
+    def export_calculation(self, result: SystemCalculationResult, path: str | Path, recommendation: Optional[RecommendationResult] = None) -> Path:
         path = Path(path)
         template = Path(self.settings.excel_template_path)
         if not template.exists() or template.resolve() == path.resolve():
             return super().export_calculation(result, path, recommendation)
-
         wb = load_workbook(template)
         layer_count = len(result.layers)
         ws, shift = self._prepare_base_sheet(wb, layer_count)
         if ws is None:
             return super().export_calculation(result, path, recommendation)
-
         extra = max(layer_count - 2, 0)
         self._write_block(ws, result, 7, 9 + extra, 11 + 2 * extra)
         self._write_block(ws, result, 21 + shift, 23 + shift + extra, 25 + 2 * shift)
         self._write_metadata(ws, result, section2_header_row=16 + shift)
-
         wb.save(path)
         return path
