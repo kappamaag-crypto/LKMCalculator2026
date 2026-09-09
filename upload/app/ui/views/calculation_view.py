@@ -17,6 +17,7 @@ from app.config import AppSettings
 
 class CalculationView(QWidget):
     calculation_done=Signal(object)
+    add_to_comparison=Signal(object)
     def __init__(self,service:CalculationService,parent=None):
         super().__init__(parent);self.service=service;self._materials=[];self._all_materials=[];self._last_result=None;self._restored_system_name="";self._area_unknown=False;self._timer=QTimer(self);self._timer.setSingleShot(True);self._timer.setInterval(220);self._timer.timeout.connect(self._on_live_recalculate);self._build_ui()
     def _build_ui(self):
@@ -25,7 +26,7 @@ class CalculationView(QWidget):
         right=QWidget();rl=QVBoxLayout(right);lb=QGroupBox("Слои системы");al=QVBoxLayout(lb);row=QHBoxLayout();self.cmb_material=QComboBox();self.cmb_material.setMinimumWidth(240);add=QPushButton("Добавить слой");add.clicked.connect(self._on_add_layer);rem=QPushButton("Удалить");rem.setProperty("secondary",True);rem.clicked.connect(self._on_remove_layer);clr=QPushButton("Очистить");clr.setProperty("secondary",True);clr.clicked.connect(self._on_clear_layers)
         for x in (QLabel("Материал:"),self.cmb_material,add,rem,clr):row.addWidget(x)
         row.addStretch();al.addLayout(row);h=QLabel("После добавления параметры DFT, потери, разбавитель и цена редактируются непосредственно в строке. Результаты обновляются автоматически.");h.setWordWrap(True);h.setProperty("subheading",True);al.addWidget(h);self.layer_table=LayerTableWidget();self.layer_table.layer_changed.connect(self._schedule_live_recalculate);al.addWidget(self.layer_table);rl.addWidget(lb)
-        buttons=QHBoxLayout();self.btn_calc=QPushButton("Рассчитать");self.btn_calc.clicked.connect(self._on_calculate);self.btn_demo=QPushButton("Демо-система");self.btn_demo.setProperty("secondary",True);self.btn_demo.clicked.connect(self._on_load_demo);self.btn_excel=QPushButton("Excel");self.btn_excel.setProperty("secondary",True);self.btn_excel.clicked.connect(self._on_export_excel);self.btn_excel.setEnabled(False);self.btn_pdf=QPushButton("PDF");self.btn_pdf.setProperty("secondary",True);self.btn_pdf.clicked.connect(self._on_export_pdf);self.btn_pdf.setEnabled(False);self.btn_to_cmp=QPushButton("В сравнение");self.btn_to_cmp.setProperty("secondary",True);self.btn_to_cmp.clicked.connect(self._on_to_comparison);self.btn_to_cmp.setEnabled(False)
+        buttons=QHBoxLayout();self.btn_calc=QPushButton("Рассчитать");self.btn_calc.clicked.connect(self._on_calculate);self.btn_demo=QPushButton("Демо-система");self.btn_demo.setProperty("secondary",True);self.btn_demo.clicked.connect(self._on_load_demo);self.btn_excel=QPushButton("Excel");self.btn_excel.setProperty("secondary",True);self.btn_excel.clicked.connect(self._on_export_excel);self.btn_excel.setEnabled(False);self.btn_pdf=QPushButton("PDF");self.btn_pdf.setProperty("secondary",True);self.btn_pdf.clicked.connect(self._on_export_pdf);self.btn_pdf.setEnabled(False);self.btn_to_cmp=QPushButton("Добавить в сравнение");self.btn_to_cmp.setProperty("secondary",True);self.btn_to_cmp.clicked.connect(self._on_to_comparison);self.btn_to_cmp.setEnabled(False)
         for x in (self.btn_calc,self.btn_demo,self.btn_excel,self.btn_pdf,self.btn_to_cmp):buttons.addWidget(x)
         buttons.addStretch();rl.addLayout(buttons);rb=QGroupBox("Результат");rr=QVBoxLayout(rb);self.lbl_summary=QLabel("Выполните расчёт");self.lbl_summary.setProperty("subheading",True);self.lbl_summary.setWordWrap(True);self.txt_details=QTextEdit();self.txt_details.setReadOnly(True);self.txt_details.setMaximumHeight(210);rr.addWidget(self.lbl_summary);rr.addWidget(self.txt_details);rl.addWidget(rb);sp.addWidget(right);sp.setStretchFactor(0,1);sp.setStretchFactor(1,2);root.addWidget(sp)
     def _on_area_changed(self):
@@ -115,4 +116,4 @@ class CalculationView(QWidget):
         try:PDFExporter().export_calculation(self._last_result,Path(path));QMessageBox.information(self,"Экспорт","Расчёт успешно сохранён в PDF")
         except Exception as e:QMessageBox.critical(self,"Ошибка экспорта PDF",str(e))
     def _on_to_comparison(self):
-        if self._last_result is not None:self.calculation_done.emit(self._last_result)
+        if self._last_result is not None:self.add_to_comparison.emit(self._last_result)
