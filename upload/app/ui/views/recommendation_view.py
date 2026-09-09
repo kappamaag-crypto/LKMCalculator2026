@@ -41,7 +41,6 @@ class RecommendationView(QWidget):
 
         splitter = QSplitter(Qt.Horizontal)
 
-        # --- Условия ---
         left = QGroupBox("Условия объекта")
         form = QFormLayout(left)
         self.ed_object = QLineEdit()
@@ -81,33 +80,26 @@ class RecommendationView(QWidget):
         btn_find = QPushButton("Подобрать системы")
         btn_find.clicked.connect(self._on_recommend)
         form.addRow(btn_find)
-
         splitter.addWidget(left)
 
-        # --- Результаты ---
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-
         self.lbl_status = QLabel("Нажмите «Подобрать системы»")
         self.lbl_status.setProperty("subheading", True)
         right_layout.addWidget(self.lbl_status)
-
         self.list_results = QListWidget()
         self.list_results.currentRowChanged.connect(self._on_select)
         right_layout.addWidget(self.list_results)
-
         self.txt_details = QTextEdit()
         self.txt_details.setReadOnly(True)
         self.txt_details.setMaximumHeight(200)
         right_layout.addWidget(self.txt_details)
-
         self.lbl_disclaimer = QLabel()
         self.lbl_disclaimer.setWordWrap(True)
         self.lbl_disclaimer.setProperty("subheading", True)
         self.lbl_disclaimer.setStyleSheet("color: #92400e; background: #fef3c7; padding: 8px; border-radius: 4px;")
         right_layout.addWidget(self.lbl_disclaimer)
-
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
@@ -123,7 +115,6 @@ class RecommendationView(QWidget):
                 "Каталог систем пуст.\nДобавьте системы во вкладке «Системы» или загрузите демо."
             )
             return
-
         obj = ObjectData(
             object_name=self.ed_object.text().strip(),
             corrosion_category=self.cmb_corrosion.currentData(),
@@ -142,21 +133,23 @@ class RecommendationView(QWidget):
         self.txt_details.clear()
         self.lbl_status.setText(result.message)
         self.lbl_disclaimer.setText(result.disclaimer)
-
         if not result.items:
             self.list_results.addItem("Подходящих систем не найдено")
             return
 
+        # QFont() without an explicit point size has pointSize() == -1.
+        # Use the QListWidget's already-resolved font so Qt never receives
+        # an unresolved point size while applying the bold style.
+        base_font = self.list_results.font()
         for item in result.items:
             text = f"★ {item.rank}.  {item.system.system_name}   —   {item.score:.0f}/100"
             lw = QListWidgetItem(text)
             lw.setData(Qt.UserRole, item)
-            font = QFont()
+            font = QFont(base_font)
             if item.rank == 1:
                 font.setBold(True)
             lw.setFont(font)
             self.list_results.addItem(lw)
-
         if self.list_results.count() > 0:
             self.list_results.setCurrentRow(0)
 
