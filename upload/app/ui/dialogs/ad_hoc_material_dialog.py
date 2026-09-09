@@ -6,12 +6,9 @@ from PySide6.QtWidgets import (
     QGroupBox, QLineEdit, QVBoxLayout, QMessageBox, QCheckBox
 )
 
-from sqlalchemy import func, select
-
 from app.domain.enums import BinderType, MaterialType
 from app.domain.models import Material
 from app.infrastructure.database.engine import get_session_factory
-from app.infrastructure.database.models import MaterialORM
 from app.infrastructure.database.repositories import MaterialRepository
 
 
@@ -110,25 +107,26 @@ class AdHocMaterialDialog(QDialog):
 
         try:
             with get_session_factory()() as session:
+                repository = MaterialRepository(session)
                 normalized = self._normalize_name(name)
-                existing_orm = session.scalar(
-                    select(MaterialORM).where(
-                        func.lower(func.trim(MaterialORM.material_name)) == normalized
-                    )
+                existing = next(
+                    (item for item in repository.list_all(active_only=False)
+                     if self._normalize_name(item.material_name) == normalized),
+                    None,
                 )
-                if existing_orm is not None:
-                    self._material = MaterialRepository(session).get_by_id(existing_orm.id)
+                if existing is not None:
+                    self._material = existing
                     QMessageBox.information(
                         self,
                         "Материал уже существует",
-                        f"Материал «{self._material.material_name}» уже есть в базе данных.\n\n"
+                        f"Материал «{existing.material_name}» уже есть в базе данных.\n\n"
                         "Дубликат не создан. Существующий материал будет добавлен в текущий расчёт.",
                     )
                     self.accept()
                     return
 
                 material = self._build_material()
-                MaterialRepository(session).add(material)
+                repository.add(material)
                 session.commit()
                 self._material = material
 
