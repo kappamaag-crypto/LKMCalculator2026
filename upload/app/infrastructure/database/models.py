@@ -9,22 +9,13 @@ from sqlalchemy import String, Text, Float, Integer, Boolean, DateTime, ForeignK
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.infrastructure.database.engine import Base
 
-
-material_corrosion = Table("material_corrosion", Base.metadata,
-    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("category", String(20), primary_key=True))
-material_durability = Table("material_durability", Base.metadata,
-    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("level", String(20), primary_key=True))
-material_surface = Table("material_surface", Base.metadata,
-    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("surface_type", String(50), primary_key=True))
-material_environment = Table("material_environment", Base.metadata,
-    Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("environment", String(50), primary_key=True))
-system_corrosion = Table("system_corrosion", Base.metadata,
-    Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True), Column("category", String(20), primary_key=True))
-system_environment = Table("system_environment", Base.metadata,
-    Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True), Column("environment", String(50), primary_key=True))
-system_surface = Table("system_surface", Base.metadata,
-    Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True), Column("surface_type", String(50), primary_key=True))
-
+material_corrosion = Table("material_corrosion", Base.metadata, Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("category", String(20), primary_key=True))
+material_durability = Table("material_durability", Base.metadata, Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("level", String(20), primary_key=True))
+material_surface = Table("material_surface", Base.metadata, Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("surface_type", String(50), primary_key=True))
+material_environment = Table("material_environment", Base.metadata, Column("material_id", ForeignKey("materials.id", ondelete="CASCADE"), primary_key=True), Column("environment", String(50), primary_key=True))
+system_corrosion = Table("system_corrosion", Base.metadata, Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True), Column("category", String(20), primary_key=True))
+system_environment = Table("system_environment", Base.metadata, Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True), Column("environment", String(50), primary_key=True))
+system_surface = Table("system_surface", Base.metadata, Column("system_id", ForeignKey("coating_systems.id", ondelete="CASCADE"), primary_key=True), Column("surface_type", String(50), primary_key=True))
 
 class MaterialORM(Base):
     __tablename__ = "materials"
@@ -80,7 +71,6 @@ class MaterialORM(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-
 class CoatingSystemORM(Base):
     __tablename__ = "coating_systems"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -104,7 +94,6 @@ class CoatingSystemORM(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     layers: Mapped[list["CoatingSystemLayerORM"]] = relationship(back_populates="system", cascade="all, delete-orphan", order_by="CoatingSystemLayerORM.layer_number")
 
-
 class CoatingSystemLayerORM(Base):
     __tablename__ = "coating_system_layers"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -124,7 +113,6 @@ class CoatingSystemLayerORM(Base):
     system: Mapped["CoatingSystemORM"] = relationship(back_populates="layers")
     __table_args__ = (UniqueConstraint("system_id", "layer_number", name="uq_system_layer_number"),)
 
-
 class LayerCompatibilityORM(Base):
     __tablename__ = "layer_compatibility"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -133,7 +121,6 @@ class LayerCompatibilityORM(Base):
     status: Mapped[str] = mapped_column(String(30), default="нет подтвержденных данных")
     notes: Mapped[str] = mapped_column(Text, default="")
     __table_args__ = (UniqueConstraint("from_binder", "to_binder", name="uq_binder_pair"),)
-
 
 class CalculationORM(Base):
     __tablename__ = "calculations"
@@ -146,15 +133,14 @@ class CalculationORM(Base):
     system_id: Mapped[Optional[int]] = mapped_column(ForeignKey("coating_systems.id", ondelete="SET NULL"), nullable=True)
     system_name: Mapped[str] = mapped_column(String(300), default="")
     total_dft: Mapped[float] = mapped_column(Float, default=0.0)
-    total_cost_per_m2: Mapped[float] = mapped_column(Float, default=0.0)
-    total_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    total_cost_per_m2: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    total_cost: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     total_consumption_kg: Mapped[float] = mapped_column(Float, default=0.0)
     snapshot_json: Mapped[str] = mapped_column(Text, default="{}")
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     layers: Mapped[list["CalculationLayerORM"]] = relationship(back_populates="calculation", cascade="all, delete-orphan", order_by="CalculationLayerORM.layer_number")
-
 
 class CalculationLayerORM(Base):
     __tablename__ = "calculation_layers"
@@ -166,10 +152,9 @@ class CalculationLayerORM(Base):
     dry_thickness: Mapped[float] = mapped_column(Float, default=0.0)
     consumption_kg: Mapped[float] = mapped_column(Float, default=0.0)
     consumption_l: Mapped[float] = mapped_column(Float, default=0.0)
-    cost_per_m2: Mapped[float] = mapped_column(Float, default=0.0)
+    cost_per_m2: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     snapshot_json: Mapped[str] = mapped_column(Text, default="{}")
     calculation: Mapped["CalculationORM"] = relationship(back_populates="layers")
-
 
 class ComparisonORM(Base):
     __tablename__ = "comparisons"
@@ -181,7 +166,6 @@ class ComparisonORM(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-
 class DictionaryORM(Base):
     __tablename__ = "dictionaries"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -191,7 +175,6 @@ class DictionaryORM(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     __table_args__ = (UniqueConstraint("dict_type", "name", name="uq_dict_type_name"),)
-
 
 class MaterialComponentORM(Base):
     __tablename__ = "material_components"
@@ -207,7 +190,6 @@ class MaterialComponentORM(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     __table_args__ = (UniqueConstraint("material_id", "component_code", name="uq_material_component_code"),)
 
-
 class MaterialMixORM(Base):
     __tablename__ = "material_mixes"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -219,7 +201,6 @@ class MaterialMixORM(Base):
     induction_time_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     temperature_reference: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="")
-
 
 class PackageORM(Base):
     __tablename__ = "packages"
@@ -233,7 +214,6 @@ class PackageORM(Base):
     package_type: Mapped[str] = mapped_column(String(30), default="single")
     is_component_package: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-
 
 class CalculationSnapshotORM(Base):
     __tablename__ = "calculation_snapshots"
