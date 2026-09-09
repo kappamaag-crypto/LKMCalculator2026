@@ -53,6 +53,14 @@ class LayerTableWidget(QTableWidget):
         return item
 
     @staticmethod
+    def _dft_text(value):
+        return "" if value is None else f"{value:.0f}"
+
+    @staticmethod
+    def _percent_text(value):
+        return "" if value is None else f"{value:.0f}"
+
+    @staticmethod
     def _dft_hint(material):
         minimum = getattr(material, "recommended_dft_min", None)
         maximum = getattr(material, "recommended_dft_max", None)
@@ -69,6 +77,8 @@ class LayerTableWidget(QTableWidget):
 
     @staticmethod
     def _dft_state(material, dft):
+        if dft is None:
+            return "invalid", "DFT не задан. Укажите толщину сухого слоя в мкм."
         minimum = getattr(material, "recommended_dft_min", None)
         maximum = getattr(material, "recommended_dft_max", None)
         hard_max = getattr(material, "hard_max_dft", None)
@@ -101,15 +111,15 @@ class LayerTableWidget(QTableWidget):
         self.setItem(row, 3, self._item("Да" if material.is_two_component else "Нет"))
         price = "" if material.price_per_kg is None else f"{material.price_per_kg:.2f}"
         self.setItem(row, 4, self._item(price, edit=True))
-        dft_item = self._item(f"{layer.target_dft:.0f}", edit=True)
+        dft_item = self._item(self._dft_text(layer.target_dft), edit=True)
         state, hint = self._dft_state(material, layer.target_dft)
         dft_item.setToolTip(hint)
         dft_item.setData(Qt.UserRole, state)
         if state != "ok":
             dft_item.setStatusTip(hint)
         self.setItem(row, 5, dft_item)
-        self.setItem(row, 6, self._item(f"{layer.losses_percent:.0f}", edit=True))
-        self.setItem(row, 7, self._item(f"{layer.thinner_percent:.0f}", edit=True))
+        self.setItem(row, 6, self._item(self._percent_text(layer.losses_percent), edit=True))
+        self.setItem(row, 7, self._item(self._percent_text(layer.thinner_percent), edit=True))
         for column in EDITABLE_COLUMNS:
             self._last_valid[(row, column)] = self.item(row, column).text()
         if result:
