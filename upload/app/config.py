@@ -29,6 +29,11 @@ class AppSettings:
     vat_rate: float = 20.0
     prices_include_vat: bool = True
 
+    # Режим состава отчётов: engineering / commercial / full.
+    # По умолчанию — инженерный, чтобы коммерческие цены не попадали
+    # в инженерные отчёты без явного выбора пользователя.
+    report_mode: str = "engineering"
+
     default_losses_percent: float = 0.0
     default_area_unit: str = "м²"
     export_dir: str = str(Path.home() / "Documents" / "LKM_Calculations")
