@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
+from sqlalchemy import null
 from sqlalchemy.orm import Session
 
 from app.infrastructure.database.models import CalculationORM, CalculationLayerORM, ComparisonORM
@@ -79,8 +80,8 @@ class HistoryService:
             area_m2=obj.area_m2 or 0.0,
             system_name=result.system.system_name or "Пользовательская",
             total_dft=result.total_dft,
-            total_cost_per_m2=result.total_cost_per_m2,
-            total_cost=result.total_cost,
+            total_cost_per_m2=result.total_cost_per_m2 if result.total_cost_per_m2 is not None else null(),
+            total_cost=result.total_cost if result.total_cost is not None else null(),
             total_consumption_kg=result.total_practical_consumption_kg,
             snapshot_json=json.dumps(snapshot, ensure_ascii=False),
             notes=notes,
@@ -95,7 +96,7 @@ class HistoryService:
                 dry_thickness=lr.target_dft,
                 consumption_kg=lr.practical_consumption_kg,
                 consumption_l=lr.practical_consumption_l,
-                cost_per_m2=lr.cost_per_m2,
+                cost_per_m2=lr.cost_per_m2 if lr.cost_per_m2 is not None else null(),
                 snapshot_json=json.dumps(snapshot["layers"][i], ensure_ascii=False),
             ))
         self.session.add(calc)
