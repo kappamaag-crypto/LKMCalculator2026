@@ -61,12 +61,12 @@ def calculate_wft(dft: float, solids_percent: float) -> float:
 def calculate_wft_with_dilution(dft: float, solids_percent: float, thinner_percent: float = 0.0,
                                 thinner_density: float = 1.0, paint_density: float = 1.0,
                                 basis: str = DILUTION_BASIS_BY_PAINT_VOLUME) -> float:
+    if thinner_percent < 0 or thinner_percent >= 100:
+        raise ValueError("Процент разбавления должен быть от 0 до менее 100%.")
     base_wft = calculate_wft(dft, solids_percent)
     if base_wft <= 0 or thinner_percent <= 0:
         return base_wft
     p = thinner_percent / 100.0
-    if p >= 1.0:
-        raise ValueError("Процент разбавления должен быть меньше 100%.")
     if basis in (DILUTION_BASIS_BY_PAINT_VOLUME, DILUTION_BASIS_BY_COMPONENT_VOLUME):
         added_volume_ratio = p
     elif basis == DILUTION_BASIS_BY_MIX_VOLUME:
@@ -86,7 +86,7 @@ def calculate_theoretical_coverage(wft: float) -> float:
 
 def calculate_loss_coefficient(losses_percent: float) -> float:
     if losses_percent < 0 or losses_percent >= 100:
-        return 1.0
+        raise ValueError("Потери должны быть от 0 до менее 100%.")
     return 100.0 / (100.0 - losses_percent)
 
 
@@ -161,13 +161,13 @@ def calculate_cost_by_price(consumption_l: float, consumption_kg: float,
 def calculate_thinner(parent_consumption_l: float, thinner_percent: float, thinner_density: float,
                       thinner_price_per_kg: Optional[float], basis: str = DILUTION_BASIS_BY_PAINT_VOLUME,
                       parent_density: float = 1.0) -> tuple[float, float, Optional[float]]:
+    if thinner_percent < 0 or thinner_percent >= 100:
+        raise ValueError("Процент разбавления должен быть от 0 до менее 100%.")
     if parent_consumption_l <= 0 or thinner_percent <= 0:
         return 0.0, 0.0, 0.0
     if thinner_density <= 0:
         raise ValueError("Плотность разбавителя должна быть положительной.")
     p = thinner_percent / 100.0
-    if p >= 1.0:
-        raise ValueError("Процент разбавления должен быть меньше 100%.")
     if basis in (DILUTION_BASIS_BY_PAINT_VOLUME, DILUTION_BASIS_BY_COMPONENT_VOLUME):
         thinner_l = parent_consumption_l * p
     elif basis == DILUTION_BASIS_BY_MIX_VOLUME:
@@ -188,6 +188,10 @@ def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
         raise ValueError("Плотность материала должна быть больше нуля.")
     if inp.solids_by_volume_percent <= 0 or inp.solids_by_volume_percent > 100:
         raise ValueError("Объёмная доля сухого остатка должна быть больше 0 и не превышать 100 %.")
+    if inp.dry_thickness < 0:
+        raise ValueError("Толщина сухого слоя не может быть отрицательной.")
+    if inp.losses_percent < 0 or inp.losses_percent >= 100:
+        raise ValueError("Потери должны быть от 0 до менее 100%.")
     wft = calculate_wft_with_dilution(inp.dry_thickness, inp.solids_by_volume_percent, inp.thinner_percent,
                                       inp.thinner_density, inp.density, inp.thinner_basis)
     base_wft = calculate_wft(inp.dry_thickness, inp.solids_by_volume_percent)
