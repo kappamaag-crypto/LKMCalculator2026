@@ -35,6 +35,11 @@ class TestLayerCalculator:
         with pytest.raises(ValueError,match="solids_by_volume_percent"):
             LayerCalculator.calculate(material,target_dft=200.0,area_m2=1.0)
 
+    def test_invalid_volume_solids_over_100_blocks_engineering_calculation(self):
+        material=make_primer(); material.solids_by_volume_percent=101.0
+        with pytest.raises(ValueError,match="Объёмная доля сухого остатка"):
+            LayerCalculator.calculate(material,target_dft=200.0,area_m2=1.0)
+
     def test_with_area(self):
         result=LayerCalculator.calculate(make_primer(),target_dft=200.0,area_m2=100.0)
         assert result.total_consumption_kg==pytest.approx(result.practical_consumption_kg*100)
@@ -102,6 +107,14 @@ class TestSystemCalculator:
         obj=ObjectData(area_m2=100.0); result,validation=SystemCalculator().calculate(obj,[LayerInput(material=material,target_dft=200.0)])
         assert not validation.has_errors; assert result.total_practical_consumption_kg>0; assert result.total_practical_consumption_l>0; assert result.total_cost_per_m2 is None; assert result.total_cost is None
 
+    def test_missing_critical_material_data_blocks_before_engine_calculation(self):
+        material=make_primer(); material.solids_by_volume_percent=None
+        obj=ObjectData(area_m2=100.0)
+        result,validation=SystemCalculator().calculate(obj,[LayerInput(material=material,target_dft=200.0)])
+        assert validation.has_errors
+        assert any(i.code=="MAT_SOLIDS_UNKNOWN" for i in validation.errors)
+        assert result.layers==[]
+
 
 class TestValidation:
     def test_negative_area(self):
@@ -109,7 +122,7 @@ class TestValidation:
     def test_dft_above_max(self):
         r=validate_layer_input(make_primer(),target_dft=250.0); assert r.has_warnings; assert any(i.code=="LAYER_DFT_ABOVE_MAX" for i in r.warnings)
     def test_solids_over_100(self):
-        mat=make_primer(); mat.solids_percent=120.0; r=validate_layer_input(mat,target_dft=100.0); assert r.has_errors; assert any(i.code=="MAT_SOLIDS_GT100" for i in r.errors)
+        mat=make_primer(); mat.solids_by_volume_percent=120.0; r=validate_layer_input(mat,target_dft=100.0); assert r.has_errors; assert any(i.code=="MAT_SV_GT100" for i in r.errors)
     def test_losses_ge_100(self): assert validate_layer_input(make_primer(),target_dft=100.0,losses_percent=100.0).has_errors
     def test_dew_point(self):
         r=validate_object_data(ObjectData(area_m2=10,surface_temperature=5.0,dew_point=8.0)); assert r.has_errors; assert any(i.code=="OBJ_DEW_POINT" for i in r.errors)
