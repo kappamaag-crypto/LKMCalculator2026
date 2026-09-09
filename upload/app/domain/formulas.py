@@ -19,8 +19,13 @@ PRICE_DENSITY_TOLERANCE = 0.05
 
 @dataclass(frozen=True)
 class LayerCalcInput:
+    """Минимальный набор данных для инженерного расчёта слоя.
+
+    Для расчёта DFT/WFT используется только объёмная доля сухого остатка.
+    Массовый сухой остаток намеренно не принимается как заменитель.
+    """
     density: float
-    solids_percent: float
+    solids_by_volume_percent: float
     dry_thickness: float
     losses_percent: float = 0.0
     price_per_kg: Optional[float] = None
@@ -45,10 +50,6 @@ class LayerCalcResult:
     thinner_consumption_l: float = 0.0
     thinner_consumption_kg: float = 0.0
     thinner_cost_per_m2: Optional[float] = None
-
-
-def round3(value: float) -> float:
-    return round(float(value), 3)
 
 
 def calculate_wft(dft: float, solids_percent: float) -> float:
@@ -183,9 +184,13 @@ def calculate_thinner(parent_consumption_l: float, thinner_percent: float, thinn
 
 
 def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
-    wft = calculate_wft_with_dilution(inp.dry_thickness, inp.solids_percent, inp.thinner_percent,
+    if inp.density <= 0:
+        raise ValueError("Плотность материала должна быть больше нуля.")
+    if inp.solids_by_volume_percent <= 0 or inp.solids_by_volume_percent > 100:
+        raise ValueError("Объёмная доля сухого остатка должна быть больше 0 и не превышать 100 %.")
+    wft = calculate_wft_with_dilution(inp.dry_thickness, inp.solids_by_volume_percent, inp.thinner_percent,
                                       inp.thinner_density, inp.density, inp.thinner_basis)
-    base_wft = calculate_wft(inp.dry_thickness, inp.solids_percent)
+    base_wft = calculate_wft(inp.dry_thickness, inp.solids_by_volume_percent)
     theor_paint_l = 0.0 if base_wft <= 0 else base_wft / 1000.0
     k_loss = calculate_loss_coefficient(inp.losses_percent)
     pract_paint_l = theor_paint_l * k_loss
