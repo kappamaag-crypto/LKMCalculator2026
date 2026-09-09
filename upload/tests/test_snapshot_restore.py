@@ -1,0 +1,96 @@
+from app.domain.models import Material
+from app.domain.enums import BinderType, MaterialType
+from app.services.snapshot_service import material_from_snapshot, thinner_from_snapshot
+
+
+def test_material_restore_uses_snapshot_engineering_values_after_catalog_change():
+    snapshot = {
+        "material_id": 101,
+        "material_name": "Material v1",
+        "manufacturer": "Test",
+        "brand": "TestBrand",
+        "material_type": MaterialType.PRIMER_ENAMEL.value,
+        "binder": BinderType.EPOXY.value,
+        "density": 1.42,
+        "solids_percent": 72.0,
+        "solids_by_volume_percent": 64.0,
+        "price_per_kg": 650.0,
+        "price_per_liter": 923.0,
+    }
+    current_catalog = Material(
+        id=101,
+        manufacturer="Test",
+        brand="TestBrand NEW",
+        material_name="Material v2",
+        material_type=MaterialType.FINISH,
+        density=1.90,
+        solids_percent=55.0,
+        solids_by_volume_percent=48.0,
+        price_per_kg=900.0,
+        price_per_liter=1710.0,
+    )
+
+    restored = material_from_snapshot(snapshot, current_catalog)
+
+    assert restored.id == 101
+    assert restored.material_name == "Material v1"
+    assert restored.density == 1.42
+    assert restored.solids_by_volume_percent == 64.0
+    assert restored.solids_percent == 72.0
+    assert restored.price_per_kg == 650.0
+    assert restored.price_per_liter == 923.0
+    assert restored.material_type is MaterialType.PRIMER_ENAMEL
+    assert restored.binder_type is BinderType.EPOXY
+
+
+def test_material_restore_works_when_catalog_material_is_deleted():
+    snapshot = {
+        "material_id": 101,
+        "material_name": "Deleted material",
+        "manufacturer": "Test",
+        "brand": "TestBrand",
+        "material_type": MaterialType.EPOXY.value,
+        "binder": BinderType.EPOXY.value,
+        "density": 1.50,
+        "solids_percent": 70.0,
+        "solids_by_volume_percent": 62.0,
+        "price_per_kg": 700.0,
+        "price_per_liter": 1050.0,
+    }
+
+    restored = material_from_snapshot(snapshot)
+
+    assert restored.id == 101
+    assert restored.density == 1.50
+    assert restored.solids_by_volume_percent == 62.0
+    assert restored.price_per_kg == 700.0
+    assert restored.price_per_liter == 1050.0
+    assert restored.material_type is MaterialType.EPOXY
+
+
+def test_thinner_restore_uses_snapshot_values_after_catalog_change():
+    snapshot = {
+        "thinner_id": 202,
+        "thinner_name": "Thinner v1",
+        "thinner_density": 0.80,
+        "thinner_price_per_kg": 120.0,
+        "thinner_price_per_liter": 96.0,
+        "thinner_basis": "BY_PAINT_VOLUME",
+    }
+    current_catalog = Material(
+        id=202,
+        material_name="Thinner v2",
+        material_type=MaterialType.THINNER,
+        density=0.90,
+        price_per_kg=200.0,
+        price_per_liter=180.0,
+    )
+
+    restored = thinner_from_snapshot(snapshot, current_catalog)
+
+    assert restored.id == 202
+    assert restored.material_name == "Thinner v1"
+    assert restored.material_type is MaterialType.THINNER
+    assert restored.density == 0.80
+    assert restored.price_per_kg == 120.0
+    assert restored.price_per_liter == 96.0
