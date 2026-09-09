@@ -4,9 +4,7 @@ import pytest
 from app.domain.models import Material,ObjectData,CoatingSystem,LayerDefinition
 from app.domain.enums import MaterialType,BinderType
 from app.domain.calculator import LayerCalculator,SystemCalculator,LayerInput
-from app.domain.formulas import (DILUTION_BASIS_BY_PAINT_VOLUME,DILUTION_BASIS_BY_MIX_VOLUME,
-    DILUTION_BASIS_BY_MASS,DILUTION_BASIS_BY_COMPONENT_VOLUME,calculate_cost_by_price,
-    calculate_wft_with_dilution,calculate_loss_coefficient)
+from app.domain.formulas import (DILUTION_BASIS_BY_PAINT_VOLUME,DILUTION_BASIS_BY_MIX_VOLUME,DILUTION_BASIS_BY_MASS,DILUTION_BASIS_BY_COMPONENT_VOLUME,calculate_cost_by_price,calculate_wft_with_dilution,calculate_loss_coefficient)
 from app.domain.validation import validate_layer_input,validate_object_data,validate_before_calculation
 
 def make_primer()->Material:
@@ -62,7 +60,7 @@ class TestSystemCalculator:
     def test_direct_area_is_sole_scaling_source(self):
         r,_=SystemCalculator().calculate(ObjectData(area_m2=200),[LayerInput(make_primer(),200)]); assert r.layers[0].total_consumption_kg==pytest.approx(r.layers[0].practical_consumption_kg*200)
     def test_zero_area_blocks_system_calculation(self):
-        r,v=SystemCalculator().calculate(ObjectData(area_m2=0),[LayerInput(make_primer(),200)]); assert v.has_errors and any(i.code=="OBJ_AREA_REQUIRED" for i in v.errors) and r.layers==[]
+        r,v=SystemCalculator().calculate(ObjectData(area_m2=0),[LayerInput(make_primer(),200)]); assert v.has_errors and any(i.code=="OBJ_AREA_ZERO" for i in v.errors) and r.layers==[]
     def test_missing_material_price_does_not_block_system_consumption(self):
         m=make_primer(); m.price_per_kg=None; m.price_per_liter=None; r,v=SystemCalculator().calculate(ObjectData(area_m2=100),[LayerInput(m,200)]); assert not v.has_errors and r.total_practical_consumption_kg>0 and r.total_cost_per_m2 is None
     def test_missing_critical_material_data_blocks_before_engine_calculation(self):
@@ -73,12 +71,14 @@ class TestSystemCalculator:
 class TestValidation:
     def test_negative_area(self): assert validate_object_data(ObjectData(area_m2=-10)).has_errors
     def test_zero_area_is_not_a_valid_object_calculation_area(self):
-        result=validate_object_data(ObjectData(area_m2=0)); assert result.has_warnings and not result.has_errors
+        result=validate_object_data(ObjectData(area_m2=0)); assert result.has_errors and any(i.code=="OBJ_AREA_ZERO" for i in result.errors)
     def test_unknown_area_is_clear_error(self):
         result=validate_object_data(ObjectData(area_m2=None)); assert any(i.code=="OBJ_AREA_UNKNOWN" for i in result.errors)
     def test_dft_above_max(self): assert validate_layer_input(make_primer(),250).has_warnings
     def test_unknown_dft_is_clear_error(self):
         result=validate_layer_input(make_primer(),None); assert any(i.code=="LAYER_DFT_UNKNOWN" for i in result.errors)
+    def test_zero_dft_is_clear_error(self):
+        result=validate_layer_input(make_primer(),0); assert any(i.code=="LAYER_DFT_ZERO" for i in result.errors)
     def test_solids_over_100(self):
         m=make_primer(); m.solids_by_volume_percent=120; assert validate_layer_input(m,100).has_errors
     def test_losses_ge_100(self): assert validate_layer_input(make_primer(),100,100).has_errors
