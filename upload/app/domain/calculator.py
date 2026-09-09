@@ -29,6 +29,8 @@ class LayerCalculator:
         solids = material.solids_by_volume_percent
         if solids is None or solids <= 0 or solids > 100:
             raise ValueError(f"Объёмный сухой остаток материала «{material.material_name}» неизвестен или некорректен. Для расчёта DFT/WFT требуется solids_by_volume_percent в диапазоне 0–100 %.")
+        if area_m2 < 0:
+            raise ValueError("Площадь объекта не может быть отрицательной.")
         thinner_density, thinner_price = 1.0, None
         if thinner_percent > 0:
             if thinner is None:
@@ -61,6 +63,9 @@ class SystemCalculator:
             if validation.has_errors:
                 return SystemCalculationResult(system=system or CoatingSystem(system_name="Ошибка валидации"), object_data=obj, calculated_at=datetime.now()), validation
         area = self.resolve_area(obj)
+        if area <= 0:
+            validation.add_error("OBJ_AREA_REQUIRED", "Для расчёта системы укажите площадь объекта больше нуля (например, 1 м² для расчёта на единицу площади).", "area_m2")
+            return SystemCalculationResult(system=system or CoatingSystem(system_name="Ошибка валидации"), object_data=obj, calculated_at=datetime.now()), validation
         layer_results = [LayerCalculator.calculate(li.material, li.target_dft, li.losses_percent if li.losses_percent is not None else self.default_losses, li.thinner_percent, li.thinner, area, li.thinner_basis) for li in layer_inputs]
         total_dft = sum(lr.target_dft for lr in layer_results)
         total_theor_kg = sum(lr.theoretical_consumption_kg for lr in layer_results)
