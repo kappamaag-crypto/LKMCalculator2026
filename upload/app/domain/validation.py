@@ -32,23 +32,18 @@ class ValidationResult:
     def merge(self, other): self.issues.extend(other.issues)
 
 def _range(result, minimum, maximum, code, message, field):
-    if minimum is not None and maximum is not None and minimum > maximum:
-        result.add_error(code, message, field)
+    if minimum is not None and maximum is not None and minimum > maximum: result.add_error(code, message, field)
 
 def _is_thinner(material: Material) -> bool:
     return getattr(getattr(material, "material_type", None), "value", "") == "разбавитель"
 
 def validate_material(material: Material) -> ValidationResult:
     r = ValidationResult()
-    if not material.material_name or not material.material_name.strip():
-        r.add_error("MAT_NAME", "Не указано название материала", "material_name")
-    if material.density is None:
-        r.add_error("MAT_DENSITY_UNKNOWN", "Плотность материала неизвестна — расчёт массы в кг невозможен", "density")
-    elif material.density <= 0:
-        r.add_error("MAT_DENSITY_INVALID", "Плотность материала должна быть больше нуля", "density")
+    if not material.material_name or not material.material_name.strip(): r.add_error("MAT_NAME", "Не указано название материала", "material_name")
+    if material.density is None: r.add_error("MAT_DENSITY_UNKNOWN", "Плотность материала неизвестна — расчёт массы в кг невозможен", "density")
+    elif material.density <= 0: r.add_error("MAT_DENSITY_INVALID", "Плотность материала должна быть больше нуля", "density")
     if material.solids_by_volume_percent is None:
-        if not _is_thinner(material):
-            r.add_error("MAT_SOLIDS_UNKNOWN", "Объёмная доля сухого остатка неизвестна — инженерный расчёт WFT невозможен", "solids_by_volume_percent")
+        if not _is_thinner(material): r.add_error("MAT_SOLIDS_UNKNOWN", "Объёмная доля сухого остатка неизвестна — инженерный расчёт WFT невозможен", "solids_by_volume_percent")
     else:
         sv = material.solids_by_volume_percent
         if sv < 0: r.add_error("MAT_SV_LT0", "Сухой остаток по объёму не может быть отрицательным", "solids_by_volume_percent")
@@ -74,23 +69,17 @@ def validate_material(material: Material) -> ValidationResult:
     return r
 
 def validate_layer_input(material: Material, target_dft: float | None, losses_percent: float | None = 0.0, thinner_percent: float | None = 0.0, layer_index: int | None = None, thinner_basis: str | None = None) -> ValidationResult:
-    r = ValidationResult()
-    mr = validate_material(material)
-    for issue in mr.issues:
-        issue.layer_index = layer_index
-    r.merge(mr)
-    if target_dft is None:
-        r.add_error("LAYER_DFT_UNKNOWN", "Не задана толщина сухого слоя (DFT) — укажите значение в мкм", "target_dft", layer_index)
+    r = ValidationResult(); mr = validate_material(material); r.merge(mr)
+    for issue in r.issues: issue.layer_index = layer_index
+    if target_dft is None: r.add_error("LAYER_DFT_UNKNOWN", "Не задана толщина сухого слоя (DFT) — укажите значение в мкм", "target_dft", layer_index)
     else:
         if target_dft < 0: r.add_error("LAYER_DFT_NEG", "Толщина сухого слоя не может быть отрицательной", "target_dft", layer_index)
-        if target_dft == 0: r.add_warning("LAYER_DFT_ZERO", "Толщина сухого слоя равна нулю", "target_dft", layer_index)
-    if losses_percent is None:
-        r.add_error("LAYER_LOSSES_UNKNOWN", "Не задан процент технологических потерь — укажите значение", "losses_percent", layer_index)
+        elif target_dft == 0: r.add_error("LAYER_DFT_ZERO", "Толщина сухого слоя равна нулю — расчёт слоя невозможен", "target_dft", layer_index)
+    if losses_percent is None: r.add_error("LAYER_LOSSES_UNKNOWN", "Не задан процент технологических потерь — укажите значение", "losses_percent", layer_index)
     else:
         if losses_percent < 0: r.add_error("LAYER_LOSSES_NEG", "Потери не могут быть отрицательными", "losses_percent", layer_index)
         if losses_percent >= 100: r.add_error("LAYER_LOSSES_GE100", "Потери не могут быть ≥ 100 %", "losses_percent", layer_index)
-    if thinner_percent is None:
-        r.add_error("LAYER_THINNER_UNKNOWN", "Не задан процент разбавления — укажите значение или 0 %", "thinner_percent", layer_index)
+    if thinner_percent is None: r.add_error("LAYER_THINNER_UNKNOWN", "Не задан процент разбавления — укажите значение или 0 %", "thinner_percent", layer_index)
     else:
         if thinner_percent < 0: r.add_error("LAYER_THINNER_NEG", "Процент разбавителя не может быть отрицательным", "thinner_percent", layer_index)
         if thinner_percent >= 100: r.add_error("LAYER_THINNER_GE100", "Процент разбавителя должен быть меньше 100 %", "thinner_percent", layer_index)
@@ -108,8 +97,7 @@ def validate_layer_input(material: Material, target_dft: float | None, losses_pe
     return r
 
 def validate_application_conditions(obj: ObjectData, material: Material, layer_index: int | None = None) -> ValidationResult:
-    r = ValidationResult()
-    temperature = obj.surface_temperature if obj.surface_temperature is not None else obj.air_temperature
+    r = ValidationResult(); temperature = obj.surface_temperature if obj.surface_temperature is not None else obj.air_temperature
     if temperature is not None:
         if material.min_application_temperature is not None and temperature < material.min_application_temperature: r.add_error("COND_TEMP_BELOW_MIN", f"Температура {temperature:g} °C ниже минимальной для «{material.material_name}» ({material.min_application_temperature:g} °C)", "surface_temperature", layer_index)
         if material.max_application_temperature is not None and temperature > material.max_application_temperature: r.add_error("COND_TEMP_ABOVE_MAX", f"Температура {temperature:g} °C выше максимальной для «{material.material_name}» ({material.max_application_temperature:g} °C)", "surface_temperature", layer_index)
@@ -122,11 +110,9 @@ def validate_application_conditions(obj: ObjectData, material: Material, layer_i
 
 def validate_object_data(obj: ObjectData) -> ValidationResult:
     r = ValidationResult()
-    if obj.area_m2 is None:
-        r.add_error("OBJ_AREA_UNKNOWN", "Не задана площадь объекта — укажите площадь в м²", "area_m2")
-    else:
-        if obj.area_m2 < 0: r.add_error("OBJ_AREA_NEG", "Площадь не может быть отрицательной", "area_m2")
-        if obj.area_m2 == 0: r.add_warning("OBJ_AREA_ZERO", "Площадь равна нулю — итоговые количества будут нулевыми", "area_m2")
+    if obj.area_m2 is None: r.add_error("OBJ_AREA_UNKNOWN", "Не задана площадь объекта — укажите площадь в м²", "area_m2")
+    elif obj.area_m2 < 0: r.add_error("OBJ_AREA_NEG", "Площадь не может быть отрицательной", "area_m2")
+    elif obj.area_m2 == 0: r.add_error("OBJ_AREA_ZERO", "Площадь должна быть больше нуля", "area_m2")
     if obj.temperature_min is not None and obj.temperature_max is not None and obj.temperature_min > obj.temperature_max: r.add_error("OBJ_TEMP_RANGE", "Минимальная температура объекта больше максимальной", "temperature_range")
     if obj.relative_humidity is not None and not 0 <= obj.relative_humidity <= 100: r.add_error("OBJ_RH_RANGE", "Относительная влажность должна быть в диапазоне 0–100 %", "relative_humidity")
     if obj.roughness is not None and obj.roughness < 0: r.add_error("OBJ_ROUGHNESS_NEG", "Шероховатость не может быть отрицательной", "roughness")
@@ -136,53 +122,24 @@ def validate_object_data(obj: ObjectData) -> ValidationResult:
 
 def validate_system_layers(layers: Sequence[LayerDefinition | LayerResult], compatibility_checker=None, system: CoatingSystem | None = None) -> ValidationResult:
     r = ValidationResult()
-    if not layers:
-        r.add_error("SYS_NO_LAYERS", "В системе отсутствуют слои", "layers")
-        return r
-    total_dft = 0.0
-    for index, layer in enumerate(layers):
+    if not layers: r.add_error("SYSTEM_NO_LAYERS", "Система не содержит слоёв", "layers"); return r
+    for idx, layer in enumerate(layers, 1):
         material = getattr(layer, "material", None)
-        dft = getattr(layer, "target_dft", None)
-        if material is not None:
-            r.merge(validate_layer_input(material, dft, layer_index=index))
-            if dft is not None:
-                total_dft += dft
-        elif dft is None:
-            r.add_error("SYS_LAYER_DFT_UNKNOWN", "Толщина слоя неизвестна", "target_dft", index)
-    if system is not None:
-        if system.number_of_layers is not None and len(layers) != system.number_of_layers:
-            r.add_error("SYS_LAYER_COUNT", f"Количество слоёв ({len(layers)}) не соответствует системе ({system.number_of_layers})", "layers")
-        if system.total_dft_min is not None and total_dft < system.total_dft_min:
-            r.add_error("SYS_TOTAL_DFT_BELOW_MIN", f"Суммарная толщина {total_dft:g} мкм ниже минимальной для системы ({system.total_dft_min:g} мкм)", "total_dft")
-        if system.total_dft_max is not None and total_dft > system.total_dft_max:
-            r.add_error("SYS_TOTAL_DFT_ABOVE_MAX", f"Суммарная толщина {total_dft:g} мкм выше максимальной для системы ({system.total_dft_max:g} мкм)", "total_dft")
-    if compatibility_checker is not None:
-        try:
-            for i in range(len(layers) - 1):
-                a = getattr(getattr(layers[i], "material", None), "binder_type", None)
-                b = getattr(getattr(layers[i + 1], "material", None), "binder_type", None)
-                if a is not None and b is not None:
-                    check = compatibility_checker(a, b)
-                    if check is False: r.add_error("SYS_COMPATIBILITY", f"Слои {i + 1} и {i + 2} несовместимы", "layers", i + 1)
-        except TypeError:
-            pass
+        if material is None: r.add_error("SYSTEM_MATERIAL_UNKNOWN", f"Не задан материал для слоя №{idx}", "material", idx); continue
+        target_dft = getattr(layer, "target_dft", None); losses = getattr(layer, "losses_percent", None); thinner = getattr(layer, "thinner_percent", None)
+        r.merge(validate_layer_input(material, target_dft, losses, thinner, idx, getattr(layer, "thinner_basis", None)))
+    if compatibility_checker and len(layers) > 1:
+        for prev, cur in zip(layers, layers[1:]):
+            prev_name = getattr(getattr(prev, "material", None), "material_name", None); cur_name = getattr(getattr(cur, "material", None), "material_name", None)
+            if not prev_name or not cur_name: continue
+            try: message = compatibility_checker(prev_name, cur_name)
+            except (TypeError, ValueError) as exc:
+                r.add_warning("COMPATIBILITY_CHECK_ERROR", f"Проверка совместимости слоёв не выполнена: {exc}", "compatibility"); continue
+            if message: r.add_error("LAYER_COMPATIBILITY", message, "compatibility")
     return r
 
-def validate_before_calculation(obj: ObjectData, layers, compatibility_checker=None, system: CoatingSystem | None = None) -> ValidationResult:
+def validate_before_calculation(obj: ObjectData, layers: Sequence[tuple[Material, float | None, float | None, float | None]], compatibility_checker=None, system=None) -> ValidationResult:
     r = validate_object_data(obj)
-    defs = []
-    for index, item in enumerate(layers):
-        if isinstance(item, (tuple, list)):
-            material = item[0]
-            target_dft = item[1]
-            losses = item[2] if len(item) > 2 else 0.0
-            thinner_percent = item[3] if len(item) > 3 else 0.0
-            defs.append(LayerDefinition(material=material, target_dft=target_dft, losses_percent=losses, thinner_percent=thinner_percent))
-        else:
-            defs.append(item)
-    r.merge(validate_system_layers(defs, compatibility_checker=compatibility_checker, system=system))
-    for index, layer in enumerate(defs):
-        material = getattr(layer, "material", None)
-        if material is not None:
-            r.merge(validate_application_conditions(obj, material, index))
+    for idx, (material, dft, losses, thinner) in enumerate(layers, 1): r.merge(validate_layer_input(material, dft, losses, thinner, idx))
+    if system is not None: r.merge(validate_system_layers(system.layers, compatibility_checker, system))
     return r
