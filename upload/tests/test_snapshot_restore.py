@@ -84,3 +84,47 @@ def test_thinner_restore_uses_snapshot_values_after_catalog_change():
     assert restored.density == 0.80
     assert restored.price_per_kg == 120.0
     assert restored.price_per_liter == 96.0
+
+
+def test_legacy_thinner_snapshot_falls_back_to_current_catalog_for_absent_fields():
+    snapshot = {
+        "thinner_id": 202,
+        "thinner_name": "Thinner v1",
+        "thinner_basis": "BY_PAINT_VOLUME",
+    }
+    current_catalog = Material(
+        id=202,
+        material_name="Thinner v2",
+        material_type=MaterialType.THINNER,
+        density=0.90,
+        price_per_kg=200.0,
+        price_per_liter=180.0,
+    )
+    restored = thinner_from_snapshot(snapshot, current_catalog)
+    assert restored.material_name == "Thinner v1"
+    assert restored.density == 0.90
+    assert restored.price_per_kg == 200.0
+    assert restored.price_per_liter == 180.0
+
+
+def test_explicit_unknown_thinner_density_is_not_replaced_by_catalog_value():
+    snapshot = {
+        "thinner_id": 202,
+        "thinner_name": "Thinner v1",
+        "thinner_density": None,
+        "thinner_price_per_kg": 120.0,
+        "thinner_price_per_liter": None,
+        "thinner_basis": "BY_PAINT_VOLUME",
+    }
+    current_catalog = Material(
+        id=202,
+        material_name="Thinner v2",
+        material_type=MaterialType.THINNER,
+        density=0.90,
+        price_per_kg=200.0,
+        price_per_liter=180.0,
+    )
+    restored = thinner_from_snapshot(snapshot, current_catalog)
+    assert restored.density is None
+    assert restored.price_per_kg == 120.0
+    assert restored.price_per_liter is None
