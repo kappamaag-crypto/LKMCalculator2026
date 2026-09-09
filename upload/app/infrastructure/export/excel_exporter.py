@@ -34,6 +34,9 @@ def _write_header_row(ws:Worksheet,row:int,headers:list[str])->None:
         cell=ws.cell(row=row,column=col,value=header); cell.font=HEADER_FONT; cell.fill=HEADER_FILL; cell.alignment=CENTER; cell.border=THIN
 
 def _cell(ws:Worksheet,row:int,col:int,value,bold:bool=False,fill=None,align=CENTER):
+    # Keep the public helper strict: comparison rows must pass an integer column.
+    if not isinstance(col,int):
+        raise TypeError(f"Excel column must be int, got {type(col).__name__}")
     cell=ws.cell(row=row,column=col,value=value); cell.font=BOLD_FONT if bold else NORMAL_FONT; cell.alignment=align; cell.border=THIN
     if fill: cell.fill=fill
     return cell
@@ -109,7 +112,6 @@ class ExcelExporter:
         systems=comparison.systems
         headers=["Инженерный показатель"]+[(s.system.system_name or f"Система {i+1}")[:25] for i,s in enumerate(systems)]
         _write_header_row(ws,row,headers); row+=1
-
         summary_rows=[
             ("Количество слоёв",[len(s.layers) for s in systems]),
             ("Общая толщина DFT, мкм",[s.total_dft for s in systems]),
@@ -125,7 +127,6 @@ class ExcelExporter:
             _cell(ws,row,1,label,True,ALT_FILL,LEFT)
             for col,value in enumerate(values,2): _cell(ws,row,col,value)
             row+=1
-
         row+=1
         max_layers=max((len(s.layers) for s in systems),default=0)
         _write_header_row(ws,row,["Слой / показатель"]+[(s.system.system_name or f"Система {i+1}")[:25] for i,s in enumerate(systems)]); row+=1
@@ -153,11 +154,10 @@ class ExcelExporter:
                 values=[]
                 for s in systems:
                     values.append(getter(s.layers[layer_index]) if layer_index < len(s.layers) else "—")
-                _cell(ws,row,f"Слой {layer_index+1}: {indicator}",True if indicator=="Материал" else False,ALT_FILL if layer_index%2==0 else None,LEFT)
-                for col,value in enumerate(values,2): _cell(ws,row,value)
+                _cell(ws,row,1,f"Слой {layer_index+1}: {indicator}",bold=(indicator=="Материал"),fill=ALT_FILL if layer_index%2==0 else None,align=LEFT)
+                for col,value in enumerate(values,2): _cell(ws,row,col,value)
                 row+=1
             row+=1
-
         _auto_width(ws,12,32)
         ws.freeze_panes="B"+str(row)
 
