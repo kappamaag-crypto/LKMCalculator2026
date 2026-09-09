@@ -105,6 +105,41 @@ class TestBasicFormulas:
         assert result.theoretical_consumption_l == pytest.approx(100 / 0.70 / 1000)
         assert result.thinner_consumption_l == pytest.approx(result.practical_consumption_l * 0.10)
 
+    def test_dilution_cost_is_material_plus_thinner_when_both_prices_known(self):
+        result = calculate_layer(
+            LayerCalcInput(
+                density=1.4,
+                solids_percent=70.0,
+                dry_thickness=100.0,
+                price_per_kg=500.0,
+                thinner_percent=10.0,
+                thinner_density=0.8,
+                thinner_price_per_kg=100.0,
+            )
+        )
+        expected_material = result.practical_consumption_kg * 500.0
+        expected_thinner = result.thinner_consumption_kg * 100.0
+        assert result.cost_per_m2 == pytest.approx(expected_material)
+        assert result.thinner_cost_per_m2 == pytest.approx(expected_thinner)
+        assert result.cost_per_m2 + result.thinner_cost_per_m2 == pytest.approx(expected_material + expected_thinner)
+
+    def test_unknown_thinner_price_does_not_zero_or_hide_thinner_consumption(self):
+        result = calculate_layer(
+            LayerCalcInput(
+                density=1.4,
+                solids_percent=70.0,
+                dry_thickness=100.0,
+                price_per_kg=500.0,
+                thinner_percent=10.0,
+                thinner_density=0.8,
+                thinner_price_per_kg=None,
+            )
+        )
+        assert result.cost_per_m2 is not None
+        assert result.thinner_consumption_l > 0
+        assert result.thinner_consumption_kg > 0
+        assert result.thinner_cost_per_m2 is None
+
     def test_scale_to_area(self):
         assert scale_to_area(0.5, 100) == 50.0
         assert scale_to_area(0.5, 0) == 0.0
