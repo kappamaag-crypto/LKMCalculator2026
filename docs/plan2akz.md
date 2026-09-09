@@ -176,11 +176,13 @@ Customer-facing regression tests покрывают:
 
 Инженерный экспорт не выводит складские/закупочные поля и не содержит дублей kg/l секций.
 
-CI `34387111351` на commit `964fed3e5f40aada9c393f5542249debbeb8cc00` завершился `174 passed / 1 failed / 13 warnings`. Единственное падение было в `test_customer_excel_expands_to_four_layers_and_keeps_styles`: проверка внутренней ячейки `C11` merged range ожидала заливку, которую openpyxl не сохраняет при XLSX round-trip. Сам persisted style у anchor `B11` корректен.
+CI `34387111351` на commit `964fed3e5f40aada9c393f5542249debbeb8cc00` завершился `174 passed / 1 failed / 13 warnings`. Единственное падение было в `test_customer_excel_expands_to_four_layers_and_keeps_styles`: проверка внутренней ячейки `C11` merged range ожидала заливку, которую openpyxl не сохраняет при XLSX round-trip.
 
-Исправление: commit `8589c7de791304336a4539005438dc380d8571de` перевёл regression-проверку на фактически сохраняемый anchor `B11` и одновременно проверяет наличие merged range `B11:E11`. Это не ослабляет проверку клиентского оформления: тест теперь проверяет именно тот стиль, который реально сохраняется в XLSX и используется Excel для merged range.
+После попытки скорректировать regression-проверку на anchor `B11` CI `34387623555` показал, что сам anchor также терял заливку: причина была в том, что исходный шаблон хранит зелёную заливку на внутренней ячейке `C9/C10`, а после расширения и повторного merge openpyxl сохраняет стиль только у top-left anchor. Поэтому исправление перенесено в exporter.
 
-**Текущий статус:** ожидается новый полный CI после commit `8589c7de791304336a4539005438dc380d8571de`. Этап 5.4 не закрывается до зелёного полного CI.
+Commit `2dbf1c6dbe801e48eaa76bacd6d3bcd41598a856` исправляет это на уровне `CustomerExcelExporter`: исходная заливка разбавителя теперь явно захватывается до `unmerge`, после расширения переносится на top-left anchor каждого нового merged range и только затем workbook сохраняется. `_restore_merged_fills()` дополнительно восстанавливает anchor fill, если в merged range осталась заполненная внутренняя ячейка.
+
+Тест `8589c7de791304336a4539005438dc380d8571de` оставлен с проверкой persisted anchor `B11` и merged range `B11:E11`; после exporter fix ожидается зелёный полный CI. Этап 5.4 не закрывается до фактического зелёного CI.
 
 Осталось:
 - получить зелёный полный pytest suite;
