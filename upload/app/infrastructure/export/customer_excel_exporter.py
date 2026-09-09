@@ -1,9 +1,4 @@
-"""Экспорт в пользовательский Excel-шаблон.
-
-Шаблон не перестраивается с нуля: существующая книга копируется и заполняется
-по найденным подписям. Если шаблон недоступен или его структура не содержит
-распознаваемых полей, используется стандартный ExcelExporter.
-"""
+"""Экспорт в пользовательский Excel-шаблон."""
 
 from __future__ import annotations
 
@@ -18,7 +13,7 @@ from app.infrastructure.export.excel_exporter import ExcelExporter
 
 
 class CustomerExcelExporter(ExcelExporter):
-    """Сохраняет исходный пользовательский шаблон и заполняет его данными."""
+    """Сохраняет исходный пользовательский шаблон и заполняет его расчётными данными."""
 
     LABELS = {
         "object": ("объект", "название объекта"),
@@ -52,8 +47,6 @@ class CustomerExcelExporter(ExcelExporter):
         ws, cell = self._find_label_cell(wb, aliases)
         if cell is None:
             return False
-        # Предпочитаем соседнюю ячейку справа; если она объединена/занята,
-        # пробуем следующую.
         for offset in (1, 2, 3):
             target = ws.cell(cell.row, cell.column + offset)
             if target.value in (None, ""):
@@ -62,7 +55,7 @@ class CustomerExcelExporter(ExcelExporter):
         return False
 
     def _fill_layers(self, wb, result: SystemCalculationResult) -> int:
-        """Заполняет таблицу слоёв, если в шаблоне найдена строка заголовков."""
+        """Заполняет найденную таблицу слоёв только инженерными показателями."""
         written = 0
         for ws in wb.worksheets:
             header_row = None
@@ -86,6 +79,7 @@ class CustomerExcelExporter(ExcelExporter):
 
             for index, layer in enumerate(result.layers, start=1):
                 row_no = header_row + index
+                total_cost = _cost_add(layer.cost_per_m2, layer.thinner_cost_per_m2)
                 values = {
                     "material": layer.material.material_name,
                     "dft": layer.target_dft,
@@ -94,11 +88,11 @@ class CustomerExcelExporter(ExcelExporter):
                     "thinner": layer.thinner_percent,
                     "kg_m2": layer.practical_consumption_kg,
                     "l_m2": layer.practical_consumption_l,
-                    "cost_m2": layer.cost_per_m2 + layer.thinner_cost_per_m2,
+                    "cost_m2": total_cost,
                 }
                 for key, value in values.items():
                     col = columns.get(key)
-                    if col:
+                    if col and value is not None:
                         ws.cell(row_no, col, value)
                         written += 1
         return written
@@ -136,3 +130,10 @@ class CustomerExcelExporter(ExcelExporter):
         self._fill_layers(wb, result)
         wb.save(path)
         return path
+
+
+def _cost_add(*values: Optional[float]) -> Optional[float]:
+    """Сумма стоимостей остаётся UNKNOWN, если неизвестна хотя бы одна часть."""
+    if any(value is None for value in values):
+        return None
+    return sum(values)
