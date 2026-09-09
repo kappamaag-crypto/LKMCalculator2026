@@ -39,11 +39,16 @@ def _template(path: Path) -> None:
     wb.save(path)
 
 
-def _result(layer_count: int, with_mixed_thinners: bool = False):
+def _result(layer_count: int, with_mixed_thinners: bool = False, long_name: bool = False):
     materials = [
         Material(
             manufacturer="Blank",
-            material_name=f"Слой {i}",
+            material_name=(
+                "Сверхдлинное наименование антикоррозионного материала для проверки "
+                "переноса полного названия без усечения "
+                if long_name and i == 1
+                else f"Слой {i}"
+            ),
             material_type=MaterialType.PRIMER_ENAMEL,
             binder_type=BinderType.EPOXY,
             density=1.4,
@@ -76,19 +81,19 @@ def _result(layer_count: int, with_mixed_thinners: bool = False):
     return result
 
 
-def _export(tmp_path: Path, layer_count: int, with_mixed_thinners: bool = False):
+def _export(tmp_path: Path, layer_count: int, with_mixed_thinners: bool = False, mode: str = "full", long_name: bool = False):
     template = tmp_path / "template.xlsx"
     _template(template)
-    output = tmp_path / f"result_{layer_count}.xlsx"
-    settings = AppSettings(report_mode="full", excel_template_path=str(template))
+    output = tmp_path / f"result_{layer_count}_{mode}.xlsx"
+    settings = AppSettings(report_mode=mode, excel_template_path=str(template))
     CustomerExcelExporter(settings).export_calculation(
-        _result(layer_count, with_mixed_thinners), output
+        _result(layer_count, with_mixed_thinners, long_name), output
     )
-    return load_workbook(output, data_only=False)["База"]
+    return load_workbook(output, data_only=False)
 
 
 def test_customer_excel_is_single_table(tmp_path):
-    ws = _export(tmp_path, 2)
+    ws = _export(tmp_path, 2)["База"]
     assert ws["B1"].value == "Расчёт системы АКЗ"
     assert ws.max_row == 11
     assert ws["C7"].value == "Blank Слой 1"
@@ -98,14 +103,14 @@ def test_customer_excel_is_single_table(tmp_path):
 
 
 def test_customer_excel_expands_to_three_layers_without_truncation(tmp_path):
-    ws = _export(tmp_path, 3)
+    ws = _export(tmp_path, 3)["База"]
     assert [ws.cell(row, 3).value for row in range(7, 10)] == [f"Blank Слой {i}" for i in range(1, 4)]
     assert ws["C13"].value == "Толщина покрытия (мкм)"
     assert ws.max_row == 13
 
 
 def test_customer_excel_expands_to_four_layers_and_keeps_styles(tmp_path):
-    ws = _export(tmp_path, 4)
+    ws = _export(tmp_path, 4)["База"]
     assert [ws.cell(row, 3).value for row in range(7, 11)] == [f"Blank Слой {i}" for i in range(1, 5)]
     assert ws["C15"].value == "Толщина покрытия (мкм)"
     assert ws.max_row == 15
@@ -116,7 +121,7 @@ def test_customer_excel_expands_to_four_layers_and_keeps_styles(tmp_path):
 
 
 def test_customer_excel_contains_all_layers_even_with_mixed_thinners(tmp_path):
-    ws = _export(tmp_path, 4, with_mixed_thinners=True)
+    ws = _export(tmp_path, 4, with_mixed_thinners=True)["База"]
     assert ws.max_row == 15
     assert [ws.cell(row, 3).value for row in range(7, 11)] == [f"Blank Слой {i}" for i in range(1, 5)]
     assert ws["B11"].value == "Разбавитель для Blank Слой 1"
@@ -125,3 +130,27 @@ def test_customer_excel_contains_all_layers_even_with_mixed_thinners(tmp_path):
     assert ws["B14"].value is None
     assert ws["O11"].value is not None
     assert ws["O13"].value is not None
+
+
+def test_customer_excel_preserves_long_material_name(tmp_path):
+    wb = _export(tmp_path, 2, long_name=True)
+    ws = wb["База"]
+    expected = "Сверхдлинное наименование антикоррозионного материала для проверки переноса полного названия без усечения"
+    assert ws["C7"].value == f"Blank {expected}"
+
+
+def test_customer_excel_commercial_and_full_keep_price_fields(tmp_path):
+    for mode in ("commercial", "full"):
+        ws = _export(tmp_path, 2, mode=mode)["База"]
+        assert ws["M7"].value == 101.0
+        assert ws["N7"].value == 141.0
+        assert all("Если стоимость" not in str(cell.value or "") for row in ws.iter_rows() for cell in row)
+
+
+def test_customer_excel_engineering_mode_uses_separate_export(tmp_path):
+    wb = _export(tmp_path, 3, mode="engineering")
+    assert wb.sheetnames == ["Инженерный расчёт"]
+    ws = wb["Инженерный расчёт"]
+    assert [ws.cell(row, 2).value for row in range(6, 9)] == [f"Blank Слой {i}" for i in range(1, 4)]
+    values = [cell.value for row in ws.iter_rows() for cell in row]
+    assert not any("Цена" in str(value) for value in values if value is not None)
