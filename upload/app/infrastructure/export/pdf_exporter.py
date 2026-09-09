@@ -45,8 +45,7 @@ class PDFExporter:
         if recommendation and recommendation.items: story+=self._section_recommendations(recommendation)
         story+=self._section_notes(); doc.build(story); return path
     def _title(self,result):
-        obj=result.object_data; area=_area(result); mode_title={"engineering":"Инженерный расчёт","commercial":"Коммерческий расчёт","full":"Полный расчёт"}[self.report_mode]
-        items=[Paragraph(mode_title+" — ЛКМ / АКЗ",self.styles["RuTitle"]),HRFlowable(width="100%",thickness=1.5,color=BLUE,spaceAfter=8)]
+        obj=result.object_data; area=_area(result); mode_title={"engineering":"Инженерный расчёт","commercial":"Коммерческий расчёт","full":"Полный расчёт"}[self.report_mode]; items=[Paragraph(mode_title+" — ЛКМ / АКЗ",self.styles["RuTitle"]),HRFlowable(width="100%",thickness=1.5,color=BLUE,spaceAfter=8)]
         logo=Path(self.settings.logo_path).expanduser() if self.settings.logo_path else None
         if logo and logo.exists():
             try: img=Image(str(logo),width=28*mm,height=14*mm); img.hAlign="LEFT"; items += [img,Spacer(1,2*mm)]
@@ -61,12 +60,9 @@ class PDFExporter:
         return [Paragraph("1. Исходные данные расчёта",self.styles["RuHeading"]),self._table(data,[75*mm,95*mm],alignments=["LEFT","LEFT"]),Spacer(1,3*mm)]
     def _section_layers(self,result):
         mode=self.report_mode
-        if mode=="engineering":
-            data=[["№","Материал","DFT","WFT","Теор. кг/м²","Практ. кг/м²","Теор. л/м²","Практ. л/м²","Стоимость системы, руб/м²"]]; widths=[7,45,15,15,19,19,19,19,22]
-        elif mode=="commercial":
-            data=[["№","Материал","Цена, руб/кг","Цена, руб/л","Расход, кг/м²","Расход на объект, кг","Стоимость, руб/м²","Стоимость объекта, руб"]]; widths=[7,48,22,22,20,25,25,27]
-        else:
-            data=[["№","Материал","DFT","WFT","Теор. кг/м²","Практ. кг/м²","Теор. л/м²","Практ. л/м²","Цена, руб/кг","Цена, руб/л","Стоимость, руб/м²","Стоимость объекта, руб"]]; widths=[7,35,12,12,16,16,16,16,17,17,20,22]
+        if mode=="engineering": data=[["№","Материал","DFT","WFT","Теор. кг/м²","Практ. кг/м²","Теор. л/м²","Практ. л/м²","Стоимость системы, руб/м²"]]; widths=[7,45,15,15,19,19,19,19,22]
+        elif mode=="commercial": data=[["№","Материал","Цена, руб/кг","Цена, руб/л","Расход, кг/м²","Расход на объект, кг","Стоимость, руб/м²","Стоимость объекта, руб"]]; widths=[7,43,20,20,20,24,23,23]
+        else: data=[["№","Материал","DFT","WFT","Теор. кг/м²","Практ. кг/м²","Теор. л/м²","Практ. л/м²","Цена, руб/кг","Цена, руб/л","Стоимость, руб/м²","Стоимость объекта, руб"]]; widths=[7,30,11,11,15,15,15,15,14,14,17,16]
         for i,lr in enumerate(result.layers,1):
             name=lr.material.display_name() if hasattr(lr.material,"display_name") else lr.material.material_name; total_m2=_cost_add(lr.cost_per_m2,lr.thinner_cost_per_m2); area=_area(result)
             if mode=="engineering": row=[str(i),Paragraph(name,self.styles["RuCellLeft"]),f"{lr.target_dft:.0f}",f"{lr.wft:.1f}",f"{lr.theoretical_consumption_kg:.3f}",f"{lr.practical_consumption_kg:.3f}",f"{lr.theoretical_consumption_l:.3f}",f"{lr.practical_consumption_l:.3f}",_cost(total_m2)]
@@ -85,8 +81,7 @@ class PDFExporter:
         else: data=[["Показатель","Значение"],["Количество слоёв",str(len(result.layers))],["Общая толщина DFT",f"{result.total_dft:.0f} мкм"],["Теоретический расход ЛКМ",f"{result.total_theoretical_consumption_kg:.3f} кг/м² ({result.total_theoretical_consumption_l:.3f} л/м²)"],["Практический расход ЛКМ",f"{result.total_practical_consumption_kg:.3f} кг/м² ({result.total_practical_consumption_l:.3f} л/м²)"],["Расход разбавителя",f"{thinner_kg:.3f} кг/м² ({thinner_l:.3f} л/м²)"],["Стоимость системы",f"{_cost(result.total_cost_per_m2)} руб/м²"],["Стоимость объекта",f"{_cost(result.total_cost)} руб"],["В том числе стоимость разбавителя",f"{_cost(result.total_thinner_cost)} руб"]]
         return [Paragraph("3. Итоговые показатели",self.styles["RuHeading"]),self._table(data,[90*mm,80*mm],alignments=["LEFT","CENTER"]),Spacer(1,3*mm)]
     def _section_comparison(self,comparison):
-        systems=comparison.systems; data=[["Показатель"]+[(s.system.system_name or f"Сис.{i+1}") for i,s in enumerate(systems)]]
-        rows=[("Слоёв",[str(len(s.layers)) for s in systems]),("DFT, мкм",[f"{s.total_dft:.0f}" for s in systems]),("Теор. кг/м²",[f"{s.total_theoretical_consumption_kg:.3f}" for s in systems]),("Практ. кг/м²",[f"{s.total_practical_consumption_kg:.3f}" for s in systems]),("Стоимость, руб/м²",[_cost(s.total_cost_per_m2) for s in systems]),("Стоимость объекта, руб",[_cost(s.total_cost,0) for s in systems])]
+        systems=comparison.systems; data=[["Показатель"]+[(s.system.system_name or f"Сис.{i+1}") for i,s in enumerate(systems)]]; rows=[("Слоёв",[str(len(s.layers)) for s in systems]),("DFT, мкм",[f"{s.total_dft:.0f}" for s in systems]),("Теор. кг/м²",[f"{s.total_theoretical_consumption_kg:.3f}" for s in systems]),("Практ. кг/м²",[f"{s.total_practical_consumption_kg:.3f}" for s in systems]),("Стоимость, руб/м²",[_cost(s.total_cost_per_m2) for s in systems]),("Стоимость объекта, руб",[_cost(s.total_cost,0) for s in systems])]
         if self.report_mode=="commercial": rows=[r for r in rows if r[0] in {"Стоимость, руб/м²","Стоимость объекта, руб"}]
         elif self.report_mode=="engineering": rows=[r for r in rows if r[0]!="Стоимость объекта, руб"]
         for label,values in rows:data.append([label]+values)
