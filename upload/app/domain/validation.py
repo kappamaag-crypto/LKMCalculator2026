@@ -73,27 +73,38 @@ def validate_material(material: Material) -> ValidationResult:
     if material.thinner_basis not in VALID_THINNER_BASES: r.add_error("MAT_THINNER_BASIS", f"Неизвестная база расчёта разбавления: «{material.thinner_basis}»", "thinner_basis")
     return r
 
-def validate_layer_input(material: Material, target_dft: float, losses_percent: float = 0.0, thinner_percent: float = 0.0, layer_index: int | None = None, thinner_basis: str | None = None) -> ValidationResult:
+def validate_layer_input(material: Material, target_dft: float | None, losses_percent: float | None = 0.0, thinner_percent: float | None = 0.0, layer_index: int | None = None, thinner_basis: str | None = None) -> ValidationResult:
     r = ValidationResult()
     mr = validate_material(material)
     for issue in mr.issues:
         issue.layer_index = layer_index
     r.merge(mr)
-    if target_dft < 0: r.add_error("LAYER_DFT_NEG", "Толщина сухого слоя не может быть отрицательной", "target_dft", layer_index)
-    if target_dft == 0: r.add_warning("LAYER_DFT_ZERO", "Толщина сухого слоя равна нулю", "target_dft", layer_index)
-    if losses_percent < 0: r.add_error("LAYER_LOSSES_NEG", "Потери не могут быть отрицательными", "losses_percent", layer_index)
-    if losses_percent >= 100: r.add_error("LAYER_LOSSES_GE100", "Потери не могут быть ≥ 100 %", "losses_percent", layer_index)
-    if thinner_percent < 0: r.add_error("LAYER_THINNER_NEG", "Процент разбавителя не может быть отрицательным", "thinner_percent", layer_index)
-    if thinner_percent >= 100: r.add_error("LAYER_THINNER_GE100", "Процент разбавителя должен быть меньше 100 %", "thinner_percent", layer_index)
+    if target_dft is None:
+        r.add_error("LAYER_DFT_UNKNOWN", "Не задана толщина сухого слоя (DFT) — укажите значение в мкм", "target_dft", layer_index)
+    else:
+        if target_dft < 0: r.add_error("LAYER_DFT_NEG", "Толщина сухого слоя не может быть отрицательной", "target_dft", layer_index)
+        if target_dft == 0: r.add_warning("LAYER_DFT_ZERO", "Толщина сухого слоя равна нулю", "target_dft", layer_index)
+    if losses_percent is None:
+        r.add_error("LAYER_LOSSES_UNKNOWN", "Не задан процент технологических потерь — укажите значение", "losses_percent", layer_index)
+    else:
+        if losses_percent < 0: r.add_error("LAYER_LOSSES_NEG", "Потери не могут быть отрицательными", "losses_percent", layer_index)
+        if losses_percent >= 100: r.add_error("LAYER_LOSSES_GE100", "Потери не могут быть ≥ 100 %", "losses_percent", layer_index)
+    if thinner_percent is None:
+        r.add_error("LAYER_THINNER_UNKNOWN", "Не задан процент разбавления — укажите значение или 0 %", "thinner_percent", layer_index)
+    else:
+        if thinner_percent < 0: r.add_error("LAYER_THINNER_NEG", "Процент разбавителя не может быть отрицательным", "thinner_percent", layer_index)
+        if thinner_percent >= 100: r.add_error("LAYER_THINNER_GE100", "Процент разбавителя должен быть меньше 100 %", "thinner_percent", layer_index)
     basis = thinner_basis or material.thinner_basis
     if basis not in VALID_THINNER_BASES: r.add_error("LAYER_THINNER_BASIS", f"Неизвестная база разбавления: «{basis}»", "thinner_basis", layer_index)
-    if material.thinner_required and thinner_percent <= 0: r.add_warning("LAYER_THINNER_REQUIRED", f"Для «{material.material_name}» указан обязательный разбавитель, но процент разбавления не задан", "thinner_percent", layer_index)
-    if material.thinner_percent_min is not None and thinner_percent < material.thinner_percent_min: r.add_warning("LAYER_THINNER_BELOW_MIN", f"Разбавление {thinner_percent:g} % ниже рекомендованного минимума {material.thinner_percent_min:g} %", "thinner_percent", layer_index)
-    if material.thinner_percent_max is not None and thinner_percent > material.thinner_percent_max: r.add_error("LAYER_THINNER_ABOVE_MAX", f"Разбавление {thinner_percent:g} % превышает допустимый максимум {material.thinner_percent_max:g} %", "thinner_percent", layer_index)
-    if basis == DILUTION_BASIS_BY_MIX_VOLUME and thinner_percent >= 100: r.add_error("LAYER_MIX_DILUTION_INVALID", "При расчёте разбавления как доли конечной смеси процент должен быть меньше 100 %", "thinner_percent", layer_index)
-    if material.recommended_dft_min is not None and target_dft > 0 and target_dft < material.recommended_dft_min: r.add_warning("LAYER_DFT_BELOW_MIN", f"Толщина {target_dft} мкм ниже рекомендуемого минимума ({material.recommended_dft_min} мкм) для «{material.material_name}»", "target_dft", layer_index)
-    if material.recommended_dft_max is not None and target_dft > 0 and target_dft > material.recommended_dft_max: r.add_warning("LAYER_DFT_ABOVE_MAX", f"Толщина {target_dft} мкм выше рекомендуемого максимума ({material.recommended_dft_max} мкм) для «{material.material_name}»", "target_dft", layer_index)
-    if material.max_single_layer_dft is not None and target_dft > material.max_single_layer_dft: r.add_error("LAYER_DFT_MAX_SINGLE", f"Толщина {target_dft} мкм превышает максимальную толщину одного слоя ({material.max_single_layer_dft} мкм) для «{material.material_name}»", "target_dft", layer_index)
+    if thinner_percent is not None:
+        if material.thinner_required and thinner_percent <= 0: r.add_warning("LAYER_THINNER_REQUIRED", f"Для «{material.material_name}» указан обязательный разбавитель, но процент разбавления не задан", "thinner_percent", layer_index)
+        if material.thinner_percent_min is not None and thinner_percent < material.thinner_percent_min: r.add_warning("LAYER_THINNER_BELOW_MIN", f"Разбавление {thinner_percent:g} % ниже рекомендованного минимума {material.thinner_percent_min:g} %", "thinner_percent", layer_index)
+        if material.thinner_percent_max is not None and thinner_percent > material.thinner_percent_max: r.add_error("LAYER_THINNER_ABOVE_MAX", f"Разбавление {thinner_percent:g} % превышает допустимый максимум {material.thinner_percent_max:g} %", "thinner_percent", layer_index)
+        if basis == DILUTION_BASIS_BY_MIX_VOLUME and thinner_percent >= 100: r.add_error("LAYER_MIX_DILUTION_INVALID", "При расчёте разбавления как доли конечной смеси процент должен быть меньше 100 %", "thinner_percent", layer_index)
+    if target_dft is not None:
+        if material.recommended_dft_min is not None and target_dft > 0 and target_dft < material.recommended_dft_min: r.add_warning("LAYER_DFT_BELOW_MIN", f"Толщина {target_dft} мкм ниже рекомендуемого минимума ({material.recommended_dft_min} мкм) для «{material.material_name}»", "target_dft", layer_index)
+        if material.recommended_dft_max is not None and target_dft > 0 and target_dft > material.recommended_dft_max: r.add_warning("LAYER_DFT_ABOVE_MAX", f"Толщина {target_dft} мкм выше рекомендуемого максимума ({material.recommended_dft_max} мкм) для «{material.material_name}»", "target_dft", layer_index)
+        if material.max_single_layer_dft is not None and target_dft > material.max_single_layer_dft: r.add_error("LAYER_DFT_MAX_SINGLE", f"Толщина {target_dft} мкм превышает максимальную толщину одного слоя ({material.max_single_layer_dft} мкм) для «{material.material_name}»", "target_dft", layer_index)
     return r
 
 def validate_application_conditions(obj: ObjectData, material: Material, layer_index: int | None = None) -> ValidationResult:
@@ -111,8 +122,11 @@ def validate_application_conditions(obj: ObjectData, material: Material, layer_i
 
 def validate_object_data(obj: ObjectData) -> ValidationResult:
     r = ValidationResult()
-    if obj.area_m2 < 0: r.add_error("OBJ_AREA_NEG", "Площадь не может быть отрицательной", "area_m2")
-    if obj.area_m2 == 0: r.add_warning("OBJ_AREA_ZERO", "Площадь равна нулю — итоговые количества будут нулевыми", "area_m2")
+    if obj.area_m2 is None:
+        r.add_error("OBJ_AREA_UNKNOWN", "Не задана площадь объекта — укажите площадь в м²", "area_m2")
+    else:
+        if obj.area_m2 < 0: r.add_error("OBJ_AREA_NEG", "Площадь не может быть отрицательной", "area_m2")
+        if obj.area_m2 == 0: r.add_warning("OBJ_AREA_ZERO", "Площадь равна нулю — итоговые количества будут нулевыми", "area_m2")
     if obj.temperature_min is not None and obj.temperature_max is not None and obj.temperature_min > obj.temperature_max: r.add_error("OBJ_TEMP_RANGE", "Минимальная температура объекта больше максимальной", "temperature_range")
     if obj.relative_humidity is not None and not 0 <= obj.relative_humidity <= 100: r.add_error("OBJ_RH_RANGE", "Относительная влажность должна быть в диапазоне 0–100 %", "relative_humidity")
     if obj.roughness is not None and obj.roughness < 0: r.add_error("OBJ_ROUGHNESS_NEG", "Шероховатость не может быть отрицательной", "roughness")
@@ -129,9 +143,10 @@ def validate_system_layers(layers: Sequence[LayerDefinition | LayerResult], comp
     for index, layer in enumerate(layers):
         material = getattr(layer, "material", None)
         dft = getattr(layer, "target_dft", None)
-        if material is not None and dft is not None:
+        if material is not None:
             r.merge(validate_layer_input(material, dft, layer_index=index))
-            total_dft += dft
+            if dft is not None:
+                total_dft += dft
         elif dft is None:
             r.add_error("SYS_LAYER_DFT_UNKNOWN", "Толщина слоя неизвестна", "target_dft", index)
     if system is not None:
