@@ -77,11 +77,10 @@ def test_engineering_excel_supports_two_layers(tmp_path: Path):
 def test_comparison_excel_matches_ui_and_preserves_all_layers(tmp_path: Path):
     obj = ObjectData(object_name="Объект сравнения", area_m2=100.0)
     engine = ComparisonEngine()
-    results = [
-        engine.compare(obj, [("Система 4 слоя", _layers_for_export(4))]).systems[0],
-        engine.compare(obj, [("Система 5 слоёв", _layers_for_export(5))]).systems[0],
-    ]
-    comparison = engine.compare_results(obj, results)
+    comparison = engine.compare(obj, [
+        ("Система 4 слоя", _layers_for_export(4)),
+        ("Система 5 слоёв", _layers_for_export(5)),
+    ])
     output = tmp_path / "comparison.xlsx"
 
     EngineeringExcelExporter().export_comparison(comparison, output)
