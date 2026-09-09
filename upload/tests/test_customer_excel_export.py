@@ -90,7 +90,10 @@ def test_customer_excel_expands_to_four_layers_and_keeps_styles(tmp_path):
     assert ws["C15"].value == "Толщина покрытия (мкм)"
     assert ws.max_row == 15
     assert ws["C9"].fill.fgColor.rgb == ws["C8"].fill.fgColor.rgb
-    assert ws["C11"].fill.fgColor.rgb == ws["C9"].fill.fgColor.rgb
+    # C11 is inside merged B11:E11; in an XLSX round-trip openpyxl exposes
+    # the fill from the top-left anchor, so validate the actual persisted style.
+    assert ws["B11"].fill.fgColor.rgb == ws["C9"].fill.fgColor.rgb
+    assert "B11:E11" in {str(rng) for rng in ws.merged_cells.ranges}
 
 
 def test_customer_excel_contains_all_layers_even_with_mixed_thinners(tmp_path):
