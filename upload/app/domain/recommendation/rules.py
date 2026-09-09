@@ -7,10 +7,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import Sequence
 
 from app.domain.models import CoatingSystem, ObjectData
-from app.domain.enums import CorrosionCategory, DurabilityLevel, SurfaceType, EnvironmentType
 from app.domain.technology import check_application_technology, check_target_dft
 
 
@@ -144,15 +143,24 @@ def _add_technology_checks(result: FilterResult, obj: ObjectData) -> None:
 
 def filter_system(system, obj, require_corrosion=True, require_durability=True):
     result = FilterResult(system=system, passed=True)
-    checks = [
-        ("corrosion", check_corrosion_category(system, obj.corrosion_category)),
-        ("durability", check_durability(system, obj.durability)),
+    checks = []
+    if require_corrosion:
+        checks.append(("corrosion", check_corrosion_category(system, obj.corrosion_category)))
+    elif obj.corrosion_category is not None:
+        result.reasons_pass.append("Категория коррозии исключена из обязательных проверок")
+
+    if require_durability:
+        checks.append(("durability", check_durability(system, obj.durability)))
+    elif obj.durability is not None:
+        result.reasons_pass.append("Долговечность исключена из обязательных проверок")
+
+    checks.extend([
         ("surface", check_surface(system, obj.surface_type)),
         ("environment", check_environment(system, obj.environment)),
         ("temperature", check_temperature(system, obj.temperature_min, obj.temperature_max)),
         ("layers", check_has_layers(system)),
-    ]
-    for kind, (ok, msg) in checks:
+    ])
+    for _kind, (ok, msg) in checks:
         if ok:
             result.reasons_pass.append(msg)
             continue
@@ -160,11 +168,6 @@ def filter_system(system, obj, require_corrosion=True, require_durability=True):
         result.reasons_fail.append(msg)
         if "Недостаточно данных" in msg:
             result.insufficient_data = True
-
-    if not require_corrosion and obj.corrosion_category is not None and not system.corrosion_categories:
-        result.insufficient_data = False
-    if not require_durability and obj.durability is not None and system.durability is None:
-        result.insufficient_data = False
 
     _add_technology_checks(result, obj)
     return result
