@@ -52,7 +52,10 @@ class RecommendationEngine:
                     calc_result, validation = self.calculator.calculate_from_system(obj, fr.system, materials_by_id, skip_validation=True)
                     if not validation.has_errors and calc_result.layers:
                         calc_map[id(fr.system)] = calc_result
-                        costs.append(calc_result.total_cost_per_m2)
+                        # Неизвестная стоимость не является нулевой стоимостью и
+                        # не должна попадать в min/max нормализацию рейтинга.
+                        if calc_result.total_cost_per_m2 is not None:
+                            costs.append(calc_result.total_cost_per_m2)
                     else:
                         logger.warning("Не удалось получить валидный расчёт стоимости для системы %r", fr.system.system_name)
                 except Exception:
