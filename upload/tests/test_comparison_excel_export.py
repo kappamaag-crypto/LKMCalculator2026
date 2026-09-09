@@ -70,4 +70,4 @@ def test_comparison_excel_does_not_truncate_shorter_system_layers(tmp_path: Path
 
     row = next(r for r in range(1, ws.max_row + 1) if ws.cell(r, 1).value == "Слой 4: Материал")
     assert ws.cell(row, 2).value == "—"
-    assert ws.cell(row, 3).value == "B — материал 4"
+    assert ws.cell(row, 3).value == "Test B — материал 4"
