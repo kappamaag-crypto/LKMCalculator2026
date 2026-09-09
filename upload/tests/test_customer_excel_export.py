@@ -45,7 +45,7 @@ def _result(layer_count: int, with_mixed_thinners: bool = False, long_name: bool
             manufacturer="Blank",
             material_name=(
                 "Сверхдлинное наименование антикоррозионного материала для проверки "
-                "переноса полного названия без усечения "
+                "переноса полного названия без усечения"
                 if long_name and i == 1
                 else f"Слой {i}"
             ),
