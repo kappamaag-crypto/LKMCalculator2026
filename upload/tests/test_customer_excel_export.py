@@ -154,3 +154,12 @@ def test_customer_excel_engineering_mode_uses_separate_export(tmp_path):
     assert [ws.cell(row, 2).value for row in range(6, 9)] == [f"Blank Слой {i}" for i in range(1, 4)]
     values = [cell.value for row in ws.iter_rows() for cell in row]
     assert not any("Цена" in str(value) for value in values if value is not None)
+
+
+def test_customer_excel_has_deterministic_print_area_for_four_layers(tmp_path):
+    ws = _export(tmp_path, 4)["База"]
+    assert str(ws.print_area) == "'База'!$B$1:$R$15"
+    assert ws.print_title_rows == "1:6"
+    assert ws.sheet_properties.pageSetUpPr.fitToPage is True
+    assert ws.page_setup.fitToWidth == 1
+    assert ws.page_setup.fitToHeight == 0
