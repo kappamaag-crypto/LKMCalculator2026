@@ -41,6 +41,23 @@ class TestScorer:
         sys=make_system("Good",[CorrosionCategory.C4],"High"); obj=ObjectData(corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.HIGH); fr=filter_system(sys,obj); assert fr.passed; assert 0<=score_system(fr,obj).total<=100
     def test_higher_durability_better(self):
         obj=ObjectData(corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.MEDIUM); a=filter_system(make_system("Med",[CorrosionCategory.C4],"Medium"),obj); b=filter_system(make_system("High",[CorrosionCategory.C4],"High"),obj); assert score_system(b,obj).total>=score_system(a,obj).total
+    def test_hard_filter_failure_forces_zero_score(self):
+        sys=make_system("Wrong category",[CorrosionCategory.C3],"High")
+        obj=ObjectData(corrosion_category=CorrosionCategory.C5,durability=DurabilityLevel.HIGH)
+        fr=filter_system(sys,obj)
+        breakdown=score_system(fr,obj)
+        assert not fr.passed
+        assert breakdown.total == 0.0
+        assert breakdown.status == "Не подходит"
+    def test_missing_required_system_metadata_is_not_marked_suitable(self):
+        sys=make_system("Missing metadata",[],None)
+        obj=ObjectData(corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.HIGH)
+        fr=filter_system(sys,obj)
+        breakdown=score_system(fr,obj)
+        assert not fr.passed
+        assert fr.insufficient_data
+        assert breakdown.status == "Недостаточно данных"
+        assert breakdown.total == 0.0
     def test_unknown_cost_is_safe(self):
         sys=make_system("Unknown cost",[CorrosionCategory.C4],"High",price=None)
         obj=ObjectData(corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.HIGH)
