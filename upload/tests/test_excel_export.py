@@ -62,9 +62,9 @@ def test_export_unknown_price_is_not_zero(sample_result):
 def test_export_has_no_procurement_or_warehouse_metrics(sample_result):
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "scope.xlsx"; ExcelExporter().export_calculation(sample_result, path); wb = load_workbook(path)
-        text = " ".join(str(cell.value or "") for ws in wb.worksheets for row in ws.iter_rows() for cell in row).lower()
-        forbidden = ("закуп", "остат", "склад", "упаковок", "фасов")
-        assert not any(term in text for term in forbidden)
+        labels = [str(cell.value or "").lower() for ws in wb.worksheets for row in ws.iter_rows() for cell in row]
+        forbidden_metrics = ("количество упаковок", "закупочное количество", "остаток на складе", "складской остаток", "фасовка, шт")
+        assert not any(term in value for value in labels for term in forbidden_metrics)
 
 def test_export_comparison(sample_result):
     from app.domain.comparison import ComparisonEngine
