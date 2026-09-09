@@ -38,6 +38,16 @@ def seed_demo_materials(session: Session) -> dict[str, int]:
     for data in demo:
         existing = session.query(MaterialORM).filter_by(material_name=data["material_name"]).first()
         if existing:
+            # Backfill fields required by the calculation engine for databases
+            # created before solids_by_volume_percent was introduced.
+            changed = False
+            for key in ("density", "solids_percent", "solids_by_volume_percent", "price_per_kg", "recommended_dft_min", "recommended_dft_max"):
+                value = data.get(key)
+                if value is not None and getattr(existing, key, None) is None:
+                    setattr(existing, key, value)
+                    changed = True
+            if changed:
+                existing.updated_at = now
             result[data["material_name"]] = existing.id
             continue
         orm = MaterialORM(**data, created_at=now, updated_at=now)
