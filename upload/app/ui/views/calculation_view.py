@@ -8,6 +8,7 @@ from app.domain.models import Material,ObjectData,CoatingSystem
 from app.domain.enums import MaterialType
 from app.domain.calculator import LayerInput
 from app.services.calculation_service import CalculationService
+from app.services.snapshot_service import material_from_snapshot, thinner_from_snapshot
 from app.ui.widgets.layer_table import LayerTableWidget
 from app.infrastructure.export.customer_excel_exporter import CustomerExcelExporter
 from app.infrastructure.export.pdf_exporter import PDFExporter
@@ -77,17 +78,19 @@ class CalculationView(QWidget):
         except (TypeError,ValueError):self.spin_area.setValue(0)
         self._restored_system_name=str(snapshot.get("system_name") or "Пользовательская система");materials_by_id={m.id:m for m in self._all_materials if m.id is not None};materials_by_name={m.material_name:m for m in self._all_materials if m.material_name};layers=[];missing=[]
         for item in snapshot.get("layers") or []:
-            material=materials_by_id.get(item.get("material_id")) or materials_by_name.get(item.get("material_name"))
-            if material is None:missing.append(str(item.get("material_name") or "без названия"));continue
+            current=materials_by_id.get(item.get("material_id")) or materials_by_name.get(item.get("material_name"))
+            material=material_from_snapshot(item,current)
             thinner=None
             if float(item.get("thinner_percent") or 0)>0:
-                thinner=materials_by_id.get(item.get("thinner_id")) or materials_by_name.get(item.get("thinner_name"))
-                if thinner is None:missing.append(str(item.get("thinner_name") or "разбавитель"));continue
+                current_thinner=materials_by_id.get(item.get("thinner_id")) or materials_by_name.get(item.get("thinner_name"))
+                if item.get("thinner_density") is None and current_thinner is None:
+                    missing.append(str(item.get("thinner_name") or "разбавитель"));continue
+                thinner=thinner_from_snapshot(item,current_thinner)
             layers.append(LayerInput(material=material,target_dft=float(item.get("target_dft") or 0),losses_percent=float(item.get("losses_percent") or 0),thinner_percent=float(item.get("thinner_percent") or 0),thinner=thinner,thinner_basis=item.get("thinner_basis")))
         self.layer_table.clear_layers();[self.layer_table.add_layer(layer) for layer in layers];self._last_result=None;[b.setEnabled(False) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)]
-        if not layers:raise ValueError("В снимке нет слоёв, которые удалось восстановить из текущей базы материалов.")
+        if not layers:raise ValueError("В снимке нет слоёв, которые удалось восстановить из сохранённых данных.")
         ok=self._recalculate(False,False)
-        if missing:QMessageBox.warning(self,"История","Не удалось восстановить: "+", ".join(missing))
+        if missing:QMessageBox.warning(self,"История","Не удалось восстановить разбавитель: "+", ".join(missing))
         return ok
     def _default_export_name(self,ext):
         name=self._last_result.object_data.object_name.strip() if self._last_result else "Расчёт_ЛКМ_АКЗ"
