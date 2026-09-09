@@ -63,3 +63,31 @@ def test_manual_material_roundtrip_and_no_duplicate():
         assert persisted is not None
         assert persisted.manufacturer == "Test manufacturer"
         assert persisted.density == 1.42
+
+
+def test_unknown_engineering_properties_and_prices_roundtrip_as_none():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+
+    material = Material(
+        material_name="ЛКМ с неизвестными параметрами",
+        material_type=MaterialType.PRIMER,
+        binder_type=BinderType.UNKNOWN,
+        density=None,
+        solids_percent=None,
+        solids_by_volume_percent=None,
+        price_per_kg=None,
+        price_per_liter=None,
+    )
+
+    with Session() as session:
+        saved = MaterialRepository(session).add(material)
+        session.commit()
+        found = MaterialRepository(session).get_by_id(saved.id)
+        assert found is not None
+        assert found.density is None
+        assert found.solids_percent is None
+        assert found.solids_by_volume_percent is None
+        assert found.price_per_kg is None
+        assert found.price_per_liter is None
