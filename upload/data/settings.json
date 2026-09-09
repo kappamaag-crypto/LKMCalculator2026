@@ -1,0 +1,22 @@
+{
+  "organization_name": "Организация",
+  "organization_address": "",
+  "organization_phone": "",
+  "organization_email": "",
+  "logo_path": "",
+  "currency": "RUB",
+  "vat_rate": 20.0,
+  "prices_include_vat": true,
+  "default_losses_percent": 0.0,
+  "default_area_unit": "м²",
+  "export_dir": "C:\\Users\\Евгений\\Documents\\LKM_Calculations",
+  "excel_template_path": "F:\\Project\\LKMCalculator2026-1\\КалькуляторЭКСЕЛЛЬ.xlsx",
+  "language": "ru",
+  "weight_conditions": 0.3,
+  "weight_corrosion": 0.2,
+  "weight_durability": 0.15,
+  "weight_temperature": 0.1,
+  "weight_compatibility": 0.1,
+  "weight_technology": 0.05,
+  "weight_cost": 0.1
+}
