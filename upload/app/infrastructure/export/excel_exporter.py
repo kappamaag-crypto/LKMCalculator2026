@@ -8,6 +8,7 @@ from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 from app.domain.models import SystemCalculationResult, ComparisonResult, ObjectData, RecommendationResult
+from app.domain.formulas import FORMULA_VERSION
 from app.config import AppSettings
 
 HEADER_FONT=Font(name="Arial",bold=True,size=12,color="FFFFFF")
@@ -73,7 +74,8 @@ class ExcelExporter:
 
     def _title_block(self,ws:Worksheet,title:str,obj:ObjectData,start_row:int=1)->int:
         ws.cell(start_row,1,title).font=TITLE_FONT; ws.merge_cells(start_row=start_row,start_column=1,end_row=start_row,end_column=6); row=start_row+1
-        ws.cell(row,1,self.settings.organization_name).font=SUBTITLE_FONT; row+=1; ws.cell(row,1,f"Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}").font=NORMAL_FONT; row+=1
+        ws.cell(row,1,self.settings.organization_name).font=SUBTITLE_FONT; row+=1; ws.cell(row,1,f"Дата расчёта: {datetime.now().strftime('%d.%m.%Y %H:%M')}").font=NORMAL_FONT; row+=1
+        ws.cell(row,1,f"Версия формул: {FORMULA_VERSION}").font=NORMAL_FONT; row+=1
         for label,value in (("№ расчёта",obj.calculation_number),("Объект",obj.object_name),("Заказчик",obj.customer)):
             if value: ws.cell(row,1,f"{label}: {value}").font=NORMAL_FONT; row+=1
         ws.cell(row,1,f"Площадь: {_area(obj):.2f} м²").font=NORMAL_FONT; return row+2
