@@ -50,3 +50,33 @@ def test_pdf_unknown_total_cost_does_not_crash(sample_result):
         layer.thinner_cost_per_m2 = None
     with tempfile.TemporaryDirectory() as tmp:
         path=Path(tmp)/"unknown-cost.pdf"; PDFExporter().export_calculation(sample_result,path); assert path.exists() and path.stat().st_size>1000
+
+def test_pdf_supports_four_layers_and_long_material_name():
+    materials = [
+        Material(
+            material_name=(
+                "Сверхдлинное наименование антикоррозионного материала для проверки "
+                "PDF без усечения"
+                if i == 1 else f"Слой PDF {i}"
+            ),
+            material_type=MaterialType.PRIMER_ENAMEL,
+            binder_type=BinderType.EPOXY,
+            density=1.4,
+            solids_percent=70.0,
+            solids_by_volume_percent=70.0,
+            price_per_kg=100.0 + i,
+            manufacturer="Blank",
+        )
+        for i in range(1, 5)
+    ]
+    obj = ObjectData(object_name="PDF 4 слоя", customer="Заказчик", area_m2=100.0)
+    result, validation = CalculationService().calculate_system(
+        obj, [LayerInput(material=m, target_dft=100 + i * 10) for i, m in enumerate(materials, 1)]
+    )
+    assert not validation.has_errors
+    assert len(result.layers) == 4
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "four-layers.pdf"
+        PDFExporter().export_calculation(result, path)
+        assert path.exists() and path.stat().st_size > 1000 and path.read_bytes()[:4] == b"%PDF"
