@@ -32,6 +32,8 @@ class CustomerExcelExporter(ExcelExporter):
         extra = max(layer_count - 2, 0)
         if not extra: return 0
         original_merges = list(ws.merged_cells.ranges)
+        thinner_styles = {row: [copy(ws.cell(row, col)._style) for col in range(2, 19)] for row in range(thinner_start, thinner_start + 2)}
+        thinner_heights = {row: ws.row_dimensions[row].height for row in range(thinner_start, thinner_start + 2)}
         for merged in original_merges: ws.unmerge_cells(str(merged))
         ws.insert_rows(thinner_start, extra); shifted_total = total_row + extra; ws.insert_rows(shifted_total, extra)
         for merged in original_merges:
@@ -41,11 +43,11 @@ class CustomerExcelExporter(ExcelExporter):
                 elif max_row >= idx: max_row += amount
             ws.merge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
         for row in range(layer_start + 2, layer_start + 2 + extra): self._copy_row_style(ws, layer_start + 1, row)
-        new_thinner_start = thinner_start + extra
-        for row in range(new_thinner_start + 2, new_thinner_start + 2 + extra): self._copy_row_style(ws, new_thinner_start + 1, row)
         for offset in range(extra):
-            source_row = layer_start + 2 + offset; shifted_thinner_row = thinner_start + extra + offset
-            for col in range(2, 19): ws.cell(shifted_thinner_row, col).fill = copy(ws.cell(source_row, col).fill)
+            target = thinner_start + extra + offset
+            source_index = offset % 2
+            for col, style in enumerate(thinner_styles[thinner_start + source_index], 2): ws.cell(target, col)._style = copy(style)
+            ws.row_dimensions[target].height = thinner_heights[thinner_start + source_index]
         return 2 * extra
     def _prepare_base_sheet(self, wb, layer_count: int):
         if "База" not in wb.sheetnames: return None
