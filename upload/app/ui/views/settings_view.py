@@ -8,6 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QFileDialog,
+    QComboBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -28,6 +29,12 @@ class SettingsView(QWidget):
     """Настройки, сохраняемые в data/settings.json."""
 
     settings_changed = Signal(object)
+
+    REPORT_MODES = (
+        ("engineering", "Инженерный", "DFT, WFT, расход, система, площадь и стоимость системы в руб/м²"),
+        ("commercial", "Коммерческий", "Цена материалов и итоговая стоимость объекта"),
+        ("full", "Полный", "Все инженерные и коммерческие данные"),
+    )
 
     def __init__(self, settings: AppSettings | None = None, parent=None):
         super().__init__(parent)
@@ -69,6 +76,10 @@ class SettingsView(QWidget):
 
         calc = QGroupBox("Расчёт и цены")
         form = QFormLayout(calc)
+        self.cmb_report_mode = QComboBox()
+        for key, title_text, description in self.REPORT_MODES:
+            self.cmb_report_mode.addItem(title_text, key)
+            self.cmb_report_mode.setItemData(self.cmb_report_mode.count() - 1, description, __import__("PySide6.QtCore", fromlist=["Qt"]).Qt.ToolTipRole)
         self.spin_vat = QDoubleSpinBox()
         self.spin_vat.setRange(0, 100)
         self.spin_vat.setDecimals(2)
@@ -78,6 +89,7 @@ class SettingsView(QWidget):
         self.spin_losses.setRange(0, 100)
         self.spin_losses.setDecimals(2)
         self.spin_losses.setSuffix(" %")
+        form.addRow("Режим отчёта:", self.cmb_report_mode)
         form.addRow("НДС:", self.spin_vat)
         form.addRow("", self.chk_vat)
         form.addRow("Потери по умолчанию:", self.spin_losses)
@@ -133,6 +145,9 @@ class SettingsView(QWidget):
         self.ed_phone.setText(s.organization_phone)
         self.ed_email.setText(s.organization_email)
         self.ed_logo.setText(s.logo_path)
+        mode = s.report_mode if s.report_mode in {key for key, _, _ in self.REPORT_MODES} else "engineering"
+        index = self.cmb_report_mode.findData(mode)
+        self.cmb_report_mode.setCurrentIndex(max(index, 0))
         self.spin_vat.setValue(s.vat_rate)
         self.chk_vat.setChecked(s.prices_include_vat)
         self.spin_losses.setValue(s.default_losses_percent)
@@ -149,6 +164,7 @@ class SettingsView(QWidget):
             currency=self.settings.currency,
             vat_rate=self.spin_vat.value(),
             prices_include_vat=self.chk_vat.isChecked(),
+            report_mode=self.cmb_report_mode.currentData() or "engineering",
             default_losses_percent=self.spin_losses.value(),
             default_area_unit=self.settings.default_area_unit,
             export_dir=self.ed_export_dir.text().strip(),
