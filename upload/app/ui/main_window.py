@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
     def _build_ui(self):
         self.tabs=QTabWidget();self.setCentralWidget(self.tabs);self.calc_view=CalculationView(self.calc_service);self.rec_view=RecommendationView(self.rec_service);self.cmp_view=ComparisonView(self.calc_service);self.two_component_view=TwoComponentView();self.materials_view=MaterialsView(self._materials);self.history_view=HistoryView();self.systems_view=SystemsView(self._materials)
         self.tabs.addTab(self.calc_view,"Расчёт");self.tabs.addTab(self.rec_view,"Рекомендации");self.tabs.addTab(self.cmp_view,"Сравнение");self.tabs.addTab(self.two_component_view,"2К-информация");self.tabs.addTab(self.materials_view,"База материалов");self.tabs.addTab(self.systems_view,"Системы");self.tabs.addTab(self.history_view,"История");stub_set=QLabel("Раздел «Настройки» — в разработке");stub_set.setAlignment(Qt.AlignCenter);stub_set.setProperty("subheading",True);self.tabs.addTab(stub_set,"Настройки")
-        self.calc_view.calculation_done.connect(self._on_calc_done);self.calc_view.add_to_comparison.connect(self._on_add_to_comparison);self.materials_view.materials_changed.connect(self._on_materials_changed);self.history_view.load_requested.connect(self._on_history_load);self.systems_view.systems_changed.connect(self._on_systems_changed)
+        self.calc_view.calculation_done.connect(self._on_calc_done);self.calc_view.add_to_comparison.connect(self._on_add_to_comparison);self.calc_view.material_added.connect(self._on_material_added_from_calculation);self.materials_view.materials_changed.connect(self._on_materials_changed);self.history_view.load_requested.connect(self._on_history_load);self.systems_view.systems_changed.connect(self._on_systems_changed)
         menubar=self.menuBar();file_menu=menubar.addMenu("Файл");act_exit=QAction("Выход",self);act_exit.triggered.connect(self.close);file_menu.addAction(act_exit);help_menu=menubar.addMenu("Справка");act_about=QAction("О программе",self);act_about.triggered.connect(self._on_about);help_menu.addAction(act_about);self.setStatusBar(QStatusBar())
     def _load_demo_data(self):self.calc_view.set_materials(self._materials);self.calc_view.set_systems(self._systems);self.rec_view.set_systems(self._systems)
     def _refresh_system_catalog(self):self._systems=_load_systems_from_db(self._materials,_demo_systems());self.calc_view.set_systems(self._systems);self.rec_view.set_systems(self._systems)
@@ -118,5 +118,9 @@ class MainWindow(QMainWindow):
     def _on_history_load(self,snapshot):
         try:self.calc_view.restore_snapshot(snapshot);self.tabs.setCurrentWidget(self.calc_view);self.statusBar().showMessage("Снимок истории восстановлен и доступен для редактирования.",10000)
         except (TypeError,ValueError,KeyError) as exc:QMessageBox.warning(self,"История",f"Не удалось восстановить снимок: {exc}")
+    def _on_material_added_from_calculation(self,material):
+        materials=_load_materials_from_db(self._materials)
+        self._on_materials_changed(materials)
+        self.statusBar().showMessage(f"Материал «{material.display_name()}» добавлен в базу и доступен во всех разделах",7000)
     def _on_materials_changed(self,materials):self._materials=materials;self.calc_view.set_materials(materials);self.systems_view.set_materials(materials);self._refresh_system_catalog();self.statusBar().showMessage(f"База материалов обновлена: {len(materials)} записей",5000)
     def _on_about(self):QMessageBox.about(self,"О программе",f"<b>{__app_name__}</b> v{__version__}<br><br>Профессиональный калькулятор расхода ЛКМ<br>и предварительного подбора систем АКЗ.")
