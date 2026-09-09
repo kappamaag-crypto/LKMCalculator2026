@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Sequence
 
+from sqlalchemy import null
 from sqlalchemy.orm import Session
 
 from app.infrastructure.database.models import CalculationORM, CalculationLayerORM, ComparisonORM
 from app.infrastructure.database.repositories import CalculationRepository
-from app.domain.models import SystemCalculationResult, ComparisonResult, ObjectData, CoatingSystem
+from app.domain.models import SystemCalculationResult, ComparisonResult
 
 
 class HistoryService:
@@ -19,9 +20,10 @@ class HistoryService:
         self.repo = CalculationRepository(session)
 
     def save_calculation(self, result: SystemCalculationResult, notes: str = "") -> int:
-        """Сохранить расчёт. Возвращает id."""
+        """Сохранить расчёт как неизменяемый снимок входных данных и результата."""
         obj = result.object_data
         snapshot = {
+            "snapshot_version": 3,
             "object": {
                 "object_name": obj.object_name,
                 "customer": obj.customer,
@@ -31,45 +33,71 @@ class HistoryService:
                 "corrosion_category": obj.corrosion_category.value if obj.corrosion_category else None,
                 "durability": obj.durability.value if obj.durability else None,
             },
+            "system": {
+                "name": result.system.system_name,
+                "manufacturer": result.system.manufacturer,
+                "description": result.system.description,
+                "total_dft_min": result.system.total_dft_min,
+                "total_dft_target": result.system.total_dft_target,
+                "total_dft_max": result.system.total_dft_max,
+            },
             "system_name": result.system.system_name,
             "total_dft": result.total_dft,
             "total_cost_per_m2": result.total_cost_per_m2,
             "total_cost": result.total_cost,
             "total_consumption_kg": result.total_practical_consumption_kg,
-            "layers": [
-                {
-                    "material_name": lr.material.material_name,
-                    "binder": lr.material.binder_type.value if hasattr(lr.material.binder_type, "value") else str(lr.material.binder_type),
-                    "density": lr.material.density,
-                    "solids_percent": lr.material.solids_percent,
-                    "price_per_kg": lr.material.price_per_kg,
-                    "target_dft": lr.target_dft,
-                    "losses_percent": lr.losses_percent,
-                    "thinner_percent": lr.thinner_percent,
-                    "wft": lr.wft,
-                    "practical_consumption_kg": lr.practical_consumption_kg,
-                    "cost_per_m2": lr.cost_per_m2,
-                    "total_consumption_kg": lr.total_consumption_kg,
-                    "total_cost": lr.total_cost,
-                }
-                for lr in result.layers
-            ],
+            "layers": [],
         }
+        for lr in result.layers:
+            snapshot["layers"].append({
+                "material_id": lr.material.id,
+                "material_name": lr.material.material_name,
+                "manufacturer": lr.material.manufacturer,
+                "brand": lr.material.brand,
+                "material_type": lr.material.material_type.value if hasattr(lr.material.material_type, "value") else str(lr.material.material_type),
+                "binder": lr.material.binder_type.value if hasattr(lr.material.binder_type, "value") else str(lr.material.binder_type),
+                "density": lr.material.density,
+                "solids_percent": lr.material.solids_percent,
+                "solids_by_volume_percent": lr.material.solids_by_volume_percent,
+                "price_per_kg": lr.material.price_per_kg,
+                "price_per_liter": lr.material.price_per_liter,
+                "target_dft": lr.target_dft,
+                "losses_percent": lr.losses_percent,
+                "thinner_percent": lr.thinner_percent,
+                "thinner_name": lr.thinner.material_name if lr.thinner else None,
+                "thinner_id": lr.thinner.id if lr.thinner else None,
+                "thinner_density": lr.thinner.density if lr.thinner else None,
+                "thinner_price_per_kg": lr.thinner.price_per_kg if lr.thinner else None,
+                "thinner_price_per_liter": lr.thinner.price_per_liter if lr.thinner else None,
+                "thinner_basis": lr.thinner_basis,
+                "wft": lr.wft,
+                "practical_consumption_kg": lr.practical_consumption_kg,
+                "practical_consumption_l": lr.practical_consumption_l,
+                "thinner_consumption_kg": lr.thinner_consumption_kg,
+                "thinner_consumption_l": lr.thinner_consumption_l,
+                "cost_per_m2": lr.cost_per_m2,
+                "thinner_cost_per_m2": lr.thinner_cost_per_m2,
+                "total_consumption_kg": lr.total_consumption_kg,
+                "total_consumption_l": lr.total_consumption_l,
+                "total_cost": lr.total_cost,
+            })
+
+        now = datetime.now(timezone.utc)
         calc = CalculationORM(
             calculation_number=obj.calculation_number or "",
             object_name=obj.object_name or "",
             customer=obj.customer or "",
             project=obj.project or "",
-            area_m2=obj.area_m2 or 0.0,
+            area_m2=obj.area_m2 if obj.area_m2 is not None else null(),
             system_name=result.system.system_name or "Пользовательская",
             total_dft=result.total_dft,
-            total_cost_per_m2=result.total_cost_per_m2,
-            total_cost=result.total_cost,
+            total_cost_per_m2=result.total_cost_per_m2 if result.total_cost_per_m2 is not None else null(),
+            total_cost=result.total_cost if result.total_cost is not None else null(),
             total_consumption_kg=result.total_practical_consumption_kg,
             snapshot_json=json.dumps(snapshot, ensure_ascii=False),
             notes=notes,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=now,
+            updated_at=now,
         )
         for i, lr in enumerate(result.layers):
             calc.layers.append(CalculationLayerORM(
@@ -79,7 +107,7 @@ class HistoryService:
                 dry_thickness=lr.target_dft,
                 consumption_kg=lr.practical_consumption_kg,
                 consumption_l=lr.practical_consumption_l,
-                cost_per_m2=lr.cost_per_m2,
+                cost_per_m2=lr.cost_per_m2 if lr.cost_per_m2 is not None else null(),
                 snapshot_json=json.dumps(snapshot["layers"][i], ensure_ascii=False),
             ))
         self.session.add(calc)
@@ -97,6 +125,7 @@ class HistoryService:
 
     def save_comparison(self, comparison: ComparisonResult, notes: str = "") -> int:
         snapshot = {
+            "snapshot_version": 1,
             "object_name": comparison.object_data.object_name,
             "area_m2": comparison.object_data.area_m2,
             "systems": [
@@ -114,11 +143,11 @@ class HistoryService:
         }
         cmp = ComparisonORM(
             object_name=comparison.object_data.object_name or "",
-            area_m2=comparison.object_data.area_m2 or 0.0,
+            area_m2=comparison.object_data.area_m2 if comparison.object_data.area_m2 is not None else null(),
             systems_count=len(comparison.systems),
             snapshot_json=json.dumps(snapshot, ensure_ascii=False),
             notes=notes,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         self.session.add(cmp)
         self.session.flush()
@@ -126,9 +155,5 @@ class HistoryService:
 
     def list_comparisons(self, limit: int = 50) -> Sequence[ComparisonORM]:
         from sqlalchemy import select
-        stmt = (
-            select(ComparisonORM)
-            .order_by(ComparisonORM.created_at.desc())
-            .limit(limit)
-        )
+        stmt = select(ComparisonORM).order_by(ComparisonORM.created_at.desc()).limit(limit)
         return self.session.scalars(stmt).all()

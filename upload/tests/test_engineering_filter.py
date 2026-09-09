@@ -4,43 +4,33 @@ from app.domain.recommendation.engineering_filter import evaluate_system
 
 
 def make_system(**kwargs):
-    material = Material(
-        material_name="Test primer",
-        recommended_dft_min=60,
-        recommended_dft_max=120,
-        max_single_layer_dft=150,
-        min_application_temperature=5,
-        max_application_temperature=40,
-        max_relative_humidity=80,
-        min_dew_point_margin_c=3,
-        application_method=ApplicationMethod.AIRLESS,
-    )
-    layer = LayerDefinition(material=material, target_dft=80)
-    return CoatingSystem(
-        system_name="Test system",
-        corrosion_categories=[CorrosionCategory.C4],
-        durability=DurabilityLevel.HIGH,
-        surface_types=[SurfaceType.NEW_STEEL],
-        number_of_layers=1,
-        layers=[layer],
-        total_dft_min=70,
-        total_dft_target=80,
-        total_dft_max=120,
-        **kwargs,
-    )
+    values = {
+        "system_name": "Test system",
+        "corrosion_categories": [CorrosionCategory.C4],
+        "durability": DurabilityLevel.HIGH,
+        "surface_types": [SurfaceType.NEW_STEEL],
+        "number_of_layers": 1,
+        "layers": [LayerDefinition(material=Material(material_name="Test primer", recommended_dft_min=60, recommended_dft_max=120, max_single_layer_dft=150, min_application_temperature=5, max_application_temperature=40, max_relative_humidity=80, min_dew_point_margin_c=3, application_method=ApplicationMethod.AIRLESS), target_dft=80)],
+        "total_dft_min": 70,
+        "total_dft_target": 80,
+        "total_dft_max": 120,
+    }
+    values.update(kwargs)
+    return CoatingSystem(**values)
 
 
 def make_object(**kwargs):
-    return ObjectData(
-        corrosion_category=CorrosionCategory.C4,
-        durability=DurabilityLevel.MEDIUM,
-        surface_type=SurfaceType.NEW_STEEL,
-        surface_temperature=20,
-        dew_point=15,
-        relative_humidity=60,
-        application_method=ApplicationMethod.AIRLESS,
-        **kwargs,
-    )
+    values = {
+        "corrosion_category": CorrosionCategory.C4,
+        "durability": DurabilityLevel.MEDIUM,
+        "surface_type": SurfaceType.NEW_STEEL,
+        "surface_temperature": 20,
+        "dew_point": 15,
+        "relative_humidity": 60,
+        "application_method": ApplicationMethod.AIRLESS,
+    }
+    values.update(kwargs)
+    return ObjectData(**values)
 
 
 def test_compliant_system_passes():
@@ -51,15 +41,13 @@ def test_compliant_system_passes():
 
 
 def test_missing_critical_system_data_is_not_treated_as_pass():
-    system = make_system(corrosion_categories=[])
-    result = evaluate_system(system, make_object())
+    result = evaluate_system(make_system(corrosion_categories=[]), make_object())
     assert result.status == "Недостаточно данных"
     assert result.has_insufficient_data
 
 
 def test_wrong_category_is_rejected():
-    system = make_system(corrosion_categories=[CorrosionCategory.C3])
-    result = evaluate_system(system, make_object())
+    result = evaluate_system(make_system(corrosion_categories=[CorrosionCategory.C3]), make_object())
     assert result.status == "Не подходит"
     assert result.failed_checks
 

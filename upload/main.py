@@ -13,11 +13,20 @@ if str(ROOT) not in sys.path:
 
 from app.config import ensure_directories
 from app.infrastructure.logging_setup import setup_logging
+from app.infrastructure.database.engine import init_db, get_session_factory
+from app.infrastructure.database.seed import run_seed
 
 
 def main() -> None:
     ensure_directories()
     setup_logging()
+    init_db()
+
+    # Начальное заполнение выполняется один раз при запуске приложения,
+    # а не из отдельных экранов. Seed идемпотентен.
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        run_seed(session)
 
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import Qt

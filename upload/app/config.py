@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
 
-# Root of the project (lkm_calculator/)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 BACKUP_DIR = DATA_DIR / "backups"
 LOG_DIR = PROJECT_ROOT / "logs"
 DB_PATH = DATA_DIR / "database.sqlite"
 SETTINGS_PATH = DATA_DIR / "settings.json"
+EXCEL_TEMPLATE_PATH = PROJECT_ROOT.parent / "КалькуляторЭКСЕЛЛЬ.xlsx"
 
 
 @dataclass
@@ -26,16 +26,16 @@ class AppSettings:
     logo_path: str = ""
 
     currency: str = "RUB"
-    vat_rate: float = 20.0          # %
+    vat_rate: float = 20.0
     prices_include_vat: bool = True
 
     default_losses_percent: float = 0.0
     default_area_unit: str = "м²"
     export_dir: str = str(Path.home() / "Documents" / "LKM_Calculations")
+    excel_template_path: str = str(EXCEL_TEMPLATE_PATH)
 
     language: str = "ru"
 
-    # Recommendation weights (sum should be ~1.0)
     weight_conditions: float = 0.30
     weight_corrosion: float = 0.20
     weight_durability: float = 0.15
