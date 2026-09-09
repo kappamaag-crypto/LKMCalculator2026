@@ -116,15 +116,19 @@ class PDFExporter:
         ]
 
     def _section_input(self, result):
+        """Показывает только реальные данные, которые вводятся на экране расчёта."""
         obj = result.object_data
+        area = _area(result)
         data = [
             ["Параметр", "Значение"],
-            ["Категория коррозии", obj.corrosion_category.value if obj.corrosion_category else "—"],
-            ["Долговечность", obj.durability.value if obj.durability else "—"],
-            ["Поверхность", obj.surface_type.value if obj.surface_type else "—"],
-            ["Среда", obj.environment.value if obj.environment else "—"],
+            ["Объект", obj.object_name or "—"],
+            ["Заказчик", obj.customer or "—"],
+            ["Проект", obj.project or "—"],
+            ["№ расчёта", obj.calculation_number or "—"],
+            ["Площадь", f"{area:.2f} м²"],
+            ["Система", result.system.system_name or "Пользовательская система"],
         ]
-        return [Paragraph("1. Исходные параметры", self.styles["RuHeading"]), self._table(data, [75 * mm, 95 * mm], alignments=["LEFT", "LEFT"]), Spacer(1, 3 * mm)]
+        return [Paragraph("1. Исходные данные расчёта", self.styles["RuHeading"]), self._table(data, [75 * mm, 95 * mm], alignments=["LEFT", "LEFT"]), Spacer(1, 3 * mm)]
 
     def _section_layers(self, result):
         data = [["№", "Материал", "DFT", "WFT", "Теор. кг/м²", "Практ. кг/м²", "Теор. л/м²", "Практ. л/м²", "Стоимость, руб/м²"]]
