@@ -116,18 +116,33 @@ def validate_object_data(obj: ObjectData) -> ValidationResult:
     if obj.temperature_min is not None and obj.temperature_max is not None and obj.temperature_min > obj.temperature_max: r.add_error("OBJ_TEMP_RANGE", "Минимальная температура объекта больше максимальной", "temperature_range")
     if obj.relative_humidity is not None and not 0 <= obj.relative_humidity <= 100: r.add_error("OBJ_RH_RANGE", "Относительная влажность должна быть в диапазоне 0–100 %", "relative_humidity")
     if obj.roughness is not None and obj.roughness < 0: r.add_error("OBJ_ROUGHNESS_NEG", "Шероховатость не может быть отрицательной", "roughness")
-    if obj.surface_temperature is not None and obj.dew_point is not None and obj.surface_temperature <= obj.dew_point: r.add_error("OBJ_DEW_POINT", f"Температура поверхности ({obj.surface_temperature} °C) не выше точки росы ({obj.dew_point} °C) — нанесение недопустимо", "dew_point")
+    if obj.surface_temperature is not None and obj.dew_point is not None and obj.surface_temperature < obj.dew_point: r.add_error("OBJ_DEW_POINT", "Температура поверхности ниже точки росы", "dew_point")
     if obj.dew_point_margin_c is not None and obj.dew_point_margin_c < 0: r.add_error("OBJ_DEW_MARGIN_NEG", "Запас до точки росы не может быть отрицательным", "dew_point_margin_c")
     return r
 
 def validate_system_layers(layers: Sequence[LayerDefinition | LayerResult], compatibility_checker=None, system: CoatingSystem | None = None) -> ValidationResult:
     r = ValidationResult()
-    if not layers: r.add_error("SYSTEM_NO_LAYERS", "Система не содержит слоёв", "layers"); return r
+    if not layers:
+        r.add_error("SYSTEM_NO_LAYERS", "Система не содержит слоёв", "layers")
+        return r
     for idx, layer in enumerate(layers, 1):
         material = getattr(layer, "material", None)
-        if material is None: r.add_error("SYSTEM_MATERIAL_UNKNOWN", f"Не задан материал для слоя №{idx}", "material", idx); continue
-        target_dft = getattr(layer, "target_dft", None); losses = getattr(layer, "losses_percent", None); thinner = getattr(layer, "thinner_percent", None)
+        if material is None:
+            r.add_error("SYSTEM_MATERIAL_UNKNOWN", f"Не задан материал для слоя №{idx}", "material", idx)
+            continue
+        target_dft = getattr(layer, "target_dft", None)
+        losses = getattr(layer, "losses_percent", None)
+        thinner = getattr(layer, "thinner_percent", None)
         r.merge(validate_layer_input(material, target_dft, losses, thinner, idx, getattr(layer, "thinner_basis", None)))
+    if system is not None:
+        expected_layers = system.number_of_layers
+        if expected_layers > 0 and expected_layers != len(layers):
+            r.add_error("SYS_LAYER_COUNT", f"В системе заявлено {expected_layers} слоёв, фактически задано {len(layers)}.", "number_of_layers")
+        total_dft = sum((getattr(layer, "target_dft", None) or 0.0) for layer in layers)
+        if system.total_dft_min is not None and total_dft < system.total_dft_min:
+            r.add_error("SYS_TOTAL_DFT_BELOW_MIN", f"Общая DFT {total_dft:g} мкм ниже минимальной для системы ({system.total_dft_min:g} мкм).", "total_dft_min")
+        if system.total_dft_max is not None and total_dft > system.total_dft_max:
+            r.add_error("SYS_TOTAL_DFT_ABOVE_MAX", f"Общая DFT {total_dft:g} мкм выше максимальной для системы ({system.total_dft_max:g} мкм).", "total_dft_max")
     if compatibility_checker and len(layers) > 1:
         for prev, cur in zip(layers, layers[1:]):
             prev_name = getattr(getattr(prev, "material", None), "material_name", None); cur_name = getattr(getattr(cur, "material", None), "material_name", None)
