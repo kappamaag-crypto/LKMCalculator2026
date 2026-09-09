@@ -88,8 +88,11 @@ class CustomerExcelExporter(ExcelExporter):
             row: [copy(ws.cell(row, col)._style) for col in range(2, 19)]
             for row in range(thinner_start, thinner_start + 2)
         }
+        # The fill of a merged row belongs to its top-left anchor.  Reading C9/C10
+        # would silently return the default fill because those cells are MergedCell
+        # instances after loading a valid XLSX template.
         thinner_fills = {
-            row: copy(ws.cell(row, 3).fill)
+            row: copy(ws.cell(row, 2).fill)
             for row in range(thinner_start, thinner_start + 2)
         }
         thinner_heights = {
@@ -130,9 +133,9 @@ class CustomerExcelExporter(ExcelExporter):
                 ws.cell(target, col)._style = copy(style)
             ws.row_dimensions[target].height = thinner_heights[source_row]
 
-            # The source template puts the thinner fill on an internal cell of a
-            # merged range (C9/C10).  After re-merging only the top-left anchor is
-            # persisted by openpyxl, so copy that fill to every affected anchor.
+            # The source fill is captured from the persisted anchor above.  After
+            # recreating the merged ranges, restore it explicitly on every target
+            # merged row anchor so XLSX round-trip keeps the customer formatting.
             fill = thinner_fills[source_row]
             for merged in list(ws.merged_cells.ranges):
                 min_col, min_row, max_col, max_row = range_boundaries(str(merged))
