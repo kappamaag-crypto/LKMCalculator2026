@@ -23,40 +23,30 @@ TOTAL_FILL=PatternFill("solid",fgColor="DBEAFE")
 CENTER=Alignment(horizontal="center",vertical="center",wrap_text=True)
 LEFT=Alignment(horizontal="left",vertical="center",wrap_text=True)
 
-
 def _auto_width(ws:Worksheet,min_width:int=10,max_width:int=40)->None:
     for col in ws.columns:
         letter=get_column_letter(col[0].column)
         length=max((len(str(c.value or "")) for c in col),default=min_width)
         ws.column_dimensions[letter].width=min(max(length+2,min_width),max_width)
 
-
 def _write_header_row(ws:Worksheet,row:int,headers:list[str])->None:
     for col,header in enumerate(headers,1):
-        cell=ws.cell(row=row,column=col,value=header)
-        cell.font=HEADER_FONT; cell.fill=HEADER_FILL; cell.alignment=CENTER; cell.border=THIN
-
+        cell=ws.cell(row=row,column=col,value=header); cell.font=HEADER_FONT; cell.fill=HEADER_FILL; cell.alignment=CENTER; cell.border=THIN
 
 def _cell(ws:Worksheet,row:int,col:int,value,bold:bool=False,fill=None,align=CENTER):
-    cell=ws.cell(row=row,column=col,value=value)
-    cell.font=BOLD_FONT if bold else NORMAL_FONT; cell.alignment=align; cell.border=THIN
+    cell=ws.cell(row=row,column=col,value=value); cell.font=BOLD_FONT if bold else NORMAL_FONT; cell.alignment=align; cell.border=THIN
     if fill: cell.fill=fill
     return cell
 
-
 def _area(obj:ObjectData)->float:
-    """Площадь расчёта задаётся непосредственно пользователем, в м²."""
-    return max(float(obj.area_m2 or 0.0), 0.0)
+    return max(float(obj.area_m2 or 0.0),0.0)
 
-
-def _cost_add(*values: Optional[float]) -> Optional[float]:
+def _cost_add(*values:Optional[float])->Optional[float]:
     if any(value is None for value in values): return None
     return sum(values)
 
-
-def _display(value, digits:int=2):
-    return "—" if value is None else round(value, digits)
-
+def _display(value,digits:int=2):
+    return "—" if value is None else round(value,digits)
 
 class ExcelExporter:
     """Экспорт инженерного расчёта без закупочной и складской логики."""
@@ -88,22 +78,21 @@ class ExcelExporter:
 
     def _sheet_layers(self,ws:Worksheet,result:SystemCalculationResult)->None:
         ws.title="Слои" if ws.title=="Sheet" else ws.title; ws.cell(1,1,f"Слои системы: {result.system.system_name}").font=TITLE_FONT; row=3
-        headers=["№","Материал","Связующее","DFT, мкм","WFT, мкм","Потери, %","Разб., %","Укрыв. теор., м²/л","Укрыв. практ., м²/л","Расход теор., кг/м²","Расход практ., кг/м²","Расход практ., л/м²","Разбавитель, кг/м²","Разбавитель, л/м²","Стоимость материала, руб/м²","Разбавитель, руб/м²","Итого, руб/м²","Расход ЛКМ на объект, кг","Разбавитель на объект, кг","Стоимость на объект, руб"]
+        headers=["№","Материал","Связующее","DFT, мкм","WFT, мкм","Потери, %","Разбавитель, %","Укрыв. теор., м²/л","Укрыв. практ., м²/л","Расход теор., кг/м²","Расход практ., кг/м²","Расход практ., л/м²","Разбавитель, кг/м²","Разбавитель, л/м²","Стоимость материала, руб/м²","Разбавитель, руб/м²","Итого, руб/м²","Расход ЛКМ на объект, кг","Разбавитель на объект, кг","Стоимость на объект, руб"]
         _write_header_row(ws,row,headers); row+=1
         for i,lr in enumerate(result.layers):
             fill=ALT_FILL if i%2 else None; binder=lr.material.binder_type.value if hasattr(lr.material.binder_type,"value") else str(lr.material.binder_type); total_m2=_cost_add(lr.cost_per_m2,lr.thinner_cost_per_m2); area=_area(result.object_data)
-            thinner_total_kg=lr.thinner_consumption_kg*area
-            values=[i+1,lr.material.material_name,binder,lr.target_dft,lr.wft,lr.losses_percent,lr.thinner_percent,lr.theoretical_coverage,lr.practical_coverage,lr.theoretical_consumption_kg,lr.practical_consumption_kg,lr.practical_consumption_l,lr.thinner_consumption_kg,lr.thinner_consumption_l,_display(lr.cost_per_m2),_display(lr.thinner_cost_per_m2),_display(total_m2),lr.total_consumption_kg,thinner_total_kg,_display(lr.total_cost)]
+            values=[i+1,lr.material.material_name,binder,lr.target_dft,lr.wft,lr.losses_percent,lr.thinner_percent,lr.theoretical_coverage,lr.practical_coverage,lr.theoretical_consumption_kg,lr.practical_consumption_kg,lr.practical_consumption_l,lr.thinner_consumption_kg,lr.thinner_consumption_l,_display(lr.cost_per_m2),_display(lr.thinner_cost_per_m2),_display(total_m2),lr.total_consumption_kg,lr.thinner_consumption_kg*area,_display(lr.total_cost)]
             for col,value in enumerate(values,1): _cell(ws,row,col,value,fill=fill)
             row+=1
-        area=_area(result.object_data); thinner_cost_m2=result.total_thinner_cost/area if area and result.total_thinner_cost is not None else None; material_cost=_cost_add(result.total_cost_per_m2, -thinner_cost_m2) if result.total_cost_per_m2 is not None and thinner_cost_m2 is not None else None; thinner_kg_m2=sum(lr.thinner_consumption_kg for lr in result.layers); thinner_l_m2=sum(lr.thinner_consumption_l for lr in result.layers)
+        area=_area(result.object_data); thinner_cost_m2=result.total_thinner_cost/area if area and result.total_thinner_cost is not None else None; material_cost=_cost_add(result.total_cost_per_m2,-thinner_cost_m2) if result.total_cost_per_m2 is not None and thinner_cost_m2 is not None else None; thinner_kg_m2=sum(lr.thinner_consumption_kg for lr in result.layers); thinner_l_m2=sum(lr.thinner_consumption_l for lr in result.layers)
         _cell(ws,row,2,"ИТОГО",True,TOTAL_FILL,LEFT); _cell(ws,row,4,result.total_dft,True,TOTAL_FILL); _cell(ws,row,11,result.total_practical_consumption_kg,True,TOTAL_FILL); _cell(ws,row,12,result.total_practical_consumption_l,True,TOTAL_FILL); _cell(ws,row,13,thinner_kg_m2,True,TOTAL_FILL); _cell(ws,row,14,thinner_l_m2,True,TOTAL_FILL); _cell(ws,row,15,_display(material_cost),True,TOTAL_FILL); _cell(ws,row,16,_display(thinner_cost_m2),True,TOTAL_FILL); _cell(ws,row,17,_display(result.total_cost_per_m2),True,TOTAL_FILL); _cell(ws,row,18,result.total_practical_consumption_kg*area,True,TOTAL_FILL); _cell(ws,row,19,thinner_kg_m2*area,True,TOTAL_FILL); _cell(ws,row,20,_display(result.total_cost),True,TOTAL_FILL); ws.freeze_panes="A4"; _auto_width(ws,8,28)
 
     def _sheet_materials(self,ws:Worksheet,result:SystemCalculationResult)->None:
         ws.cell(1,1,"Спецификация материалов").font=TITLE_FONT; row=3; _write_header_row(ws,row,["Материал","Производитель","Плотность, кг/л","Сухой остаток по объёму, %","Цена, руб/кг","Цена, руб/л","Расход ЛКМ, кг","Расход ЛКМ, л","Расход разбавителя, кг","Расход разбавителя, л","Стоимость материала, руб","Разбавитель, руб"]); row+=1; area=_area(result.object_data)
         for i,lr in enumerate(result.layers):
             fill=ALT_FILL if i%2 else None; material_total=lr.cost_per_m2*area if lr.cost_per_m2 is not None else None; thinner_total=lr.thinner_cost_per_m2*area if lr.thinner_cost_per_m2 is not None else None
-            values=[lr.material.material_name,lr.material.manufacturer or "—",_display(lr.material.density),_display(lr.material.solids_by_volume_percent if lr.material.solids_by_volume_percent is not None else lr.material.solids_percent),_display(lr.material.price_per_kg),_display(lr.material.price_per_liter),lr.total_consumption_kg,lr.total_consumption_l,lr.thinner_consumption_kg*area,lr.thinner_consumption_l*area,_display(material_total),_display(thinner_total)]
+            values=[lr.material.material_name,lr.material.manufacturer or "—",_display(lr.material.density),_display(lr.material.solids_by_volume_percent),_display(lr.material.price_per_kg),_display(lr.material.price_per_liter),lr.total_consumption_kg,lr.total_consumption_l,lr.thinner_consumption_kg*area,lr.thinner_consumption_l*area,_display(material_total),_display(thinner_total)]
             for col,value in enumerate(values,1): _cell(ws,row,col,value,fill=fill)
             row+=1
         _auto_width(ws)
