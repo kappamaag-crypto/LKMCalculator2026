@@ -88,7 +88,7 @@ class HistoryService:
             object_name=obj.object_name or "",
             customer=obj.customer or "",
             project=obj.project or "",
-            area_m2=obj.area_m2 or 0.0,
+            area_m2=obj.area_m2,
             system_name=result.system.system_name or "Пользовательская",
             total_dft=result.total_dft,
             total_cost_per_m2=result.total_cost_per_m2 if result.total_cost_per_m2 is not None else null(),
@@ -143,7 +143,7 @@ class HistoryService:
         }
         cmp = ComparisonORM(
             object_name=comparison.object_data.object_name or "",
-            area_m2=comparison.object_data.area_m2 or 0.0,
+            area_m2=comparison.object_data.area_m2,
             systems_count=len(comparison.systems),
             snapshot_json=json.dumps(snapshot, ensure_ascii=False),
             notes=notes,
