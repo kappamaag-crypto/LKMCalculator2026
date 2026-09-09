@@ -16,6 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 from app.config import AppSettings
 from app.domain.models import SystemCalculationResult, ComparisonResult, RecommendationResult
+from app.domain.formulas import FORMULA_VERSION
 
 BLUE = colors.HexColor("#1A56DB")
 DARK = colors.HexColor("#1A1A2E")
@@ -102,7 +103,8 @@ class PDFExporter:
             Paragraph("Расчёт расхода лакокрасочных материалов<br/>и подбор системы АКЗ", self.styles["RuTitle"]),
             HRFlowable(width="100%", thickness=1.5, color=BLUE, spaceAfter=8),
             Paragraph(self.settings.organization_name or "Организация", self.styles["RuBody"]),
-            Paragraph(f"Дата: {datetime.now():%d.%m.%Y %H:%M}", self.styles["RuSmall"]),
+            Paragraph(f"Дата расчёта: {datetime.now():%d.%m.%Y %H:%M}", self.styles["RuSmall"]),
+            Paragraph(f"Версия формул: {FORMULA_VERSION}", self.styles["RuSmall"]),
             Paragraph(f"<b>Объект:</b> {obj.object_name or '—'}", self.styles["RuBody"]),
             Paragraph(f"<b>Заказчик:</b> {obj.customer or '—'}", self.styles["RuBody"]),
             Paragraph(f"<b>Площадь:</b> {area:.2f} м²", self.styles["RuBody"]),
@@ -122,7 +124,7 @@ class PDFExporter:
         return [Paragraph("1. Исходные параметры", self.styles["RuHeading"]), self._table(data, [75 * mm, 95 * mm]), Spacer(1, 3 * mm)]
 
     def _section_layers(self, result):
-        data = [["№", "Материал", "DFT", "WFT", "ЛКМ кг/м²", "ЛКМ л/м²", "Разб. кг/м²", "Разб. л/м²", "Итого руб/м²"]]
+        data = [["№", "Материал", "DFT", "WFT", "ЛКМ кг/м²", "ЛКМ л/м²", "Разбавитель кг/м²", "Разбавитель л/м²", "Итого руб/м²"]]
         for i, lr in enumerate(result.layers, 1):
             total_cost = _total_cost(lr.cost_per_m2, lr.thinner_cost_per_m2)
             data.append([
@@ -137,7 +139,7 @@ class PDFExporter:
                      f"{result.total_practical_consumption_kg:.3f}", f"{result.total_practical_consumption_l:.3f}",
                      f"{thinner_kg_m2:.3f}", f"{thinner_l_m2:.3f}", _cost(result.total_cost_per_m2)])
         return [Paragraph("2. Состав системы и расчёт слоёв", self.styles["RuHeading"]),
-                self._table(data, [8*mm, 42*mm, 15*mm, 15*mm, 20*mm, 19*mm, 20*mm, 19*mm, 22*mm], highlight_last=True),
+                self._table(data, [8*mm, 42*mm, 15*mm, 15*mm, 20*mm, 19*mm, 24*mm, 23*mm, 22*mm], highlight_last=True),
                 Spacer(1, 3 * mm)]
 
     def _section_totals(self, result):
@@ -192,7 +194,7 @@ class PDFExporter:
         )
         return [Paragraph("Примечания", self.styles["RuHeading"]), Paragraph(text, self.styles["RuBody"]),
                 HRFlowable(width="100%", thickness=0.5, color=BORDER),
-                Paragraph(f"Калькулятор ЛКМ / АКЗ v3.0 • {datetime.now():%d.%m.%Y %H:%M}", self.styles["RuSmall"])]
+                Paragraph(f"Калькулятор ЛКМ / АКЗ v3.0 • Формулы {FORMULA_VERSION} • {datetime.now():%d.%m.%Y %H:%M}", self.styles["RuSmall"])]
 
     def _table(self, data, col_widths=None, header=True, highlight_last=False):
         processed = []
