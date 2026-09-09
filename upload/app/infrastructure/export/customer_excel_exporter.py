@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from openpyxl import load_workbook
 
 from app.config import AppSettings
+from app.domain.formulas import FORMULA_VERSION
 from app.domain.models import SystemCalculationResult, RecommendationResult
 from app.infrastructure.export.excel_exporter import ExcelExporter
 
 
 class CustomerExcelExporter(ExcelExporter):
-    """Сохраняет исходный пользовательский шаблон и заполняет его расчётными данными."""
+    """Сохраняет пользовательский шаблон и заполняет только инженерные показатели расчёта."""
 
     LABELS = {
         "object": ("объект", "название объекта"),
@@ -25,6 +27,8 @@ class CustomerExcelExporter(ExcelExporter):
         "total_dft": ("общая толщина", "суммарная толщина", "толщина dft"),
         "cost_m2": ("стоимость, руб/м²", "стоимость руб/м2", "стоимость м²"),
         "total_cost": ("стоимость объекта", "итого стоимость"),
+        "calculation_date": ("дата расчёта",),
+        "formula_version": ("версия формул", "версия расчёта"),
     }
 
     def __init__(self, settings: Optional[AppSettings] = None):
@@ -121,6 +125,8 @@ class CustomerExcelExporter(ExcelExporter):
             "total_dft": result.total_dft,
             "cost_m2": result.total_cost_per_m2,
             "total_cost": result.total_cost,
+            "calculation_date": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            "formula_version": FORMULA_VERSION,
         }
 
         for key, value in values.items():
