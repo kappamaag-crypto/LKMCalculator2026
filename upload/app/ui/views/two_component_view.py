@@ -10,7 +10,7 @@ from app.services.two_component_service import TwoComponentService
 
 
 class TwoComponentView(QWidget):
-    """Показывает подтверждённые сведения о компонентах 2К-материалов."""
+    """Показывает только справочные сведения о компонентах 2К-материала."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -23,7 +23,7 @@ class TwoComponentView(QWidget):
         root.setContentsMargins(24, 24, 24, 24)
         root.setSpacing(12)
 
-        title = QLabel("2К-материалы — технологическая информация")
+        title = QLabel("2К-материалы — справочная информация")
         title.setProperty("heading", True)
         root.addWidget(title)
 
@@ -31,26 +31,24 @@ class TwoComponentView(QWidget):
         self.cmb_material.currentIndexChanged.connect(self._show_selected)
         root.addWidget(self.cmb_material)
 
-        box = QGroupBox("Данные смешения")
+        box = QGroupBox("Информация о смешении")
         form = QFormLayout(box)
         self.lbl_a = QLabel("—")
         self.lbl_b = QLabel("—")
         self.lbl_ratio = QLabel("—")
         self.lbl_pot = QLabel("—")
         self.lbl_induction = QLabel("—")
-        self.lbl_temp = QLabel("—")
         self.lbl_notes = QLabel("—")
         self.lbl_notes.setWordWrap(True)
         form.addRow("Компонент A:", self.lbl_a)
         form.addRow("Компонент B:", self.lbl_b)
-        form.addRow("Соотношение:", self.lbl_ratio)
-        form.addRow("Рабочее время:", self.lbl_pot)
+        form.addRow("Соотношение A:B:", self.lbl_ratio)
+        form.addRow("Рабочее время (pot life):", self.lbl_pot)
         form.addRow("Индукционная выдержка:", self.lbl_induction)
-        form.addRow("Температура справки:", self.lbl_temp)
         form.addRow("Примечания / источник:", self.lbl_notes)
         root.addWidget(box)
 
-        note = QLabel("Справочная информация. Закупочное количество, фасовки и остатки не рассчитываются.")
+        note = QLabel("Справочная информация. Расход, закупка, фасовка, комплекты и остатки для 2К-материалов не рассчитываются.")
         note.setWordWrap(True)
         note.setProperty("subheading", True)
         root.addWidget(note)
@@ -104,7 +102,6 @@ class TwoComponentView(QWidget):
             self.lbl_ratio.setText("не указано")
             self.lbl_pot.setText("не указано")
             self.lbl_induction.setText("не указано")
-            self.lbl_temp.setText("не указано")
             self.lbl_notes.setText("Для материала нет подтверждённой записи смешения.")
             return
 
@@ -113,7 +110,4 @@ class TwoComponentView(QWidget):
         self.lbl_ratio.setText(result.ratio_text)
         self.lbl_pot.setText(self._fmt_minutes(result.working_time_minutes))
         self.lbl_induction.setText(self._fmt_minutes(result.induction_time_minutes))
-        self.lbl_temp.setText(
-            f"{result.temperature_reference:g} °C" if result.temperature_reference is not None else "не указано"
-        )
         self.lbl_notes.setText(result.notes or "Источник не указан")
