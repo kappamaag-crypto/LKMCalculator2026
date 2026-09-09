@@ -83,9 +83,9 @@ class CalculationService:
         """Краткая текстовая сводка расчёта, включая расход разбавителя."""
         thinner_l_m2 = sum(lr.thinner_consumption_l for lr in result.layers)
         thinner_kg_m2 = sum(lr.thinner_consumption_kg for lr in result.layers)
-        area = result.object_data.area_m2 or 0.0
-        thinner_l_total = thinner_l_m2 * area if area > 0 else 0.0
-        thinner_kg_total = thinner_kg_m2 * area if area > 0 else 0.0
+        area = result.object_data.area_m2
+        thinner_l_total = thinner_l_m2 * area if area is not None else None
+        thinner_kg_total = thinner_kg_m2 * area if area is not None else None
         lines = [
             f"Система: {result.system.system_name}",
             f"Объект: {result.object_data.object_name or '—'}",
