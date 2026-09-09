@@ -18,12 +18,13 @@ class LayerTableWidget(QTableWidget):
         super().__init__(0,len(COLUMNS),parent)
         self.setHorizontalHeaderLabels([x[0] for x in COLUMNS])
         header=self.horizontalHeader()
-        header.setSectionResizeMode(1,QHeaderView.Stretch)
+        header.setSectionResizeMode(1,QHeaderView.ResizeToContents)
         header.setDefaultAlignment(Qt.AlignCenter)
         self.setWordWrap(False)
         self.setTextElideMode(Qt.ElideRight)
         for i,(_,width) in enumerate(COLUMNS):
             if i!=1:self.setColumnWidth(i,width)
+        self.setColumnWidth(1,220)
         header.setMinimumSectionSize(40)
         self.setAlternatingRowColors(True);self.setSelectionBehavior(QAbstractItemView.SelectRows);self.setSelectionMode(QAbstractItemView.SingleSelection);self.verticalHeader().setVisible(False);self._layer_inputs=[];self._updating=False;self._last_valid={};self.itemChanged.connect(self._changed)
     def _item(self,text,align=Qt.AlignCenter,edit=False,tooltip=None):
