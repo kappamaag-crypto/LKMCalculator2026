@@ -23,7 +23,7 @@ class CalculationView(QWidget):
     REPORT_MODES=(("engineering","Инженерный"),("commercial","Коммерческий"),("full","Полный"))
     def __init__(self,service:CalculationService,parent=None):
         super().__init__(parent);self.service=service;self.settings=AppSettings.load();self._materials=[];self._all_materials=[];self._systems=[];self._last_result=None;self._restored_system_name="";self._area_unknown=False;self._timer=QTimer(self);self._timer.setSingleShot(True);self._timer.setInterval(220);self._timer.timeout.connect(self._on_live_recalculate);self._build_ui()
-    def set_settings(self,settings:AppSettings):self.settings=settings
+    def set_settings(self,settings:AppSettings):self.settings=settings;self._update_export_menu_checks()
     def _build_ui(self):
         root=QVBoxLayout(self);root.setContentsMargins(12,12,12,12);root.setSpacing(10);t=QLabel("Расчёт системы покрытия");t.setProperty("heading",True);root.addWidget(t);sp=QSplitter(Qt.Horizontal)
         left=QWidget();ll=QVBoxLayout(left);b=QGroupBox("Объект");f=QFormLayout(b);self.ed_object=QLineEdit();self.ed_customer=QLineEdit();self.ed_project=QLineEdit();self.ed_calc_number=QLineEdit();self.ed_system_name=QLineEdit();self.ed_system_name.setPlaceholderText("Название системы");self.spin_area=QDoubleSpinBox();self.spin_area.setRange(0.01,1000000);self.spin_area.setValue(1);self.spin_area.setDecimals(2);self.spin_area.setSuffix(" м²");f.addRow("Объект:",self.ed_object);f.addRow("Заказчик:",self.ed_customer);f.addRow("Проект:",self.ed_project);f.addRow("№ расчёта:",self.ed_calc_number);f.addRow("Система:",self.ed_system_name);f.addRow("Площадь:",self.spin_area);self.spin_area.valueChanged.connect(self._on_area_changed);sysbox=QGroupBox("Сохранённая система");sf=QVBoxLayout(sysbox);self.cmb_system=QComboBox();self.cmb_system.addItem("— выбрать систему из базы —",None);self.btn_load_system=QPushButton("Загрузить систему в расчёт");self.btn_load_system.clicked.connect(self._on_load_saved_system);sf.addWidget(self.cmb_system);sf.addWidget(self.btn_load_system);ll.addWidget(b);ll.addWidget(sysbox);ll.addStretch();sp.addWidget(left)
@@ -34,10 +34,17 @@ class CalculationView(QWidget):
         for x in (self.btn_calc,self.btn_demo,self.btn_excel,self.btn_pdf,self.btn_to_cmp):buttons.addWidget(x)
         buttons.addStretch();rl.addLayout(buttons);rb=QGroupBox("Результат");rr=QVBoxLayout(rb);self.lbl_summary=QLabel("Выполните расчёт");self.lbl_summary.setProperty("subheading",True);self.lbl_summary.setWordWrap(True);self.txt_details=QTextEdit();self.txt_details.setReadOnly(True);self.txt_details.setMaximumHeight(210);rr.addWidget(self.lbl_summary);rr.addWidget(self.txt_details);rl.addWidget(rb);sp.addWidget(right);sp.setStretchFactor(0,1);sp.setStretchFactor(1,2);root.addWidget(sp)
     def _create_export_menu(self,export_name,callback):
-        menu=QMenu(self);menu.setTitle(f"{export_name} — режим отчёта")
+        menu=QMenu(self);menu.setTitle(f"{export_name} — режим отчёта");menu.setSeparatorsCollapsible(False);menu._mode_actions={}
+        group=__import__('PySide6.QtGui',fromlist=['QActionGroup']).QActionGroup(menu);group.setExclusive(True);menu._mode_group=group
         for key,title in self.REPORT_MODES:
-            action=QAction(title,menu);action.triggered.connect(lambda checked=False,m=key:callback(m));menu.addAction(action)
+            action=QAction(title,menu);action.setCheckable(True);action.setData(key);action.triggered.connect(lambda checked=False,m=key:callback(m));group.addAction(action);menu.addAction(action);menu._mode_actions[key]=action
         return menu
+    def _update_export_menu_checks(self):
+        mode=self.settings.report_mode if self.settings.report_mode in dict(self.REPORT_MODES) else "engineering"
+        for button in (getattr(self,'btn_excel',None),getattr(self,'btn_pdf',None)):
+            menu=button.menu() if button is not None else None
+            if menu is None:continue
+            for key,action in getattr(menu,'_mode_actions',{}).items():action.setChecked(key==mode)
     def _export_settings(self,mode):return replace(self.settings,report_mode=mode)
     def _on_area_changed(self):self._area_unknown=False;self._schedule_live_recalculate()
     def set_materials(self,materials:list):
@@ -108,7 +115,7 @@ class CalculationView(QWidget):
         except (ValueError,TypeError) as e:self.lbl_summary.setText(f"Ошибка расчёта: {e}");self.txt_details.clear();return False
         if validation.has_errors:
             msg="\n".join(f"• {e.message}" for e in validation.errors);self.lbl_summary.setText("Расчёт требует исправления входных данных");self.txt_details.setPlainText(msg);[b.setEnabled(False) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)];return False
-        self._last_result=result;area=result.object_data.area_m2;object_paint_l=result.total_practical_consumption_l*area;object_paint_kg=result.total_practical_consumption_kg*area;self.layer_table.set_layers(layers,result.layers);self.lbl_summary.setText(f"Толщина: {result.total_dft:.0f} мкм | ЛКМ: {result.total_practical_consumption_l:.4f} л/м² / {result.total_practical_consumption_kg:.3f} кг/м² | На объект: {object_paint_l:.2f} л / {object_paint_kg:.2f} кг | Стоимость: {self._money(result.total_cost_per_m2)} руб/м² | Объект: {self._money(result.total_cost,0)} руб");self.txt_details.setPlainText(self.service.format_summary(result));[b.setEnabled(True) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)]
+        self._last_result=result;area=result.object_data.area_m2;object_paint_l=result.total_practical_consumption_l*area;object_paint_kg=result.total_practical_consumption_kg*area;self.layer_table.set_layers(layers,result.layers);self.lbl_summary.setText(f"Толщина: {result.total_dft:.0f} мкм | ЛКМ: {result.total_practical_consumption_l:.4f} л/м² / {result.total_practical_consumption_kg:.3f} кг/м² | На объект: {object_paint_l:.2f} л / {object_paint_kg:.2f} кг | Стоимость: {self._money(result.total_cost_per_m2)} руб/м² | Объект: {self._money(result.total_cost,0)} руб");self.txt_details.setPlainText(self.service.format_summary(result));[b.setEnabled(True) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)];self._update_export_menu_checks()
         if notify:self.calculation_done.emit(result)
         return True
     def _on_live_recalculate(self):self._recalculate(False,False)
