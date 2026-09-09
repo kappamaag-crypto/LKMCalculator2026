@@ -1,7 +1,4 @@
-"""Диалог быстрого добавления материала непосредственно в расчёт.
-
-Материал не сохраняется в БД: он существует только в текущем расчёте.
-"""
+"""Диалог добавления материала непосредственно из экрана расчёта."""
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
@@ -9,17 +6,23 @@ from PySide6.QtWidgets import (
     QGroupBox, QLineEdit, QVBoxLayout, QMessageBox, QCheckBox
 )
 
+from sqlalchemy import func, select
+
 from app.domain.enums import BinderType, MaterialType
 from app.domain.models import Material
+from app.infrastructure.database.engine import get_session_factory
+from app.infrastructure.database.models import MaterialORM
+from app.infrastructure.database.repositories import MaterialRepository
 
 
 class AdHocMaterialDialog(QDialog):
-    """Создание временного материала для текущего расчёта."""
+    """Создание материала из расчёта с сохранением в БД."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Добавить материал в расчёт")
         self.setMinimumWidth(460)
+        self._material: Material | None = None
         self._build_ui()
 
     def _build_ui(self):
@@ -47,7 +50,7 @@ class AdHocMaterialDialog(QDialog):
         form.addRow("Бренд:", self.ed_brand)
         form.addRow("Тип:", self.cmb_type)
         form.addRow("Связующее:", self.cmb_binder)
-        form.addRow(":", self.chk_two_component)
+        form.addRow("Компонентность:", self.chk_two_component)
         root.addWidget(basic)
 
         calc = QGroupBox("Параметры для расчёта")
@@ -66,15 +69,16 @@ class AdHocMaterialDialog(QDialog):
         cf.addRow("Жёсткий максимум DFT:", self.spin_hard_max)
         root.addWidget(calc)
 
-        note = QGroupBox("Важно")
+        note = QGroupBox("Сохранение")
         nf = QFormLayout(note)
-        note_text = QLineEdit("Материал не записывается в базу данных и доступен только в текущем расчёте.")
+        note_text = QLineEdit("Материал будет сохранён в базе данных и сразу добавлен в текущий расчёт.")
         note_text.setReadOnly(True)
         note_text.setFrame(False)
         nf.addRow(note_text)
         root.addWidget(note)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("Сохранить и добавить")
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
@@ -89,8 +93,13 @@ class AdHocMaterialDialog(QDialog):
         box.setKeyboardTracking(False)
         return box
 
+    @staticmethod
+    def _normalize_name(value: str) -> str:
+        return " ".join(value.strip().split()).casefold()
+
     def _accept(self):
-        name = self.ed_name.text().strip()
+        name = " ".join(self.ed_name.text().strip().split())
+        self.ed_name.setText(name)
         if not name:
             QMessageBox.warning(self, "Материал", "Укажите название материала.")
             self.ed_name.setFocus()
@@ -98,9 +107,43 @@ class AdHocMaterialDialog(QDialog):
         if self.spin_dft_max.value() and self.spin_dft_min.value() > self.spin_dft_max.value():
             QMessageBox.warning(self, "Материал", "Рекомендуемый DFT от не может быть больше DFT до.")
             return
+
+        try:
+            with get_session_factory()() as session:
+                normalized = self._normalize_name(name)
+                existing_orm = session.scalar(
+                    select(MaterialORM).where(
+                        func.lower(func.trim(MaterialORM.material_name)) == normalized
+                    )
+                )
+                if existing_orm is not None:
+                    self._material = MaterialRepository(session).get_by_id(existing_orm.id)
+                    QMessageBox.information(
+                        self,
+                        "Материал уже существует",
+                        f"Материал «{self._material.material_name}» уже есть в базе данных.\n\n"
+                        "Дубликат не создан. Существующий материал будет добавлен в текущий расчёт.",
+                    )
+                    self.accept()
+                    return
+
+                material = self._build_material()
+                MaterialRepository(session).add(material)
+                session.commit()
+                self._material = material
+
+        except Exception as exc:
+            QMessageBox.critical(self, "Ошибка сохранения", f"Не удалось сохранить материал в БД:\n{exc}")
+            return
+
+        QMessageBox.information(
+            self,
+            "Материал добавлен",
+            f"Материал «{self._material.material_name}» сохранён в базе данных и добавлен в расчёт.",
+        )
         self.accept()
 
-    def material(self) -> Material:
+    def _build_material(self) -> Material:
         min_dft = self.spin_dft_min.value() or None
         max_dft = self.spin_dft_max.value() or None
         hard_max = self.spin_hard_max.value() or None
@@ -121,3 +164,6 @@ class AdHocMaterialDialog(QDialog):
             is_active=True,
             is_incomplete=False,
         )
+
+    def material(self) -> Material | None:
+        return self._material
