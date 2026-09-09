@@ -39,7 +39,7 @@ def _template(path: Path) -> None:
     wb.save(path)
 
 
-def _result(layer_count: int):
+def _result(layer_count: int, with_mixed_thinners: bool = False):
     materials = [
         Material(
             manufacturer="Blank",
@@ -53,19 +53,37 @@ def _result(layer_count: int):
         )
         for i in range(1, layer_count + 1)
     ]
+    thinner = Material(
+        manufacturer="Blank",
+        material_name="Разбавитель универсальный",
+        material_type=MaterialType.THINNER,
+        density=0.9,
+        price_per_kg=50.0,
+    )
     obj = ObjectData(object_name="Тест", customer="Заказчик", area_m2=100.0)
-    layers = [LayerInput(material=m, target_dft=100 + i * 10, losses_percent=5.0) for i, m in enumerate(materials, 1)]
+    layers = [
+        LayerInput(
+            material=m,
+            target_dft=100 + i * 10,
+            losses_percent=5.0,
+            thinner_percent=5.0 if with_mixed_thinners and i % 2 == 1 else 0.0,
+            thinner=thinner if with_mixed_thinners and i % 2 == 1 else None,
+        )
+        for i, m in enumerate(materials, 1)
+    ]
     result, validation = CalculationService().calculate_system(obj, layers)
     assert not validation.has_errors
     return result
 
 
-def _export(tmp_path: Path, layer_count: int):
+def _export(tmp_path: Path, layer_count: int, with_mixed_thinners: bool = False):
     template = tmp_path / "template.xlsx"
     _template(template)
     output = tmp_path / f"result_{layer_count}.xlsx"
     settings = AppSettings(report_mode="full", excel_template_path=str(template))
-    CustomerExcelExporter(settings).export_calculation(_result(layer_count), output)
+    CustomerExcelExporter(settings).export_calculation(
+        _result(layer_count, with_mixed_thinners), output
+    )
     return load_workbook(output, data_only=False)["База"]
 
 
@@ -98,6 +116,12 @@ def test_customer_excel_expands_to_four_layers_and_keeps_styles(tmp_path):
 
 
 def test_customer_excel_contains_all_layers_even_with_mixed_thinners(tmp_path):
-    ws = _export(tmp_path, 4)
+    ws = _export(tmp_path, 4, with_mixed_thinners=True)
     assert ws.max_row == 15
-    assert all(ws.cell(row, 3).value is not None for row in (7, 8, 9, 10))
+    assert [ws.cell(row, 3).value for row in range(7, 11)] == [f"Blank Слой {i}" for i in range(1, 5)]
+    assert ws["B11"].value == "Разбавитель для Blank Слой 1"
+    assert ws["B12"].value is None
+    assert ws["B13"].value == "Разбавитель для Blank Слой 3"
+    assert ws["B14"].value is None
+    assert ws["O11"].value is not None
+    assert ws["O13"].value is not None
