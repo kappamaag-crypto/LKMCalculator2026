@@ -9,6 +9,7 @@ from app.domain.enums import MaterialType, BinderType, CorrosionCategory, Durabi
 from app.domain.calculator import LayerInput
 from app.services.calculation_service import CalculationService
 from app.infrastructure.export.excel_exporter import ExcelExporter
+from app.domain.formulas import FORMULA_VERSION
 
 @pytest.fixture
 def sample_result():
@@ -27,6 +28,13 @@ def test_export_has_required_sheets(sample_result):
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "test.xlsx"; ExcelExporter().export_calculation(sample_result, path); names = set(load_workbook(path).sheetnames); assert {"Исходные данные","Слои","Материалы","Итоги"}.issubset(names)
 
+def test_export_contains_date_and_formula_version(sample_result):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "test.xlsx"; ExcelExporter().export_calculation(sample_result, path); wb = load_workbook(path); ws = wb["Исходные данные"]
+        values = [str(cell.value or "") for row in ws.iter_rows() for cell in row]
+        assert any("Дата расчёта:" in value for value in values)
+        assert any(FORMULA_VERSION in value for value in values)
+
 def test_layers_sheet_has_data(sample_result):
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "test.xlsx"; ExcelExporter().export_calculation(sample_result, path); ws = load_workbook(path)["Слои"]; assert ws.max_row >= 4; assert any(cell.value and "Blank" in str(cell.value) for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=3) for cell in row)
@@ -38,6 +46,25 @@ def test_layers_sheet_has_thinner_consumption_columns(sample_result):
 def test_materials_sheet_labels_volume_solids(sample_result):
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "test.xlsx"; ExcelExporter().export_calculation(sample_result, path); ws = load_workbook(path)["Материалы"]; headers = [ws.cell(3, col).value for col in range(1, ws.max_column + 1)]; assert "Сухой остаток по объёму, %" in headers; assert "Сухой остаток, %" not in headers
+
+def test_export_unknown_price_is_not_zero(sample_result):
+    sample_result.layers[0].cost_per_m2 = None
+    sample_result.total_cost_per_m2 = None
+    sample_result.total_cost = None
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "unknown.xlsx"; ExcelExporter().export_calculation(sample_result, path); wb = load_workbook(path)
+        ws_layers = wb["Слои"]
+        assert ws_layers.cell(4, 15).value == "—"
+        assert ws_layers.cell(4, 17).value == "—"
+        ws_summary = wb["Итоги"]
+        assert any(ws_summary.cell(row, 2).value == "—" for row in range(1, ws_summary.max_row + 1))
+
+def test_export_has_no_procurement_or_warehouse_metrics(sample_result):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "scope.xlsx"; ExcelExporter().export_calculation(sample_result, path); wb = load_workbook(path)
+        text = " ".join(str(cell.value or "") for ws in wb.worksheets for row in ws.iter_rows() for cell in row).lower()
+        forbidden = ("закуп", "остат", "склад", "упаковок", "фасов")
+        assert not any(term in text for term in forbidden)
 
 def test_export_comparison(sample_result):
     from app.domain.comparison import ComparisonEngine
