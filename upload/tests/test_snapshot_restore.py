@@ -2,6 +2,7 @@ from app.domain.calculator import LayerCalculator
 from app.domain.models import Material
 from app.domain.enums import BinderType, MaterialType
 from app.services.snapshot_service import material_from_snapshot, thinner_from_snapshot
+from app.ui.views.calculation_view import CalculationView
 
 
 def test_material_restore_uses_snapshot_engineering_values_after_catalog_change():
@@ -128,3 +129,10 @@ def test_explicit_unknown_thinner_density_is_not_replaced_by_catalog_value():
     assert restored.density is None
     assert restored.price_per_kg == 120.0
     assert restored.price_per_liter is None
+
+
+def test_calculation_view_snapshot_number_preserves_unknown_dft():
+    assert CalculationView._snapshot_number(None) is None
+    assert CalculationView._snapshot_number(0) == 0.0
+    assert CalculationView._snapshot_number("120") == 120.0
+    assert CalculationView._snapshot_number("UNKNOWN") is None
