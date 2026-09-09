@@ -60,6 +60,25 @@ class CustomerExcelExporter(ExcelExporter):
             dst.fill = copy(src.fill)
             dst.border = copy(src.border)
 
+    @staticmethod
+    def _restore_merged_fills(ws) -> None:
+        """Восстанавливает заливку внутри merged cells после unmerge/merge.
+
+        openpyxl хранит стиль преимущественно на верхней-левой ячейке
+        объединения. После повторного merge внутренние MergedCell могут
+        потерять fill, хотя визуально исходный шаблон предполагал единую
+        заливку всего диапазона. Копируем только fill, не затрагивая границы,
+        шрифт и числовые форматы.
+        """
+        for merged in ws.merged_cells.ranges:
+            min_col, min_row, max_col, max_row = range_boundaries(str(merged))
+            source = ws.cell(min_row, min_col)
+            if source.fill is None:
+                continue
+            for row in range(min_row, max_row + 1):
+                for col in range(min_col, max_col + 1):
+                    ws.cell(row, col).fill = copy(source.fill)
+
     def _expand_section(self, ws, layer_start: int, thinner_start: int, total_row: int, layer_count: int) -> int:
         """Расширяет один 2-слойный блок до ``layer_count`` слоёв.
 
@@ -90,6 +109,8 @@ class CustomerExcelExporter(ExcelExporter):
                 elif max_row >= idx:
                     max_row += amount
             ws.merge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+
+        self._restore_merged_fills(ws)
 
         # Новые строки наследуют оформление соседних строк шаблона.
         for row in range(layer_start + 2, layer_start + 2 + extra):
