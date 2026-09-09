@@ -87,12 +87,27 @@ def material_from_snapshot(item: dict[str, Any], current: Optional[Material] = N
 
 
 def thinner_from_snapshot(item: dict[str, Any], current: Optional[Material] = None) -> Material:
-    """Build the thinner from snapshot properties even if its catalog row changed."""
+    """Build thinner from snapshot values, with catalog fallback only for absent legacy fields."""
+    if not isinstance(item, dict):
+        raise ValueError("Некорректные данные разбавителя в снимке истории.")
+
     thinner_item = dict(item)
     thinner_item["material_id"] = item.get("thinner_id")
-    thinner_item["material_name"] = item.get("thinner_name") or (current.material_name if current else "")
-    thinner_item["density"] = item.get("thinner_density")
-    thinner_item["price_per_kg"] = item.get("thinner_price_per_kg")
-    thinner_item["price_per_liter"] = item.get("thinner_price_per_liter")
+    if "thinner_name" in item:
+        thinner_item["material_name"] = item.get("thinner_name")
+    elif current is not None:
+        thinner_item["material_name"] = current.material_name
+
+    # Do not manufacture None values for legacy snapshots: an absent field is
+    # deliberately allowed to fall back to the current catalog row. An explicit
+    # None in a modern snapshot remains None and therefore means "unknown".
+    for snapshot_key, material_key in (
+        ("thinner_density", "density"),
+        ("thinner_price_per_kg", "price_per_kg"),
+        ("thinner_price_per_liter", "price_per_liter"),
+    ):
+        if snapshot_key in item:
+            thinner_item[material_key] = item[snapshot_key]
+
     thinner_item["material_type"] = MaterialType.THINNER.value
     return material_from_snapshot(thinner_item, current=current)
