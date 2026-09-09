@@ -36,7 +36,6 @@ def _enum_or_none(enum_cls,value):
     try:return enum_cls(value)
     except (ValueError,TypeError):return None
 def _load_systems_from_db(materials,fallback):
-    """Load systems with their layers eagerly, so the calculation screen receives real layer definitions."""
     try:
         material_by_id={m.id:m for m in materials if m.id is not None}
         with get_session_factory()() as session:
@@ -54,14 +53,13 @@ def _load_systems_from_db(materials,fallback):
 
 def dft_fallback(material):
     value=getattr(material,"recommended_dft_min",None);return value if value is not None and value>0 else 100
-
 def _demo_systems():
     mats={m.id:m for m in _demo_materials()};return [CoatingSystem(id=1,system_name="Blank Universal + Finish (C3–C4 Medium)",manufacturer="Blank",layers=[LayerDefinition(material_id=1,material=mats[1],layer_number=1,target_dft=150),LayerDefinition(material_id=2,material=mats[2],layer_number=2,target_dft=80)],number_of_layers=2)]
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__();self.setWindowTitle(f"{__app_name__} v{__version__}");self.setMinimumSize(1100,700);self.resize(1280,800);self.setStyleSheet(APP_STYLE);self.settings=AppSettings.load();self.calc_service=CalculationService();self.rec_service=RecommendationService();self._materials=_load_materials_from_db(_demo_materials());self._systems=_load_systems_from_db(self._materials,_demo_systems());self._build_ui();self._load_demo_data();self.statusBar().showMessage("Готово. Материалы и системы загружены из базы данных.")
     def _build_ui(self):
-        self.tabs=QTabWidget();self.setCentralWidget(self.tabs);self.calc_view=CalculationView(self.calc_service);self.rec_view=RecommendationView(self.rec_service);self.cmp_view=ComparisonView(self.calc_service);self.two_component_view=TwoComponentView();self.materials_view=MaterialsView(self._materials);self.history_view=HistoryView();self.systems_view=SystemsView(self._materials);self.settings_view=SettingsView(self.settings)
+        self.tabs=QTabWidget();self.setCentralWidget(self.tabs);self.calc_view=CalculationView(self.calc_service);self.calc_view.set_settings(self.settings);self.rec_view=RecommendationView(self.rec_service);self.cmp_view=ComparisonView(self.calc_service);self.two_component_view=TwoComponentView();self.materials_view=MaterialsView(self._materials);self.history_view=HistoryView();self.systems_view=SystemsView(self._materials);self.settings_view=SettingsView(self.settings)
         self.tabs.addTab(self.calc_view,"Расчёт");self.tabs.addTab(self.rec_view,"Рекомендации");self.tabs.addTab(self.cmp_view,"Сравнение");self.tabs.addTab(self.two_component_view,"2К-информация");self.tabs.addTab(self.materials_view,"База материалов");self.tabs.addTab(self.systems_view,"Системы");self.tabs.addTab(self.history_view,"История");self.tabs.addTab(self.settings_view,"Настройки")
         self.calc_view.calculation_done.connect(self._on_calc_done);self.calc_view.add_to_comparison.connect(self._on_add_to_comparison);self.calc_view.material_added.connect(self._on_material_added_from_calculation);self.materials_view.materials_changed.connect(self._on_materials_changed);self.history_view.load_requested.connect(self._on_history_load);self.systems_view.systems_changed.connect(self._on_systems_changed);self.settings_view.settings_changed.connect(self._on_settings_changed)
         menubar=self.menuBar();file_menu=menubar.addMenu("Файл");act_exit=QAction("Выход",self);act_exit.triggered.connect(self.close);file_menu.addAction(act_exit);help_menu=menubar.addMenu("Справка");act_about=QAction("О программе",self);act_about.triggered.connect(self._on_about);help_menu.addAction(act_about);self.setStatusBar(QStatusBar())
@@ -69,15 +67,14 @@ class MainWindow(QMainWindow):
     def _refresh_system_catalog(self):self._systems=_load_systems_from_db(self._materials,_demo_systems());self.calc_view.set_systems(self._systems);self.rec_view.set_systems(self._systems)
     def _on_systems_changed(self):self._refresh_system_catalog();self.statusBar().showMessage(f"Каталог систем обновлён: {len(self._systems)}",5000)
     def _on_settings_changed(self,settings):
-        self.settings=settings
-        self.statusBar().showMessage("Настройки сохранены и применены",5000)
+        self.settings=settings;self.calc_view.set_settings(settings);self.statusBar().showMessage("Настройки применены к расчёту и экспорту",7000)
     @staticmethod
     def _money(value,decimals=2):return "—" if value is None else f"{value:,.{decimals}f}".replace(","," ")
     def _on_calc_done(self,result):
         self.statusBar().showMessage(f"Расчёт выполнен: {result.total_dft:.0f} мкм, {self._money(result.total_cost_per_m2)} руб/м², объект {self._money(result.total_cost,0)} руб",10000)
         try:self.history_view.save_result(result)
         except Exception as exc:self.statusBar().showMessage(f"Не удалось сохранить расчёт в историю: {exc}",10000)
-    def _on_add_to_comparison(self,result):self.cmp_view.add_from_calculation(result);self.tabs.setCurrentWidget(self.cmp_view);self.statusBar().showMessage("Система добавлена в сравнение. Добавьте другие варианты и нажмите «Сравнить».",10000)
+    def _on_add_to_comparison(self,result):self.cmp_view.add_from_calculation(result);self.tabs.setCurrentWidget(self.cmp_view);self.statusBar().showMessage("Система добавлена в сравнение. Добавьте другие варианты и нажмите «Сравнить`.",10000)
     def _on_history_load(self,snapshot):
         try:self.calc_view.restore_snapshot(snapshot);self.tabs.setCurrentWidget(self.calc_view);self.statusBar().showMessage("Снимок истории восстановлен и доступен для редактирования.",10000)
         except (TypeError,ValueError,KeyError) as exc:QMessageBox.warning(self,"История",f"Не удалось восстановить снимок: {exc}")
