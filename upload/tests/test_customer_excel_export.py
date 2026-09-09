@@ -97,7 +97,7 @@ def test_customer_excel_expands_to_four_layers_and_keeps_styles(tmp_path):
     assert ws["C15"].value == "Толщина покрытия (мкм)"
     assert ws["C33"].value == "Толщина покрытия (мкм)"
     assert ws["C9"].fill.fgColor.rgb == ws["C8"].fill.fgColor.rgb
-    assert ws["C11"].fill.fgColor.rgb == ws["C10"].fill.fgColor.rgb
+    assert ws["C11"].fill.fgColor.rgb == ws["C9"].fill.fgColor.rgb
 
 
 def test_customer_excel_contains_all_layers_even_with_mixed_thinners(tmp_path):
