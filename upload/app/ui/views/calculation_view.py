@@ -2,7 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
-from PySide6.QtWidgets import QDialog,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QGroupBox,QLabel,QLineEdit,QDoubleSpinBox,QComboBox,QPushButton,QMessageBox,QTextEdit,QSplitter,QFileDialog
+from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QGroupBox,QLabel,QLineEdit,QDoubleSpinBox,QComboBox,QPushButton,QMessageBox,QTextEdit,QSplitter,QFileDialog,QDialog
 from PySide6.QtCore import Qt,Signal,QTimer
 from app.domain.models import Material,ObjectData,CoatingSystem
 from app.domain.enums import MaterialType
@@ -42,9 +42,14 @@ class CalculationView(QWidget):
         self._all_materials=[m for m in self._all_materials if m.id!=material.id]
         self._materials=[m for m in self._materials if m.id!=material.id]
         if material.material_type!=MaterialType.THINNER:
-            self._materials.append(material);self.cmb_material.addItem(material.display_name(),material);self.cmb_material.setCurrentIndex(self.cmb_material.count()-1)
+            self._all_materials.append(material)
+            self._materials.append(material)
+            self.cmb_material.addItem(material.display_name(),material)
+            self.cmb_material.setCurrentIndex(self.cmb_material.count()-1)
+            default_dft=material.recommended_dft_min if material.recommended_dft_min is not None and material.recommended_dft_min>0 else 100
+            self.layer_table.add_layer(LayerInput(material=material,target_dft=default_dft,losses_percent=0,thinner_percent=0))
         self.material_added.emit(material)
-        self.status_message(f"Материал «{material.display_name()}» сохранён в БД и добавлен в текущий расчёт")
+        self.status_message(f"Материал «{material.display_name()}» сохранён в БД и автоматически добавлен в текущий расчёт")
     def set_systems(self,systems:list[CoatingSystem]):self._systems=list(systems or []);self._refresh_systems()
     def _refresh_systems(self):
         if not hasattr(self,'cmb_system'):return
