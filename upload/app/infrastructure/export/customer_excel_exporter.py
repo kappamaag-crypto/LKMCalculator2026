@@ -240,6 +240,19 @@ class CustomerExcelExporter(ExcelExporter):
             self._write_thinner_row(ws, thinner_start + i, layer)
         self._write_totals(ws, total_row, result)
 
+    @staticmethod
+    def _configure_print_layout(ws, total_row: int) -> None:
+        """Make the dynamic customer table deterministic for printing/PDF conversion."""
+        ws.print_area = f"B1:R{total_row}"
+        ws.print_title_rows = "1:6"
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.page_margins.left = 0.25
+        ws.page_margins.right = 0.25
+        ws.page_margins.top = 0.4
+        ws.page_margins.bottom = 0.4
+
     def _write_metadata(self, ws, result) -> None:
         obj = result.object_data
         ws.cell(1, 2).value = "Расчёт системы АКЗ"
@@ -269,7 +282,9 @@ class CustomerExcelExporter(ExcelExporter):
             return super().export_calculation(result, path, recommendation)
 
         extra = max(len(result.layers) - 2, 0)
+        total_row = 11 + 2 * extra
         self._write_metadata(ws, result)
-        self._write_block(ws, result, 7, 9 + extra, 11 + 2 * extra)
+        self._write_block(ws, result, 7, 9 + extra, total_row)
+        self._configure_print_layout(ws, total_row)
         wb.save(path)
         return path
