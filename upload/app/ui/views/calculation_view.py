@@ -11,6 +11,7 @@ from app.services.calculation_service import CalculationService
 from app.services.snapshot_service import material_from_snapshot, thinner_from_snapshot
 from app.services.snapshot_utils import snapshot_number
 from app.ui.widgets.layer_table import LayerTableWidget
+from app.ui.dialogs.ad_hoc_material_dialog import AdHocMaterialDialog
 from app.infrastructure.export.customer_excel_exporter import CustomerExcelExporter
 from app.infrastructure.export.pdf_exporter import PDFExporter
 from app.config import AppSettings
@@ -24,15 +25,19 @@ class CalculationView(QWidget):
         left=QWidget();ll=QVBoxLayout(left);b=QGroupBox("Объект");f=QFormLayout(b);self.ed_object=QLineEdit();self.ed_customer=QLineEdit();self.ed_project=QLineEdit();self.ed_calc_number=QLineEdit();self.ed_system_name=QLineEdit();self.ed_system_name.setPlaceholderText("Название системы");self.spin_area=QDoubleSpinBox();self.spin_area.setRange(0.01,1000000);self.spin_area.setValue(1);self.spin_area.setDecimals(2);self.spin_area.setSuffix(" м²")
         f.addRow("Объект:",self.ed_object);f.addRow("Заказчик:",self.ed_customer);f.addRow("Проект:",self.ed_project);f.addRow("№ расчёта:",self.ed_calc_number);f.addRow("Система:",self.ed_system_name);f.addRow("Площадь:",self.spin_area);self.spin_area.valueChanged.connect(self._on_area_changed)
         sysbox=QGroupBox("Сохранённая система");sf=QVBoxLayout(sysbox);self.cmb_system=QComboBox();self.cmb_system.addItem("— выбрать систему из базы —",None);self.btn_load_system=QPushButton("Загрузить систему в расчёт");self.btn_load_system.clicked.connect(self._on_load_saved_system);sf.addWidget(self.cmb_system);sf.addWidget(self.btn_load_system);ll.addWidget(b);ll.addWidget(sysbox);ll.addStretch();sp.addWidget(left)
-        right=QWidget();rl=QVBoxLayout(right);lb=QGroupBox("Слои системы");al=QVBoxLayout(lb);row=QHBoxLayout();self.cmb_material=QComboBox();self.cmb_material.setMinimumWidth(240);add=QPushButton("Добавить слой");add.clicked.connect(self._on_add_layer);rem=QPushButton("Удалить");rem.setProperty("secondary",True);rem.clicked.connect(self._on_remove_layer);clr=QPushButton("Очистить");clr.setProperty("secondary",True);clr.clicked.connect(self._on_clear_layers)
-        for x in (QLabel("Материал:"),self.cmb_material,add,rem,clr):row.addWidget(x)
-        row.addStretch();al.addLayout(row);h=QLabel("После добавления параметры DFT, потери, разбавитель и цена редактируются непосредственно в строке. Результаты обновляются автоматически.");h.setWordWrap(True);h.setProperty("subheading",True);al.addWidget(h);self.layer_table=LayerTableWidget();self.layer_table.layer_changed.connect(self._schedule_live_recalculate);al.addWidget(self.layer_table);rl.addWidget(lb)
+        right=QWidget();rl=QVBoxLayout(right);lb=QGroupBox("Слои системы");al=QVBoxLayout(lb);row=QHBoxLayout();self.cmb_material=QComboBox();self.cmb_material.setMinimumWidth(240);add=QPushButton("Добавить слой");add.clicked.connect(self._on_add_layer);add_material=QPushButton("+ Материал");add_material.setToolTip("Добавить временный материал прямо в текущий расчёт");add_material.clicked.connect(self._on_add_material);rem=QPushButton("Удалить");rem.setProperty("secondary",True);rem.clicked.connect(self._on_remove_layer);clr=QPushButton("Очистить");clr.setProperty("secondary",True);clr.clicked.connect(self._on_clear_layers)
+        for x in (QLabel("Материал:"),self.cmb_material,add,add_material,rem,clr):row.addWidget(x)
+        row.addStretch();al.addLayout(row);h=QLabel("Материал можно выбрать из базы или добавить прямо здесь. После добавления параметры DFT, потери, разбавитель и цена редактируются непосредственно в строке. Результаты обновляются автоматически.");h.setWordWrap(True);h.setProperty("subheading",True);al.addWidget(h);self.layer_table=LayerTableWidget();self.layer_table.layer_changed.connect(self._schedule_live_recalculate);al.addWidget(self.layer_table);rl.addWidget(lb)
         buttons=QHBoxLayout();self.btn_calc=QPushButton("Рассчитать");self.btn_calc.clicked.connect(self._on_calculate);self.btn_demo=QPushButton("Демо-система");self.btn_demo.setProperty("secondary",True);self.btn_demo.clicked.connect(self._on_load_demo);self.btn_excel=QPushButton("Excel");self.btn_excel.setProperty("secondary",True);self.btn_excel.clicked.connect(self._on_export_excel);self.btn_excel.setEnabled(False);self.btn_pdf=QPushButton("PDF");self.btn_pdf.setProperty("secondary",True);self.btn_pdf.clicked.connect(self._on_export_pdf);self.btn_pdf.setEnabled(False);self.btn_to_cmp=QPushButton("Добавить в сравнение");self.btn_to_cmp.setProperty("secondary",True);self.btn_to_cmp.clicked.connect(self._on_to_comparison);self.btn_to_cmp.setEnabled(False)
         for x in (self.btn_calc,self.btn_demo,self.btn_excel,self.btn_pdf,self.btn_to_cmp):buttons.addWidget(x)
         buttons.addStretch();rl.addLayout(buttons);rb=QGroupBox("Результат");rr=QVBoxLayout(rb);self.lbl_summary=QLabel("Выполните расчёт");self.lbl_summary.setProperty("subheading",True);self.lbl_summary.setWordWrap(True);self.txt_details=QTextEdit();self.txt_details.setReadOnly(True);self.txt_details.setMaximumHeight(210);rr.addWidget(self.lbl_summary);rr.addWidget(self.txt_details);rl.addWidget(rb);sp.addWidget(right);sp.setStretchFactor(0,1);sp.setStretchFactor(1,2);root.addWidget(sp)
     def _on_area_changed(self):self._area_unknown=False;self._schedule_live_recalculate()
     def set_materials(self,materials:list):
         self._all_materials=list(materials);self._materials=[m for m in materials if m.material_type!=MaterialType.THINNER];self.cmb_material.clear();[self.cmb_material.addItem(m.display_name(),m) for m in self._materials];self._refresh_systems()
+    def _on_add_material(self):
+        dialog=AdHocMaterialDialog(self)
+        if dialog.exec()!=dialog.Accepted:return
+        material=dialog.material();self._all_materials.append(material);self._materials.append(material);self.cmb_material.addItem(material.display_name(),material);self.cmb_material.setCurrentIndex(self.cmb_material.count()-1);self.status_message(f"Материал «{material.display_name()}» добавлен только в текущий расчёт")
     def set_systems(self,systems:list[CoatingSystem]):self._systems=list(systems or []);self._refresh_systems()
     def _refresh_systems(self):
         if not hasattr(self,'cmb_system'):return
@@ -52,8 +57,7 @@ class CalculationView(QWidget):
             target=ld.target_dft if ld.target_dft is not None else ld.dft_min
             if target is None:missing.append(f"DFT слоя №{ld.layer_number}");continue
             thinner=None
-            if ld.thinner_material_id:
-                thinner=next((m for m in self._all_materials if m.id==ld.thinner_material_id),None)
+            if ld.thinner_material_id:thinner=next((m for m in self._all_materials if m.id==ld.thinner_material_id),None)
             layers.append(LayerInput(material=material,target_dft=target,losses_percent=ld.losses_percent or 0,thinner_percent=ld.thinner_percent or 0,thinner=thinner,thinner_basis=ld.thinner_basis))
         if not layers:QMessageBox.warning(self,"Система","В выбранной системе нет пригодных для расчёта слоёв");return
         self._timer.stop();self.layer_table.clear_layers();[self.layer_table.add_layer(x) for x in layers];self.ed_system_name.setText(system.system_name);self._restored_system_name=system.system_name;self._last_result=None;[b.setEnabled(False) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)]
@@ -92,7 +96,7 @@ class CalculationView(QWidget):
         except (ValueError,TypeError) as e:self.lbl_summary.setText(f"Ошибка расчёта: {e}");self.txt_details.clear();return False
         if validation.has_errors:
             msg="\n".join(f"• {e.message}" for e in validation.errors);self.lbl_summary.setText("Расчёт требует исправления входных данных");self.txt_details.setPlainText(msg);[b.setEnabled(False) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)];return False
-        self._last_result=result;thinner_l=sum(lr.thinner_consumption_l for lr in result.layers);thinner_kg=sum(lr.thinner_consumption_kg for lr in result.layers);area=result.object_data.area_m2;object_paint_l=result.total_practical_consumption_l*area;object_paint_kg=result.total_practical_consumption_kg*area;self.layer_table.set_layers(layers,result.layers);self.lbl_summary.setText(f"Толщина: {result.total_dft:.0f} мкм | ЛКМ: {result.total_practical_consumption_l:.4f} л/м² / {result.total_practical_consumption_kg:.3f} кг/м² | На объект: {object_paint_l:.2f} л / {object_paint_kg:.2f} кг | Стоимость: {self._money(result.total_cost_per_m2)} руб/м² | Объект: {self._money(result.total_cost,0)} руб");self.txt_details.setPlainText(self.service.format_summary(result));[b.setEnabled(True) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)];
+        self._last_result=result;area=result.object_data.area_m2;object_paint_l=result.total_practical_consumption_l*area;object_paint_kg=result.total_practical_consumption_kg*area;self.layer_table.set_layers(layers,result.layers);self.lbl_summary.setText(f"Толщина: {result.total_dft:.0f} мкм | ЛКМ: {result.total_practical_consumption_l:.4f} л/м² / {result.total_practical_consumption_kg:.3f} кг/м² | На объект: {object_paint_l:.2f} л / {object_paint_kg:.2f} кг | Стоимость: {self._money(result.total_cost_per_m2)} руб/м² | Объект: {self._money(result.total_cost,0)} руб");self.txt_details.setPlainText(self.service.format_summary(result));[b.setEnabled(True) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)]
         if notify:self.calculation_done.emit(result)
         return True
     def _on_live_recalculate(self):self._recalculate(False,False)
