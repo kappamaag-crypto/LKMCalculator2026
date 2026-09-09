@@ -32,7 +32,9 @@ def _template(path: Path) -> None:
         ws.merge_cells(rng)
     for cell in ("C7", "C8"):
         ws[cell].fill = PatternFill("solid", fgColor="FFF2CC")
-    for cell in ("C9", "C10"):
+    # Для merged-cell заливка должна находиться на top-left anchor: именно
+    # это сохраняется в XLSX и доступно экспортеру после load_workbook().
+    for cell in ("B9", "B10"):
         ws[cell].fill = PatternFill("solid", fgColor="E2F0D9")
     wb.save(path)
 
@@ -89,8 +91,9 @@ def test_customer_excel_expands_to_four_layers_and_keeps_styles(tmp_path):
     assert [ws.cell(row, 3).value for row in range(7, 11)] == [f"Blank Слой {i}" for i in range(1, 5)]
     assert ws["C15"].value == "Толщина покрытия (мкм)"
     assert ws.max_row == 15
-    assert ws["C9"].fill.fgColor.rgb == ws["C8"].fill.fgColor.rgb
+    assert ws["C9"].fill.fgColor.rgb == "00FFF2CC"
     assert ws["B11"].fill.fgColor.rgb == "00E2F0D9"
+    assert ws["B12"].fill.fgColor.rgb == "00E2F0D9"
     assert "B11:E11" in {str(rng) for rng in ws.merged_cells.ranges}
 
 
