@@ -41,15 +41,11 @@ class LayerCalculator:
         if material.density is None or material.density <= 0:
             raise ValueError(f"Плотность материала «{material.material_name}» неизвестна или некорректна.")
 
-        # DFT/WFT и теоретический расход требуют именно объёмной доли сухого остатка.
-        # Массовый сухой остаток нельзя молча трактовать как объёмный: это даёт
-        # систематическую ошибку в инженерном расчёте.
         solids = material.solids_by_volume_percent
-        if solids is None or solids <= 0:
+        if solids is None or solids <= 0 or solids > 100:
             raise ValueError(
-                f"Объёмный сухой остаток материала «{material.material_name}» "
-                "неизвестен или некорректен. Для расчёта DFT/WFT требуется "
-                "solids_by_volume_percent."
+                f"Объёмный сухой остаток материала «{material.material_name}» неизвестен или некорректен. "
+                "Для расчёта DFT/WFT требуется solids_by_volume_percent в диапазоне 0–100 %."
             )
 
         thinner_density = 1.0
@@ -68,7 +64,7 @@ class LayerCalculator:
         basis = thinner_basis or material.thinner_basis
         inp = LayerCalcInput(
             density=material.density,
-            solids_percent=solids,
+            solids_by_volume_percent=solids,
             dry_thickness=target_dft,
             losses_percent=losses_percent,
             price_per_kg=material.price_per_kg,
@@ -120,11 +116,7 @@ class SystemCalculator:
 
     @staticmethod
     def resolve_area(obj: ObjectData) -> float:
-        """Возвращает заданную пользователем площадь объекта в м².
-
-        Площадь — единственный источник масштаба расчёта. Старый режим
-        «площадь элемента × количество элементов» намеренно не поддерживается.
-        """
+        """Возвращает заданную пользователем площадь объекта в м²."""
         return obj.area_m2 if obj.area_m2 > 0 else 0.0
 
     def calculate(
@@ -168,23 +160,12 @@ class SystemCalculator:
         total_theor_l = sum(lr.theoretical_consumption_l for lr in layer_results)
         total_pract_l = sum(lr.practical_consumption_l for lr in layer_results)
 
-        all_layer_costs_known = all(
-            lr.cost_per_m2 is not None and lr.thinner_cost_per_m2 is not None
-            for lr in layer_results
-        )
-        total_cost_m2 = (
-            sum(lr.cost_per_m2 + lr.thinner_cost_per_m2 for lr in layer_results)
-            if all_layer_costs_known else None
-        )
-
+        all_layer_costs_known = all(lr.cost_per_m2 is not None and lr.thinner_cost_per_m2 is not None for lr in layer_results)
+        total_cost_m2 = sum(lr.cost_per_m2 + lr.thinner_cost_per_m2 for lr in layer_results) if all_layer_costs_known else None
         all_total_costs_known = all(lr.total_cost is not None for lr in layer_results)
         total_cost = sum(lr.total_cost for lr in layer_results) if all_total_costs_known else None
-
         all_thinner_costs_known = all(lr.thinner_cost_per_m2 is not None for lr in layer_results)
-        total_thinner_cost = (
-            sum(scale_to_area(lr.thinner_cost_per_m2, area) for lr in layer_results)
-            if all_thinner_costs_known else None
-        )
+        total_thinner_cost = sum(scale_to_area(lr.thinner_cost_per_m2, area) for lr in layer_results) if all_thinner_costs_known else None
 
         result = SystemCalculationResult(
             system=system or CoatingSystem(system_name="Пользовательская система"),
