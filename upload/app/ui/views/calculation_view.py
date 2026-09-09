@@ -17,7 +17,7 @@ from app.infrastructure.export.pdf_exporter import PDFExporter
 from app.config import AppSettings
 
 class CalculationView(QWidget):
-    calculation_done=Signal(object);add_to_comparison=Signal(object)
+    calculation_done=Signal(object);add_to_comparison=Signal(object);material_added=Signal(object)
     def __init__(self,service:CalculationService,parent=None):
         super().__init__(parent);self.service=service;self._materials=[];self._all_materials=[];self._systems=[];self._last_result=None;self._restored_system_name="";self._area_unknown=False;self._timer=QTimer(self);self._timer.setSingleShot(True);self._timer.setInterval(220);self._timer.timeout.connect(self._on_live_recalculate);self._build_ui()
     def _build_ui(self):
@@ -25,7 +25,7 @@ class CalculationView(QWidget):
         left=QWidget();ll=QVBoxLayout(left);b=QGroupBox("Объект");f=QFormLayout(b);self.ed_object=QLineEdit();self.ed_customer=QLineEdit();self.ed_project=QLineEdit();self.ed_calc_number=QLineEdit();self.ed_system_name=QLineEdit();self.ed_system_name.setPlaceholderText("Название системы");self.spin_area=QDoubleSpinBox();self.spin_area.setRange(0.01,1000000);self.spin_area.setValue(1);self.spin_area.setDecimals(2);self.spin_area.setSuffix(" м²")
         f.addRow("Объект:",self.ed_object);f.addRow("Заказчик:",self.ed_customer);f.addRow("Проект:",self.ed_project);f.addRow("№ расчёта:",self.ed_calc_number);f.addRow("Система:",self.ed_system_name);f.addRow("Площадь:",self.spin_area);self.spin_area.valueChanged.connect(self._on_area_changed)
         sysbox=QGroupBox("Сохранённая система");sf=QVBoxLayout(sysbox);self.cmb_system=QComboBox();self.cmb_system.addItem("— выбрать систему из базы —",None);self.btn_load_system=QPushButton("Загрузить систему в расчёт");self.btn_load_system.clicked.connect(self._on_load_saved_system);sf.addWidget(self.cmb_system);sf.addWidget(self.btn_load_system);ll.addWidget(b);ll.addWidget(sysbox);ll.addStretch();sp.addWidget(left)
-        right=QWidget();rl=QVBoxLayout(right);lb=QGroupBox("Слои системы");al=QVBoxLayout(lb);row=QHBoxLayout();self.cmb_material=QComboBox();self.cmb_material.setMinimumWidth(240);add=QPushButton("Добавить слой");add.clicked.connect(self._on_add_layer);add_material=QPushButton("+ Материал");add_material.setToolTip("Добавить временный материал прямо в текущий расчёт");add_material.clicked.connect(self._on_add_material);rem=QPushButton("Удалить");rem.setProperty("secondary",True);rem.clicked.connect(self._on_remove_layer);clr=QPushButton("Очистить");clr.setProperty("secondary",True);clr.clicked.connect(self._on_clear_layers)
+        right=QWidget();rl=QVBoxLayout(right);lb=QGroupBox("Слои системы");al=QVBoxLayout(lb);row=QHBoxLayout();self.cmb_material=QComboBox();self.cmb_material.setMinimumWidth(240);add=QPushButton("Добавить слой");add.clicked.connect(self._on_add_layer);add_material=QPushButton("+ Материал");add_material.setToolTip("Добавить материал прямо в текущий расчёт и сохранить его в БД");add_material.clicked.connect(self._on_add_material);rem=QPushButton("Удалить");rem.setProperty("secondary",True);rem.clicked.connect(self._on_remove_layer);clr=QPushButton("Очистить");clr.setProperty("secondary",True);clr.clicked.connect(self._on_clear_layers)
         for x in (QLabel("Материал:"),self.cmb_material,add,add_material,rem,clr):row.addWidget(x)
         row.addStretch();al.addLayout(row);h=QLabel("Материал можно выбрать из базы или добавить прямо здесь. После добавления параметры DFT, потери, разбавитель и цена редактируются непосредственно в строке. Результаты обновляются автоматически.");h.setWordWrap(True);h.setProperty("subheading",True);al.addWidget(h);self.layer_table=LayerTableWidget();self.layer_table.layer_changed.connect(self._schedule_live_recalculate);al.addWidget(self.layer_table);rl.addWidget(lb)
         buttons=QHBoxLayout();self.btn_calc=QPushButton("Рассчитать");self.btn_calc.clicked.connect(self._on_calculate);self.btn_demo=QPushButton("Демо-система");self.btn_demo.setProperty("secondary",True);self.btn_demo.clicked.connect(self._on_load_demo);self.btn_excel=QPushButton("Excel");self.btn_excel.setProperty("secondary",True);self.btn_excel.clicked.connect(self._on_export_excel);self.btn_excel.setEnabled(False);self.btn_pdf=QPushButton("PDF");self.btn_pdf.setProperty("secondary",True);self.btn_pdf.clicked.connect(self._on_export_pdf);self.btn_pdf.setEnabled(False);self.btn_to_cmp=QPushButton("Добавить в сравнение");self.btn_to_cmp.setProperty("secondary",True);self.btn_to_cmp.clicked.connect(self._on_to_comparison);self.btn_to_cmp.setEnabled(False)
@@ -37,7 +37,14 @@ class CalculationView(QWidget):
     def _on_add_material(self):
         dialog=AdHocMaterialDialog(self)
         if dialog.exec()!=dialog.Accepted:return
-        material=dialog.material();self._all_materials.append(material);self._materials.append(material);self.cmb_material.addItem(material.display_name(),material);self.cmb_material.setCurrentIndex(self.cmb_material.count()-1);self.status_message(f"Материал «{material.display_name()}» добавлен только в текущий расчёт")
+        material=dialog.material()
+        if material is None:return
+        self._all_materials=[m for m in self._all_materials if m.id!=material.id]
+        self._materials=[m for m in self._materials if m.id!=material.id]
+        if material.material_type!=MaterialType.THINNER:
+            self._materials.append(material);self.cmb_material.addItem(material.display_name(),material);self.cmb_material.setCurrentIndex(self.cmb_material.count()-1)
+        self.material_added.emit(material)
+        self.status_message(f"Материал «{material.display_name()}» сохранён в БД и добавлен в текущий расчёт")
     def set_systems(self,systems:list[CoatingSystem]):self._systems=list(systems or []);self._refresh_systems()
     def _refresh_systems(self):
         if not hasattr(self,'cmb_system'):return
