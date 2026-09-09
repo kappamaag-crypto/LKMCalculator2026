@@ -25,6 +25,11 @@ class TestLayerCalculator:
         result=LayerCalculator.calculate(make_primer(),target_dft=200.0,losses_percent=0.0,area_m2=1.0)
         assert result.wft==pytest.approx(200*100/73); assert result.theoretical_coverage==pytest.approx(10*73/200); assert result.practical_consumption_kg==pytest.approx(200/10/73*1.4); assert result.cost_per_m2==pytest.approx(result.practical_consumption_kg*552.0)
 
+    def test_missing_density_blocks_engineering_calculation(self):
+        material=make_primer(); material.density=None
+        with pytest.raises(ValueError,match="Плотность материала"):
+            LayerCalculator.calculate(material,target_dft=200.0,area_m2=1.0)
+
     def test_missing_volume_solids_blocks_engineering_calculation(self):
         material=make_primer(); material.solids_by_volume_percent=None
         with pytest.raises(ValueError,match="solids_by_volume_percent"):
@@ -35,6 +40,13 @@ class TestLayerCalculator:
         assert result.total_consumption_kg==pytest.approx(result.practical_consumption_kg*100)
         assert result.total_consumption_l==pytest.approx(result.practical_consumption_l*100)
         assert result.total_cost==pytest.approx(result.cost_per_m2*100)
+
+    def test_with_area_scales_thinner_separately(self):
+        result=LayerCalculator.calculate(make_primer(),target_dft=200.0,thinner_percent=5.0,thinner=make_thinner(),area_m2=100.0)
+        assert result.total_consumption_l==pytest.approx(result.practical_consumption_l*100)
+        assert result.thinner_consumption_l==pytest.approx(result.practical_consumption_l*0.05)
+        assert result.thinner_consumption_kg==pytest.approx(result.thinner_consumption_l*0.9)
+        assert result.total_cost==pytest.approx((result.cost_per_m2+result.thinner_cost_per_m2)*100)
 
     def test_consumption_only_no_procurement_fields(self):
         result=LayerCalculator.calculate(make_primer(),target_dft=200.0,area_m2=1000.0)
