@@ -46,6 +46,18 @@ def test_snapshot_contains_thinner_information():
         with session_scope(sf) as session:
             calc=HistoryService(session).get_calculation(calc_id); layer=json.loads(calc.snapshot_json)["layers"][0]; assert layer["thinner_name"]=="Разбавитель Test"; assert layer["thinner_density"]==0.9; assert layer["thinner_price_per_kg"] is None; assert layer["thinner_percent"]==10; assert layer["thinner_consumption_l"]>0
 
+def test_unknown_area_is_preserved_as_null(sample_result):
+    sample_result.object_data.area_m2 = None
+    with tempfile.TemporaryDirectory() as tmp:
+        db=Path(tmp)/"unknown_area.sqlite"; engine=get_engine(db); init_db(engine); sf=get_session_factory(engine)
+        with session_scope(sf) as session:
+            calc_id=HistoryService(session).save_calculation(sample_result)
+            calc=HistoryService(session).get_calculation(calc_id)
+            assert calc is not None
+            assert calc.area_m2 is None
+            snapshot=json.loads(calc.snapshot_json)
+            assert snapshot["object"]["area_m2"] is None
+
 def test_delete(sample_result):
     with tempfile.TemporaryDirectory() as tmp:
         db=Path(tmp)/"hist2.sqlite"; engine=get_engine(db); init_db(engine); sf=get_session_factory(engine)
