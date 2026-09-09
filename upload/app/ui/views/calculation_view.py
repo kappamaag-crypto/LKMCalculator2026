@@ -86,18 +86,19 @@ class CalculationView(QWidget):
             current=materials_by_id.get(item.get("material_id")) or materials_by_name.get(item.get("material_name"))
             material=material_from_snapshot(item,current)
             thinner=None
-            thinner_percent=self._snapshot_number(item.get("thinner_percent"))
+            thinner_raw=item.get("thinner_percent") if "thinner_percent" in item else 0
+            thinner_percent=self._snapshot_number(thinner_raw)
             if thinner_percent is not None and thinner_percent>0:
                 current_thinner=materials_by_id.get(item.get("thinner_id")) or materials_by_name.get(item.get("thinner_name"))
                 if item.get("thinner_density") is None and current_thinner is None:
                     missing.append(str(item.get("thinner_name") or "разбавитель"));continue
                 thinner=thinner_from_snapshot(item,current_thinner)
             target_dft=self._snapshot_number(item.get("target_dft"))
-            losses_percent=self._snapshot_number(item.get("losses_percent"))
-            if losses_percent is None:losses_percent=0
+            losses_raw=item.get("losses_percent") if "losses_percent" in item else 0
+            losses_percent=self._snapshot_number(losses_raw)
             if target_dft is None:
                 missing.append(f"DFT слоя №{index} ({item.get('material_name') or 'материал не указан'})")
-            layers.append(LayerInput(material=material,target_dft=target_dft,losses_percent=losses_percent,thinner_percent=thinner_percent if thinner_percent is not None else 0,thinner=thinner,thinner_basis=item.get("thinner_basis")))
+            layers.append(LayerInput(material=material,target_dft=target_dft,losses_percent=losses_percent,thinner_percent=thinner_percent,thinner=thinner,thinner_basis=item.get("thinner_basis")))
         self.layer_table.clear_layers();[self.layer_table.add_layer(layer) for layer in layers];self._last_result=None;[b.setEnabled(False) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)]
         if not layers:raise ValueError("В снимке нет слоёв, которые удалось восстановить из сохранённых данных.")
         ok=self._recalculate(False,False)
