@@ -68,7 +68,11 @@ class SystemCalculator:
         validation = ValidationResult()
         if not skip_validation:
             layers_for_val = [(li.material, li.target_dft, li.losses_percent, li.thinner_percent) for li in layer_inputs]
-            validation = validate_before_calculation(obj, layers_for_val, self.compatibility_checker, system=system)
+            # The main calculation screen builds a lightweight system object
+            # containing metadata but not ORM/template layers. Validate the
+            # actual layer inputs; validate template layers only when present.
+            validation_system = system if system is not None and system.layers else None
+            validation = validate_before_calculation(obj, layers_for_val, self.compatibility_checker, system=validation_system)
             if validation.has_errors:
                 return SystemCalculationResult(system=system or CoatingSystem(system_name="Ошибка валидации"), object_data=obj, calculated_at=datetime.now()), validation
         area = self.resolve_area(obj)
