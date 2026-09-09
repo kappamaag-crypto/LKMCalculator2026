@@ -28,6 +28,12 @@ class CustomerExcelExporter(ExcelExporter):
             src, dst = ws.cell(source_row, col), ws.cell(target_row, col)
             if src.has_style: dst._style = copy(src._style)
             dst.number_format = src.number_format; dst.protection = copy(src.protection); dst.alignment = copy(src.alignment); dst.font = copy(src.font); dst.fill = copy(src.fill); dst.border = copy(src.border)
+    @staticmethod
+    def _restore_merged_fills(ws) -> None:
+        for merged in ws.merged_cells.ranges:
+            min_col, min_row, max_col, max_row = range_boundaries(str(merged)); source = ws.cell(min_row, min_col)
+            for row in range(min_row, max_row + 1):
+                for col in range(min_col, max_col + 1): ws.cell(row, col).fill = copy(source.fill)
     def _expand_section(self, ws, layer_start: int, thinner_start: int, total_row: int, layer_count: int) -> int:
         extra = max(layer_count - 2, 0)
         if not extra: return 0
@@ -44,10 +50,10 @@ class CustomerExcelExporter(ExcelExporter):
             ws.merge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
         for row in range(layer_start + 2, layer_start + 2 + extra): self._copy_row_style(ws, layer_start + 1, row)
         for offset in range(extra):
-            target = thinner_start + extra + offset
-            source_index = offset % 2
+            target = thinner_start + extra + offset; source_index = offset % 2
             for col, style in enumerate(thinner_styles[thinner_start + source_index], 2): ws.cell(target, col)._style = copy(style)
             ws.row_dimensions[target].height = thinner_heights[thinner_start + source_index]
+        self._restore_merged_fills(ws)
         return 2 * extra
     def _prepare_base_sheet(self, wb, layer_count: int):
         if "База" not in wb.sheetnames: return None
