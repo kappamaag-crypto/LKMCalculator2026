@@ -55,23 +55,11 @@ class CustomerExcelExporter(ExcelExporter):
             dst.fill = copy(src.fill)
             dst.border = copy(src.border)
 
-    @staticmethod
-    def _snapshot_fills(ws):
-        return {(cell.row, cell.column): copy(cell.fill) for row in ws.iter_rows() for cell in row}
-
-    @staticmethod
-    def _restore_fills(ws, snapshot) -> None:
-        for (row, col), fill in snapshot.items():
-            ws.cell(row, col).fill = copy(fill)
-
     def _expand_section(self, ws, layer_start: int, thinner_start: int, total_row: int, layer_count: int) -> int:
         extra = max(layer_count - 2, 0)
         if not extra:
             return 0
 
-        # Unmerge/merge can discard fills on former interior cells. Preserve
-        # the complete fill map before structural changes and restore it after.
-        fill_snapshot = self._snapshot_fills(ws)
         original_merges = list(ws.merged_cells.ranges)
         for merged in original_merges:
             ws.unmerge_cells(str(merged))
@@ -90,24 +78,20 @@ class CustomerExcelExporter(ExcelExporter):
                     max_row += amount
             ws.merge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
 
-        # Restore fills for the unchanged cells first; then explicitly copy the
-        # template's layer/thinner row styles into the newly inserted rows.
-        self._restore_fills(ws, fill_snapshot)
-
+        # New layer rows inherit the layer-row style. The old thinner rows have
+        # shifted down by ``extra`` rows, so preserve their original styles by
+        # copying from the corresponding newly expanded layer-row positions.
         for row in range(layer_start + 2, layer_start + 2 + extra):
             self._copy_row_style(ws, layer_start + 1, row)
         new_thinner_start = thinner_start + extra
         for row in range(new_thinner_start + 2, new_thinner_start + 2 + extra):
             self._copy_row_style(ws, new_thinner_start + 1, row)
 
-        # The rows that were shifted out of the merged area must retain their
-        # original fills as well (notably the thinner rows in the 4-layer case).
         for offset in range(extra):
-            old_row = thinner_start + offset
-            new_row = thinner_start + extra + offset
-            if old_row in range(1, ws.max_row + 1) and new_row in range(1, ws.max_row + 1):
-                for col in range(2, 19):
-                    ws.cell(new_row, col).fill = copy(ws.cell(old_row, col).fill)
+            source_row = layer_start + 2 + offset
+            shifted_thinner_row = thinner_start + extra + offset
+            for col in range(2, 19):
+                ws.cell(shifted_thinner_row, col).fill = copy(ws.cell(source_row, col).fill)
 
         return 2 * extra
 
