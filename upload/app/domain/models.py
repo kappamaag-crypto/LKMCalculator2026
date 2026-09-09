@@ -79,7 +79,9 @@ class LayerDefinition:
     layer_type: MaterialType = MaterialType.OTHER
     dft_min: Optional[float] = None
     dft_max: Optional[float] = None
-    target_dft: float = 0.0
+    # None означает «DFT не задан», 0 — это уже явно заданное нулевое значение.
+    target_dft: Optional[float] = None
+    # 0 % разбавления — валидное значение «без разбавления», поэтому не трактуется как UNKNOWN.
     thinner_percent: float = 0.0
     thinner_material_id: Optional[int] = None
     thinner_basis: Optional[str] = None
@@ -145,7 +147,8 @@ class ObjectData:
     customer: str = ""
     project: str = ""
     calculation_number: str = ""
-    area_m2: float = 0.0
+    # None означает «площадь не задана»; положительное значение — реальная площадь расчёта.
+    area_m2: Optional[float] = None
     structure_type: str = ""
     substrate: str = ""
     application_method: Optional[ApplicationMethod] = None
