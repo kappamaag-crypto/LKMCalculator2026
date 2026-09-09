@@ -36,7 +36,7 @@ class CalculationView(QWidget):
         self._all_materials=list(materials);self._materials=[m for m in materials if m.material_type!=MaterialType.THINNER];self.cmb_material.clear();[self.cmb_material.addItem(m.display_name(),m) for m in self._materials];self._refresh_systems()
     def _on_add_material(self):
         dialog=AdHocMaterialDialog(self)
-        if dialog.exec()!=dialog.Accepted:return
+        if dialog.exec()!=QDialog.Accepted:return
         material=dialog.material()
         if material is None:return
         self._all_materials=[m for m in self._all_materials if m.id!=material.id]
