@@ -18,6 +18,7 @@ class ComparisonEngine:
         comparison=ComparisonResult(object_data=obj,systems=results,created_at=datetime.now()); self._annotate(comparison); return comparison
     def compare_results(self,obj:ObjectData,results:Sequence[SystemCalculationResult])->ComparisonResult:
         if len(results)<2: raise ValueError("Для сравнения требуется не менее 2 систем")
+        if len(results)>10: raise ValueError("Максимум 10 систем для сравнения")
         comparison=ComparisonResult(object_data=obj,systems=list(results),created_at=datetime.now()); self._annotate(comparison); return comparison
     def _annotate(self,comparison:ComparisonResult)->None:
         systems=comparison.systems
