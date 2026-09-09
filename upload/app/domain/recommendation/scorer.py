@@ -139,8 +139,10 @@ def _score_technology(system: CoatingSystem) -> tuple[float, str]:
 
 
 def _score_cost(calc: Optional[SystemCalculationResult], all_costs: Sequence[float]) -> tuple[float, str]:
-    if calc is None or not all_costs:
+    if calc is None or calc.total_cost_per_m2 is None:
         return 50.0, "Стоимость не рассчитана"
+    if not all_costs:
+        return 50.0, f"Стоимость {calc.total_cost_per_m2:.1f} руб/м² (сравнение недоступно)"
     cost = calc.total_cost_per_m2
     min_c = min(all_costs)
     max_c = max(all_costs)
