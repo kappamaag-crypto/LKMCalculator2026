@@ -4,7 +4,9 @@ import pytest
 from app.domain.models import Material,ObjectData,CoatingSystem,LayerDefinition
 from app.domain.enums import MaterialType,BinderType
 from app.domain.calculator import LayerCalculator,SystemCalculator,LayerInput
-from app.domain.formulas import DILUTION_BASIS_BY_PAINT_VOLUME,DILUTION_BASIS_BY_MASS,calculate_cost_by_price,calculate_wft_with_dilution
+from app.domain.formulas import (DILUTION_BASIS_BY_PAINT_VOLUME,DILUTION_BASIS_BY_MIX_VOLUME,
+    DILUTION_BASIS_BY_MASS,DILUTION_BASIS_BY_COMPONENT_VOLUME,calculate_cost_by_price,
+    calculate_wft_with_dilution,calculate_loss_coefficient)
 from app.domain.validation import validate_layer_input,validate_object_data,validate_before_calculation
 
 def make_primer()->Material:
@@ -41,7 +43,19 @@ class TestLayerCalculator:
     def test_inconsistent_kg_and_liter_prices_are_rejected(self):
         with pytest.raises(ValueError,match="Цена за литр"): calculate_cost_by_price(.1,.14,552,900,density=1.4)
     def test_dilution_basis_paint_volume(self): assert calculate_wft_with_dilution(200,73,10,.9,1.4,DILUTION_BASIS_BY_PAINT_VOLUME)==pytest.approx((200*100/73)*1.1)
+    def test_dilution_basis_component_volume_matches_paint_volume(self): assert calculate_wft_with_dilution(200,73,10,.9,1.4,DILUTION_BASIS_BY_COMPONENT_VOLUME)==pytest.approx((200*100/73)*1.1)
+    def test_dilution_basis_mix_volume_uses_final_mix_fraction(self): assert calculate_wft_with_dilution(200,73,10,.9,1.4,DILUTION_BASIS_BY_MIX_VOLUME)==pytest.approx((200*100/73)/(1-.1))
     def test_dilution_basis_mass_uses_density_conversion(self): assert calculate_wft_with_dilution(200,73,10,.9,1.4,DILUTION_BASIS_BY_MASS)==pytest.approx((200*100/73)*(1+.1*1.4/.9))
+    def test_loss_coefficient_rejects_invalid_values(self):
+        with pytest.raises(ValueError): calculate_loss_coefficient(-0.01)
+        with pytest.raises(ValueError): calculate_loss_coefficient(100)
+        with pytest.raises(ValueError): calculate_loss_coefficient(100.0)
+    def test_negative_dft_rejected_by_formula(self):
+        with pytest.raises(ValueError,match="Толщина сухого слоя"): LayerCalculator.calculate(make_primer(),-1)
+    def test_zero_dft_has_zero_physical_consumption(self):
+        r=LayerCalculator.calculate(make_primer(),0); assert r.wft==0 and r.practical_consumption_l==0 and r.practical_consumption_kg==0 and r.cost_per_m2==0
+    def test_invalid_dilution_rejected_even_with_zero_dft(self):
+        with pytest.raises(ValueError,match="Процент разбавления"): calculate_wft_with_dilution(0,73,100)
 class TestSystemCalculator:
     def test_two_layer_system(self):
         obj=ObjectData(area_m2=100); result,v=SystemCalculator().calculate(obj,[LayerInput(make_primer(),200),LayerInput(make_finish(),100)]); assert not v.has_errors and result.total_dft==300 and result.total_cost_per_m2>0
