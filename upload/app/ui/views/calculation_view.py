@@ -49,6 +49,12 @@ class CalculationView(QWidget):
         if self.layer_table.rowCount():self._timer.start()
     @staticmethod
     def _money(v,dec=2):return "—" if v is None else f"{v:,.{dec}f}".replace(","," ")
+    @staticmethod
+    def _snapshot_number(value):
+        """Convert a snapshot numeric field without turning UNKNOWN/None into zero."""
+        if value is None:return None
+        try:return float(value)
+        except (TypeError,ValueError):return None
     def _recalculate(self,dialogs=False,notify=False):
         layers=self.layer_table.get_layer_inputs()
         if not layers:
@@ -74,23 +80,28 @@ class CalculationView(QWidget):
     def restore_snapshot(self,snapshot:dict)->bool:
         if not isinstance(snapshot,dict):raise ValueError("Некорректный формат снимка истории")
         obj=snapshot.get("object") or {};self._timer.stop();self.ed_object.setText(str(obj.get("object_name") or ""));self.ed_customer.setText(str(obj.get("customer") or ""));self.ed_project.setText(str(obj.get("project") or ""));self.ed_calc_number.setText(str(obj.get("calculation_number") or ""))
-        try:self.spin_area.setValue(float(obj.get("area_m2") or 0))
-        except (TypeError,ValueError):self.spin_area.setValue(0)
+        area=self._snapshot_number(obj.get("area_m2"));self.spin_area.setValue(area if area is not None and area>=0 else 0)
         self._restored_system_name=str(snapshot.get("system_name") or "Пользовательская система");materials_by_id={m.id:m for m in self._all_materials if m.id is not None};materials_by_name={m.material_name:m for m in self._all_materials if m.material_name};layers=[];missing=[]
-        for item in snapshot.get("layers") or []:
+        for index,item in enumerate(snapshot.get("layers") or [],1):
             current=materials_by_id.get(item.get("material_id")) or materials_by_name.get(item.get("material_name"))
             material=material_from_snapshot(item,current)
             thinner=None
-            if float(item.get("thinner_percent") or 0)>0:
+            thinner_percent=self._snapshot_number(item.get("thinner_percent"))
+            if thinner_percent is not None and thinner_percent>0:
                 current_thinner=materials_by_id.get(item.get("thinner_id")) or materials_by_name.get(item.get("thinner_name"))
                 if item.get("thinner_density") is None and current_thinner is None:
                     missing.append(str(item.get("thinner_name") or "разбавитель"));continue
                 thinner=thinner_from_snapshot(item,current_thinner)
-            layers.append(LayerInput(material=material,target_dft=float(item.get("target_dft") or 0),losses_percent=float(item.get("losses_percent") or 0),thinner_percent=float(item.get("thinner_percent") or 0),thinner=thinner,thinner_basis=item.get("thinner_basis")))
+            target_dft=self._snapshot_number(item.get("target_dft"))
+            losses_percent=self._snapshot_number(item.get("losses_percent"))
+            if losses_percent is None:losses_percent=0
+            if target_dft is None:
+                missing.append(f"DFT слоя №{index} ({item.get('material_name') or 'материал не указан'})")
+            layers.append(LayerInput(material=material,target_dft=target_dft,losses_percent=losses_percent,thinner_percent=thinner_percent if thinner_percent is not None else 0,thinner=thinner,thinner_basis=item.get("thinner_basis")))
         self.layer_table.clear_layers();[self.layer_table.add_layer(layer) for layer in layers];self._last_result=None;[b.setEnabled(False) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)]
         if not layers:raise ValueError("В снимке нет слоёв, которые удалось восстановить из сохранённых данных.")
         ok=self._recalculate(False,False)
-        if missing:QMessageBox.warning(self,"История","Не удалось восстановить разбавитель: "+", ".join(missing))
+        if missing:QMessageBox.warning(self,"История","Не удалось полностью восстановить данные: "+", ".join(missing))
         return ok
     def _default_export_name(self,ext):
         name=self._last_result.object_data.object_name.strip() if self._last_result else "Расчёт_ЛКМ_АКЗ"
