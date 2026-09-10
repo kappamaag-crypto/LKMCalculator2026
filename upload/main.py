@@ -15,6 +15,7 @@ from app.config import ensure_directories
 from app.infrastructure.logging_setup import setup_logging
 from app.infrastructure.database.engine import init_db, get_session_factory
 from app.infrastructure.database.seed import run_seed
+from app.services.notification_worker import NotificationWorker
 
 
 def main() -> None:
@@ -27,6 +28,9 @@ def main() -> None:
     session_factory = get_session_factory()
     with session_factory() as session:
         run_seed(session)
+        # Worker одноразовый и opt-in: обычный запуск приложения не требует
+        # SMTP и не создаёт фонового daemon/thread.
+        NotificationWorker.run_once(session)
 
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import Qt
