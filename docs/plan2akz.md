@@ -44,9 +44,8 @@ Precision/regression покрывает отсутствие промежуто�
 - из последнего успешного расчёта можно создать несохранённый черновик системы с тем же составом, DFT и разбавлением, после чего проверить/отредактировать и сохранить его в БД;
 - расчёт передаётся в редактор системы через `SystemCalculationResult`, без повторного расчёта и без изменения расчётного движка.
 
-Коммиты текущего этапа:
+Подтверждённые коммиты текущего этапа:
 - `c00299d766147607c2226a07183254dd3958957c` — safe drag-reorder слоёв на экране расчёта;
-- `dcdebf1ad8cd6cd150e0792398bdbca0bbb68e6` — кнопки ↑/↓ в редакторе сохранённых систем;
 - `6f16fd66553bb6237314c1ca2088af16e236fa37` — создание черновика системы из последнего расчёта;
 - `7e80e9fea4c0ce7518917a5f105781383bdc0d58` — передача последнего `SystemCalculationResult` в редактор систем.
 
@@ -143,7 +142,7 @@ PDF строится из `SystemCalculationResult`, поддерживает 2/
 
 Коммиты:
 - `8598365345d000c884978642cde4e916c0fbf7a0` — `test: strengthen precision and unit invariants`;
-- `5662a6f39c6e2312ee30f8bc236a25a0f8bc7` — `test: add independent multilayer system golden cases`.
+- `5662a6f39c6e2312ee30f8bc236a25d8d3c339e9` — `test: add independent multilayer system golden cases`.
 
 CI:
 - `34439245472` — **success**;
