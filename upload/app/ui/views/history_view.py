@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Optional
 
 from PySide6.QtWidgets import (
@@ -171,19 +170,16 @@ class HistoryView(QWidget):
         try:
             sf = self._get_session_factory()
             with session_scope(sf) as session:
-                calc = HistoryService(session).get_calculation(calc_id)
-                if not calc or not calc.snapshot_json:
-                    QMessageBox.warning(self, "История", "Снимок отсутствует")
-                    return
-                snapshot = json.loads(calc.snapshot_json)
+                service = HistoryService(session)
+                snapshot = service.get_calculation_snapshot(calc_id)
                 self.load_requested.emit(snapshot)
-                QMessageBox.information(self, "История", "Снимок загружен в форму расчёта.")
-        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            QMessageBox.information(self, "История", "Проверенный снимок загружен в форму расчёта.")
+        except (KeyError, ValueError) as e:
             QMessageBox.critical(self, "Ошибка снимка", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", str(e))
 
-    def save_result(self, result) -> None:
+    def save_result(self, result) -> Optional[int]:
         try:
             sf = self._get_session_factory()
             with session_scope(sf) as session:
