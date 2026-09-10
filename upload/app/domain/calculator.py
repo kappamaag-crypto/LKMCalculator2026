@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional, Sequence, Callable
 from app.domain.models import Material, LayerResult, CoatingSystem, ObjectData, SystemCalculationResult
 from app.domain.normative import NormativeModel
+from app.domain.engineering_context import EngineeringContext
 from app.domain.formulas import LayerCalcInput, calculate_layer, scale_to_area
 from app.domain.validation import ValidationResult, validate_before_calculation
 
@@ -66,26 +67,30 @@ class SystemCalculator:
         return obj.area_m2 if obj.area_m2 > 0 else 0.0
 
     @staticmethod
-    def _attach_engineering_context(result: SystemCalculationResult, normative_model: NormativeModel | None) -> SystemCalculationResult:
-        """Attach an explicitly supplied normative model without inventing defaults."""
-        result.normative_model = normative_model
-        return result
+    def _resolve_engineering_context(
+        normative_model: NormativeModel | None,
+        engineering_context: EngineeringContext | None,
+    ) -> EngineeringContext:
+        """Normalize legacy normative_model input into the typed context object."""
+        if normative_model is not None and engineering_context is not None:
+            raise ValueError("Передайте либо normative_model, либо engineering_context, но не оба сразу.")
+        if engineering_context is not None:
+            return engineering_context
+        return EngineeringContext(normative_model=normative_model)
 
-    def calculate(self, obj: ObjectData, layer_inputs: Sequence[LayerInput], system: Optional[CoatingSystem] = None, skip_validation: bool = False, normative_model: NormativeModel | None = None) -> tuple[SystemCalculationResult, ValidationResult]:
+    def calculate(self, obj: ObjectData, layer_inputs: Sequence[LayerInput], system: Optional[CoatingSystem] = None, skip_validation: bool = False, normative_model: NormativeModel | None = None, engineering_context: EngineeringContext | None = None) -> tuple[SystemCalculationResult, ValidationResult]:
+        context = self._resolve_engineering_context(normative_model, engineering_context)
         validation = ValidationResult()
         if not skip_validation:
             layers_for_val = [(li.material, li.target_dft, li.losses_percent, li.thinner_percent) for li in layer_inputs]
-            # The main calculation screen builds a lightweight system object
-            # containing metadata but not ORM/template layers. Validate the
-            # actual layer inputs; validate template layers only when present.
             validation_system = system if system is not None and system.layers else None
             validation = validate_before_calculation(obj, layers_for_val, self.compatibility_checker, system=validation_system)
             if validation.has_errors:
-                return self._attach_engineering_context(SystemCalculationResult(system=system or CoatingSystem(system_name="Ошибка валидации"), object_data=obj, calculated_at=datetime.now()), normative_model), validation
+                return SystemCalculationResult(system=system or CoatingSystem(system_name="Ошибка валидации"), object_data=obj, calculated_at=datetime.now(), engineering_context=context), validation
         area = self.resolve_area(obj)
         if area <= 0:
             validation.add_error("OBJ_AREA_REQUIRED", "Для расчёта системы укажите площадь объекта больше нуля (например, 1 м² для расчёта на единицу площади).", "area_m2")
-            return self._attach_engineering_context(SystemCalculationResult(system=system or CoatingSystem(system_name="Ошибка валидации"), object_data=obj, calculated_at=datetime.now()), normative_model), validation
+            return SystemCalculationResult(system=system or CoatingSystem(system_name="Ошибка валидации"), object_data=obj, calculated_at=datetime.now(), engineering_context=context), validation
         layer_results = [LayerCalculator.calculate(li.material, li.target_dft, li.losses_percent if li.losses_percent is not None else self.default_losses, li.thinner_percent, li.thinner, area, li.thinner_basis) for li in layer_inputs]
         total_dft = sum(lr.target_dft for lr in layer_results)
         total_theor_kg = sum(lr.theoretical_consumption_kg for lr in layer_results)
@@ -98,10 +103,9 @@ class SystemCalculator:
         total_cost = sum(lr.total_cost for lr in layer_results) if all_total_costs_known else None
         all_thinner_costs_known = all(lr.thinner_cost_per_m2 is not None for lr in layer_results)
         total_thinner_cost = sum(scale_to_area(lr.thinner_cost_per_m2, area) for lr in layer_results) if all_thinner_costs_known else None
-        result = SystemCalculationResult(system=system or CoatingSystem(system_name="Пользовательская система"),object_data=obj,layers=layer_results,total_dft=total_dft,total_theoretical_consumption_kg=total_theor_kg,total_practical_consumption_kg=total_pract_kg,total_theoretical_consumption_l=total_theor_l,total_practical_consumption_l=total_pract_l,total_cost_per_m2=total_cost_m2,total_cost=total_cost,total_thinner_cost=total_thinner_cost,calculated_at=datetime.now())
-        return self._attach_engineering_context(result, normative_model), validation
+        return SystemCalculationResult(system=system or CoatingSystem(system_name="Пользовательская система"),object_data=obj,layers=layer_results,total_dft=total_dft,total_theoretical_consumption_kg=total_theor_kg,total_practical_consumption_kg=total_pract_kg,total_theoretical_consumption_l=total_theor_l,total_practical_consumption_l=total_pract_l,total_cost_per_m2=total_cost_m2,total_cost=total_cost,total_thinner_cost=total_thinner_cost,calculated_at=datetime.now(),engineering_context=context), validation
 
-    def calculate_from_system(self, obj: ObjectData, system: CoatingSystem, materials_by_id: dict[int, Material], losses_percent: float | None = None, skip_validation: bool = False, normative_model: NormativeModel | None = None) -> tuple[SystemCalculationResult, ValidationResult]:
+    def calculate_from_system(self, obj: ObjectData, system: CoatingSystem, materials_by_id: dict[int, Material], losses_percent: float | None = None, skip_validation: bool = False, normative_model: NormativeModel | None = None, engineering_context: EngineeringContext | None = None) -> tuple[SystemCalculationResult, ValidationResult]:
         layer_inputs=[]
         losses=losses_percent if losses_percent is not None else self.default_losses
         missing=[]
@@ -113,12 +117,13 @@ class SystemCalculator:
                 continue
             thinner=materials_by_id.get(ld.thinner_material_id) if ld.thinner_material_id else None
             layer_inputs.append(LayerInput(material=material,target_dft=ld.target_dft,losses_percent=losses,thinner_percent=ld.thinner_percent,thinner=thinner,thinner_basis=ld.thinner_basis))
+        context = self._resolve_engineering_context(normative_model, engineering_context)
         if missing:
             validation=ValidationResult()
             validation.add_error("SYSTEM_LAYER_MATERIAL_MISSING", f"Не загружен материал для слоя(ёв): {', '.join(map(str, missing))}.", "layers")
-            return self._attach_engineering_context(SystemCalculationResult(system=system,object_data=obj,calculated_at=datetime.now()), normative_model), validation
+            return SystemCalculationResult(system=system,object_data=obj,calculated_at=datetime.now(),engineering_context=context), validation
         if not layer_inputs:
             validation=ValidationResult()
             validation.add_error("SYSTEM_NO_LAYERS", "Система не содержит доступных слоёв для расчёта.", "layers")
-            return self._attach_engineering_context(SystemCalculationResult(system=system,object_data=obj,calculated_at=datetime.now()), normative_model), validation
-        return self.calculate(obj, layer_inputs, system=system, skip_validation=skip_validation, normative_model=normative_model)
+            return SystemCalculationResult(system=system,object_data=obj,calculated_at=datetime.now(),engineering_context=context), validation
+        return self.calculate(obj, layer_inputs, system=system, skip_validation=skip_validation, engineering_context=context)
