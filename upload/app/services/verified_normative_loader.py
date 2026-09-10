@@ -11,9 +11,9 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
-from app.domain.normative import NormativeModel, NormativeRule, NormativeSource, UNKNOWN
+from app.domain.normative import NormativeModel, NormativeRegistry, NormativeRule, NormativeSource, UNKNOWN
 
 
 class VerifiedNormativeLoadError(ValueError):
@@ -52,30 +52,6 @@ def _sha256(path: Path) -> str:
 
 def load_verified_normative_model(manifest_path: Path, repository_root: Path) -> NormativeModel:
     """Load a reviewed sidecar and verify that it still belongs to its source.
-
-    The manifest format is intentionally explicit::
-
-        {
-          "source": {
-            "document_id": "...",
-            "relative_path": "books/...pdf",
-            "sha256": "...",
-            "title": "...",
-            "revision": "..."
-          },
-          "model_id": "...",
-          "version": "...",
-          "description": "...",
-          "rules": [
-            {
-              "rule_id": "...",
-              "status": "KNOWN",
-              "value": 25,
-              "applicability": "...",
-              "notes": "..."
-            }
-          ]
-        }
 
     Values are taken verbatim from the manifest. No value is calculated,
     guessed, or extracted from PDF text by this loader.
@@ -144,3 +120,22 @@ def load_verified_normative_model(manifest_path: Path, repository_root: Path) ->
         rules=rules,
         description=str(raw.get("description", "")).strip(),
     )
+
+
+def load_verified_normative_registry(
+    manifest_paths: Iterable[Path],
+    repository_root: Path,
+    registry: NormativeRegistry | None = None,
+) -> NormativeRegistry:
+    """Load verified sidecars into one deterministic normative registry.
+
+    Each manifest is verified independently before registration. Duplicate
+    ``model_id:version`` entries are rejected instead of silently replacing an
+    already accepted model. No manifest is optional or auto-discovered: the
+    caller explicitly supplies the sidecars that are approved for the workflow.
+    """
+    target = registry if registry is not None else NormativeRegistry()
+    for manifest_path in manifest_paths:
+        model = load_verified_normative_model(manifest_path, repository_root)
+        target.register(model)
+    return target
