@@ -27,10 +27,15 @@ def test_direction_is_previous_layer_to_applied_layer():
 
 
 def test_warning_markers_are_not_treated_as_forbidden():
-    # Source marker 2: epoxy applied over vinyl-chloride requires roughening.
-    # The current BinderType cannot represent vinyl-chloride, so this pair is
-    # intentionally not guessed from the generic word "покрытие".
-    assert check_binders(BinderType.EPOXY, BinderType.EPOXY).status is CompatibilityStatus.ALLOWED
+    # Source marker 1: AC over HV requires an adhesion check.
+    rule = RULES[("hv", "ac")]
+    assert rule.status is CompatibilityStatus.WARNING
+    assert "адгезию" in rule.note
+
+    # Source marker 2: epoxy over HS requires roughening.
+    rule = RULES[("vinyl_chloride", "epoxy")]
+    assert rule.status is CompatibilityStatus.WARNING
+    assert "шероховатости" in rule.note
 
 
 def test_unmapped_current_binder_is_unknown():
