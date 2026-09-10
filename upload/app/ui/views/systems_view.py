@@ -25,6 +25,7 @@ class SystemsView(QWidget):
         self._materials = list(materials)
         self._systems = []
         self._current_id = None
+        self._calculation_result = None
         self._build_ui()
         self.set_materials(materials)
         self.reload()
@@ -42,12 +43,16 @@ class SystemsView(QWidget):
         self.list_systems.currentIndexChanged.connect(self._load_selected)
         self.btn_new = QPushButton("Новая система")
         self.btn_new.clicked.connect(self._new)
+        self.btn_from_calculation = QPushButton("Из текущего расчёта")
+        self.btn_from_calculation.setToolTip("Создать несохранённый черновик системы из последнего расчёта")
+        self.btn_from_calculation.clicked.connect(self._from_calculation)
         self.btn_reload = QPushButton("Обновить")
         self.btn_reload.setProperty("secondary", True)
         self.btn_reload.clicked.connect(self.reload)
         top.addWidget(QLabel("Система:"))
         top.addWidget(self.list_systems, 1)
         top.addWidget(self.btn_new)
+        top.addWidget(self.btn_from_calculation)
         top.addWidget(self.btn_reload)
         root.addLayout(top)
 
@@ -122,6 +127,48 @@ class SystemsView(QWidget):
         for material in self._materials:
             if self._material_type_value(material) != MaterialType.THINNER.value:
                 self.cmb_material.addItem(material.display_name(), material)
+
+    def set_calculation_result(self, result):
+        self._calculation_result = result
+        self.btn_from_calculation.setEnabled(result is not None and bool(getattr(result, "layers", None)))
+
+    def _from_calculation(self):
+        result = self._calculation_result
+        if result is None or not result.layers:
+            QMessageBox.warning(self, "Система", "Сначала выполните расчёт с хотя бы одним слоем")
+            return
+
+        system = getattr(result, "system", None)
+        self._current_id = None
+        self.list_systems.blockSignals(True)
+        self.list_systems.setCurrentIndex(0)
+        self.list_systems.blockSignals(False)
+        self.ed_name.setText((getattr(system, "system_name", "") or "Пользовательская система") + " — из расчёта")
+        self.ed_manufacturer.setText(getattr(system, "manufacturer", "") or "")
+        self.ed_description.setText(getattr(system, "description", "") or "Создано из расчёта")
+        self.ed_substrate.setText(getattr(system, "substrate", "") or "")
+        self.ed_standards.setText(getattr(system, "standards", "") or "")
+        self.ed_certificate.setText(getattr(system, "certificate", "") or "")
+
+        self.table.blockSignals(True)
+        self.table.setRowCount(0)
+        for number, layer in enumerate(result.layers, start=1):
+            self._append_row(
+                number,
+                layer.material,
+                None,
+                layer.target_dft,
+                None,
+                layer.thinner_percent,
+            )
+        self.table.blockSignals(False)
+        self.table.selectRow(0)
+        self.status_message(f"Создан черновик системы из расчёта: {len(result.layers)} слоёв. Проверьте и сохраните его.")
+
+    def status_message(self, text):
+        parent = self.window()
+        if hasattr(parent, "statusBar"):
+            parent.statusBar().showMessage(text, 10000)
 
     def reload(self):
         try:
