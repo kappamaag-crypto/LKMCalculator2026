@@ -31,8 +31,8 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance отложен из-за запрета на Actions/тесты. Необратимые downgrade требуют восстановления backup. |
 | 11 | ЧАСТИЧНО | Self-contained immutable material snapshots v5, verified reads и integrity hashing реализованы; acceptance/runtime smoke отложен. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox интегрирован с `calculation_saved`; opt-in worker/trigger, idempotency metadata и env-only SMTP реализованы. SMTP/runtime smoke и тесты отложены. |
-| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v7 реализованы. `SystemCalculationResult` типизированно содержит `EngineeringContext`; `SystemCalculator`, `CalculationService` и `CalculationView` принимают/переносят его явно. History умеет сохранять и восстанавливать typed context, включая legacy v6. Реального каталога/выбора source-backed normative model в UI пока нет; acceptance отложен. |
-| 13 | ЧАСТИЧНО | `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` + serializer и History snapshot v7 реализованы. `CalculationView` хранит/принимает typed surface context и восстанавливает его из history; legacy object surface сохраняется как fallback. Без источника assessment остаётся `UNKNOWN`. Нужны полноценный UI редактор/источник и acceptance. |
+| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v7 реализованы. `SystemCalculationResult` типизированно содержит `EngineeringContext`; `SystemCalculator`, `CalculationService` и `CalculationView` принимают/переносят его явно. History умеет сохранять и восстанавливать typed context, включая legacy v6. В UI появился явный редактор source identity нормативной базы; реальные source-backed правила по-прежнему не загружаются автоматически. Acceptance отложен. |
+| 13 | ЧАСТИЧНО | `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` + serializer и History snapshot v7 реализованы. `CalculationView` хранит/принимает typed surface context и восстанавливает его из history; legacy object surface сохраняется как fallback. В UI появился редактор подготовки/профиля и их источников. Без источника assessment остаётся `UNKNOWN`. Acceptance отложен. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; environment/technology/compatibility/explanation/weights остаются. |
@@ -88,6 +88,12 @@ Code commit: `b545603bef83dfb10b346516f9f19a7b305d8494` — `CalculationService.
 ### §12/§13 — CalculationView workflow integration
 Code commit: `98d3fe008f420067ee8db8ae30447682d5c2730d` — `CalculationView` хранит typed engineering context, передаёт его при расчёте и восстанавливает из snapshot, включая legacy v6 representation.
 
+### §12/§13 — UI source/context editor
+Code commit: `4f9175755f8e43100b80f4f43cddf58a3248ef4a` — добавлен отдельный диалог редактирования нормативного source identity, подготовки поверхности и профиля; значения не подменяются нормативными догадками.
+
+### §12/§13 — MainWindow engineering workflow
+Code commit: `cd58fa3ee2d24d3a5eeb7d1140aea3d4a231180a` — в главное окно добавлен раздел «Инженерное → Контекст НД и поверхности…», контекст передаётся в `CalculationView` и участвует в расчёте.
+
 Тесты, runtime smoke и GitHub Actions для этих этапов намеренно не запускались по указанию пользователя. Поэтому §12/§13 остаются `ЧАСТИЧНО`.
 
 ## §22 — Критическое ограничение
@@ -106,7 +112,7 @@ Code commit: `98d3fe008f420067ee8db8ae30447682d5c2730d` — `CalculationView` х
 3. §10 не считать закрытым без acceptance-доказательства.
 4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
-6. §12/§13: следующий шаг — источник/registry для фактического выбора source-backed нормативной модели и структурированной поверхности в UI; после этого переходить к §14, не выдумывая нормативные значения.
+6. §12/§13: следующий шаг — дать пользователю безопасный выбор/реестр конкретных source-backed моделей и правил (без генерации нормативных значений); затем переходить к §14, не выдумывая нормативные значения.
 7. §22 вести отдельно и не закрывать формально до полного workflow integration.
 8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
