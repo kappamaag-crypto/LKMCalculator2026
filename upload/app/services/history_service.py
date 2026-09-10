@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.infrastructure.database.models import CalculationORM, CalculationLayerORM, ComparisonORM
 from app.infrastructure.database.repositories import CalculationRepository
 from app.domain.models import SystemCalculationResult, ComparisonResult
+from app.services.snapshot_utils import load_and_verify_snapshot, seal_snapshot
 
 
 class HistoryService:
@@ -23,7 +24,7 @@ class HistoryService:
         """Сохранить расчёт как неизменяемый снимок входных данных и результата."""
         obj = result.object_data
         snapshot = {
-            "snapshot_version": 3,
+            "snapshot_version": 4,
             "object": {
                 "object_name": obj.object_name,
                 "customer": obj.customer,
@@ -81,6 +82,7 @@ class HistoryService:
                 "total_consumption_l": lr.total_consumption_l,
                 "total_cost": lr.total_cost,
             })
+        snapshot = seal_snapshot(snapshot)
 
         now = datetime.now(timezone.utc)
         calc = CalculationORM(
@@ -120,12 +122,19 @@ class HistoryService:
     def get_calculation(self, calc_id: int) -> Optional[CalculationORM]:
         return self.repo.get_by_id(calc_id)
 
+    def get_calculation_snapshot(self, calc_id: int) -> dict:
+        """Read only a verified sealed snapshot; catalog changes cannot rewrite it."""
+        calc = self.get_calculation(calc_id)
+        if calc is None:
+            raise KeyError(calc_id)
+        return load_and_verify_snapshot(calc.snapshot_json)
+
     def delete_calculation(self, calc_id: int) -> None:
         self.repo.delete(calc_id)
 
     def save_comparison(self, comparison: ComparisonResult, notes: str = "") -> int:
         snapshot = {
-            "snapshot_version": 1,
+            "snapshot_version": 2,
             "object_name": comparison.object_data.object_name,
             "area_m2": comparison.object_data.area_m2,
             "systems": [
@@ -141,6 +150,7 @@ class HistoryService:
             "cheapest_index": comparison.cheapest_index,
             "best_balance_index": comparison.best_balance_index,
         }
+        snapshot = seal_snapshot(snapshot)
         cmp = ComparisonORM(
             object_name=comparison.object_data.object_name or "",
             area_m2=comparison.object_data.area_m2 if comparison.object_data.area_m2 is not None else null(),
@@ -152,6 +162,13 @@ class HistoryService:
         self.session.add(cmp)
         self.session.flush()
         return cmp.id
+
+    def get_comparison_snapshot(self, comparison_id: int) -> dict:
+        """Read only a verified sealed comparison snapshot."""
+        cmp = self.session.get(ComparisonORM, comparison_id)
+        if cmp is None:
+            raise KeyError(comparison_id)
+        return load_and_verify_snapshot(cmp.snapshot_json)
 
     def list_comparisons(self, limit: int = 50) -> Sequence[ComparisonORM]:
         from sqlalchemy import select
