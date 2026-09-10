@@ -29,7 +29,7 @@
 | 8 | ВЫПОЛНЕНО | 2K учитывается как один смешанный материалный слой; TDS technology rules вынесены в §14. |
 | 9 | ЧАСТИЧНО | `PackagingPlanner` считает коммерческую потребность по фасовке: целые упаковки, резерв и опциональную стоимость; regression `26897211`. Складские остатки, складской учёт, резерв склада и закупочные заказы в проект не входят. Полный коммерческий workflow/UI ещё не реализован. |
 | 10 | ЧАСТИЧНО | Alembic присутствует. Добавлены SQLite-safe backup/restore helpers `de1fd6f` и regression/migration idempotency `f8adeff`; acceptance CI не используем из-за исчерпанного Actions-лимита. Для миграций с необратимым `downgrade` (например, `004_nullable_calculation_inputs`) rollback должен выполняться восстановлением предмиграционного backup, а не возвратом данных к вымышленным значениям. |
-| 11 | ЧАСТИЧНО | Добавлен tamper-evident контракт snapshots: каноническая сериализация, SHA-256, проверка при чтении, отдельный snapshot API для расчёта/сравнения. Code commits `e63b4ba` и `0104553c`; regression `3b8ffab`. Полное закрытие требует локального smoke/проверки реконструкции и согласования поведения legacy snapshots без хэша. |
+| 11 | ЧАСТИЧНО | Tamper-evident snapshots: каноническая сериализация, SHA-256, проверка при чтении, отдельный snapshot API для расчёта/сравнения; теперь и каждый сохранённый `CalculationLayerORM.snapshot_json` sealed независимо. Code commits `e63b4ba`, `0104553c`, `012bff6`; regression `3b8ffab` и обновление `4b232ece`. Полное закрытие требует фактического acceptance smoke создания/чтения через `HistoryService`, проверки реконструкции без mutable catalog dependency и согласования поведения legacy snapshots без хэша. |
 | 11.1 | НЕ ВЫПОЛНЕНО | Outbox/SMTP/retry/idempotency/safe secrets. |
 | 12 | НЕ ВЫПОЛНЕНО | Versioned normative model. |
 | 13 | НЕ ВЫПОЛНЕНО | Structured Sa/St/profile model. |
@@ -88,7 +88,11 @@ Code commit: `0104553c219844dfe8c80e4c485b5a514d727cd8` — `HistoryService` sea
 
 Regression commit: `3b8ffab399e7665c4f59cb6bee9a8fc076c2bf66` — deterministic hash, tamper rejection and explicit legacy-unsealed behavior.
 
-GitHub Actions **не запускаются**: лимит Actions пользователя исчерпан. Статус §11 остаётся `ЧАСТИЧНО`, пока локальная проверка не даст достаточного acceptance-доказательства для закрытия.
+Code commit: `012bff67f013601be715ec8ea5dedc284f28e9d6` — individual calculation-layer snapshots are now sealed as independent immutable records.
+
+Regression commit: `4b232ecef956811a554568032a11fae9f1f81f5d` — nested/layer snapshot integrity regression, including detection of changed catalog-like values.
+
+GitHub Actions **не запускаются**: лимит Actions пользователя исчерпан. Новые проверки в Actions не создавались.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -105,9 +109,10 @@ GitHub Actions **не запускаются**: лимит Actions пользо�
 2. §10 не считать закрытым без acceptance-доказательства; существующие backup/restore и migration tests сохранять.
 3. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 4. Текущий рабочий этап — §11: закончить immutable snapshot acceptance локальными/статическими проверками, не используя Actions.
-5. После acceptance §11 перейти к §11.1, затем далее по матрице.
-6. §22 вести отдельно и не закрывать формально до полного workflow integration.
-7. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
+5. Не переводить §11 в `ВЫПОЛНЕНО` только на основании написанных тестов; требуется фактическое локальное smoke-доказательство или иное явное acceptance-доказательство.
+6. После acceptance §11 перейти к §11.1, затем далее по матрице.
+7. §22 вести отдельно и не закрывать формально до полного workflow integration.
+8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
 ## CI / контрольные точки
 - `34439245472`
@@ -120,7 +125,7 @@ GitHub Actions **не запускаются**: лимит Actions пользо�
 - `34453753830` — commit `f8adeff`, queued; новые Actions runs по текущей работе не запускаются.
 
 ## Последняя проверка
-`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. §10 не закрыт. По §11 реализированы hash-sealed snapshots и regression tests; требуется локальное acceptance-доказательство перед `ВЫПОЛНЕНО`.
+`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. По §11 добавлено независимое sealing для layer snapshots и regression. Эти тесты добавлены, но фактический локальный runtime smoke в текущем окружении не выполнен; §11 остаётся `ЧАСТИЧНО`.
 
 ## Следующий рабочий фокус
-Закончить §11 без GitHub Actions: локально проверить создание/чтение sealed snapshot, обнаружение изменения JSON и независимость от текущего каталога; затем отдельным plan/docs commit закрыть §11 только при наличии доказательства. После этого перейти к §11.1.
+Продолжить §11 без GitHub Actions: обеспечить фактический acceptance smoke создания/чтения snapshot через `HistoryService`, проверить независимость от изменения каталога и определить безопасную стратегию чтения legacy snapshots без хэша. Только после этого закрыть §11 и перейти к §11.1.
