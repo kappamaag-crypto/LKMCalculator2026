@@ -5,7 +5,6 @@ from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor,QBrush
 from app.domain.models import ComparisonResult,ObjectData
-from app.domain.calculator import LayerInput
 from app.services.calculation_service import CalculationService
 from app.infrastructure.export.engineering_excel_exporter import EngineeringExcelExporter
 
@@ -14,7 +13,7 @@ class ComparisonView(QWidget):
     def __init__(self,service:CalculationService,parent=None):
         super().__init__(parent);self.service=service;self._systems_data=[];self._result_data=[];self._object=ObjectData(area_m2=1.0);self._last_comparison=None;self._build_ui()
     def _build_ui(self):
-        root=QVBoxLayout(self);root.setContentsMargins(12,12,12,12);title=QLabel("Сравнение систем");title.setProperty("heading",True);root.addWidget(title);sub=QLabel("Сравнивайте инженерные и коммерческие показатели систем. Складские остатки и закупочная информация не включаются.");sub.setProperty("subheading",True);sub.setWordWrap(True);root.addWidget(sub);row=QHBoxLayout();self.btn_compare=QPushButton("Сравнить");self.btn_compare.clicked.connect(self._on_compare);self.btn_export=QPushButton("Экспорт сравнения");self.btn_export.setProperty("secondary",True);self.btn_export.setEnabled(False);self.btn_export.clicked.connect(self._on_export);self.btn_clear=QPushButton("Очистить");self.btn_clear.setProperty("secondary",True);self.btn_clear.clicked.connect(self._on_clear);self.lbl_count=QLabel("Систем: 0");
+        root=QVBoxLayout(self);root.setContentsMargins(12,12,12,12);title=QLabel("Сравнение систем");title.setProperty("heading",True);root.addWidget(title);sub=QLabel("Сравнивайте инженерные, технологические и коммерческие показатели систем. Складские остатки и закупочная информация не включаются.");sub.setProperty("subheading",True);sub.setWordWrap(True);root.addWidget(sub);row=QHBoxLayout();self.btn_compare=QPushButton("Сравнить");self.btn_compare.clicked.connect(self._on_compare);self.btn_export=QPushButton("Экспорт сравнения");self.btn_export.setProperty("secondary",True);self.btn_export.setEnabled(False);self.btn_export.clicked.connect(self._on_export);self.btn_clear=QPushButton("Очистить");self.btn_clear.setProperty("secondary",True);self.btn_clear.clicked.connect(self._on_clear);self.lbl_count=QLabel("Систем: 0");
         for x in (self.btn_compare,self.btn_export,self.btn_clear,self.lbl_count):row.addWidget(x)
         row.addStretch();root.addLayout(row);self.table=QTableWidget(0,1);self.table.setHorizontalHeaderLabels(["Показатель"]);self.table.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch);self.table.setAlternatingRowColors(True);self.table.setSelectionMode(QAbstractItemView.NoSelection);self.table.verticalHeader().setVisible(False);root.addWidget(self.table);self.lbl_legend=QLabel();self.lbl_legend.setProperty("subheading",True);self.lbl_legend.setWordWrap(True);root.addWidget(self.lbl_legend)
     def set_object(self,obj:ObjectData):self._object=obj
@@ -30,8 +29,7 @@ class ComparisonView(QWidget):
     def _on_compare(self):
         if len(self._systems_data)<2:QMessageBox.warning(self,"Внимание","Добавьте не менее 2 систем");return
         try:
-            if len(self._result_data)==len(self._systems_data):
-                self._last_comparison=self.service.comparison.compare_results(self._object,self._result_data)
+            if len(self._result_data)==len(self._systems_data):self._last_comparison=self.service.comparison.compare_results(self._object,self._result_data)
             else:self._last_comparison=self.service.compare_systems(self._object,self._systems_data)
         except ValueError as exc:QMessageBox.warning(self,"Расчёт невозможен",str(exc));return
         self._fill_table(self._last_comparison);self.btn_export.setEnabled(True)
@@ -50,8 +48,6 @@ class ComparisonView(QWidget):
         systems=comparison.systems;headers=["Показатель"]+[(s.system.system_name or f"Система {i+1}")[:40] for i,s in enumerate(systems)]
         self.table.setColumnCount(len(headers));self.table.setHorizontalHeaderLabels(headers)
         thinner_m2=[(s.total_thinner_cost/s.object_data.area_m2) if s.total_thinner_cost is not None and s.object_data.area_m2 else None for s in systems]
-        # total_cost_per_m2 is the complete system cost: paint + thinner.
-        # Keep the UI breakdown consistent with LayerResult.cost_per_m2 (paint only).
         paint_m2=[(s.total_cost_per_m2-t) if s.total_cost_per_m2 is not None and t is not None else None for s,t in zip(systems,thinner_m2)]
         rows=[
             ("Количество слоёв",[len(s.layers) for s in systems],False),
@@ -63,6 +59,9 @@ class ComparisonView(QWidget):
             ("Разбавитель, руб/м²",thinner_m2,True),
             ("ЛКМ + разбавитель, руб/м²",[s.total_cost_per_m2 for s in systems],True),
         ]
+        technology=[self.service.comparison._technology_values(s) for s in systems]
+        if technology:
+            for indicator in technology[0]:rows.append((indicator,[item[indicator] for item in technology],False))
         max_layers=max((len(s.layers) for s in systems),default=0)
         for n in range(max_layers):
             rows.extend([
@@ -87,4 +86,6 @@ class ComparisonView(QWidget):
         if comparison.thinnest_index is not None:parts.append(f"Минимальная толщина: {headers[comparison.thinnest_index+1]}")
         if comparison.cheapest_index is not None:parts.append(f"Минимальная стоимость ЛКМ: {headers[comparison.cheapest_index+1]}")
         if comparison.fewest_layers_index is not None:parts.append(f"Меньше всего слоёв: {headers[comparison.fewest_layers_index+1]}")
+        if comparison.thickest_index is not None and comparison.thickest_index != comparison.thinnest_index:parts.append(f"Толще: {headers[comparison.thickest_index+1]} — это может означать больший запас, но само по себе не является доказательством лучшей защиты")
+        if comparison.cheapest_index is not None and comparison.most_expensive_index is not None and comparison.cheapest_index != comparison.most_expensive_index:parts.append("Стоимость различается из-за состава слоёв, расхода, цен материалов и разбавления; сравнивать только цену без требований к среде эксплуатации нельзя")
         self.lbl_legend.setText("  |  ".join(parts))
