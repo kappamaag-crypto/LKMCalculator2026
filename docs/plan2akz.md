@@ -31,8 +31,8 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance отложен из-за запрета на Actions/тесты. Необратимые downgrade требуют восстановления backup. |
 | 11 | ЧАСТИЧНО | Self-contained immutable material snapshots v5, verified reads и integrity hashing реализованы; acceptance/runtime smoke отложен. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox интегрирован с `calculation_saved`; opt-in worker/trigger, idempotency metadata и env-only SMTP реализованы. SMTP/runtime smoke и тесты отложены. |
-| 12 | ЧАСТИЧНО | `NormativeSource`, `NormativeRule`, `NormativeModel`, `NormativeRegistry` реализованы; добавлена source-preserving сериализация/десериализация для persistence (`4a623ed5`). Реальная запись нормативного контекста из workflow и acceptance ещё отсутствуют. |
-| 13 | ЧАСТИЧНО | Immutable `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` реализованы; добавлена source-preserving сериализация/десериализация (`4a623ed5`). Интеграция с `ObjectData`/History workflow, UI, normative validation и acceptance ещё не завершены. |
+| 12 | ЧАСТИЧНО | `NormativeSource`, `NormativeRule`, `NormativeModel`, `NormativeRegistry` + source-preserving serializer реализованы. History snapshot v6 теперь сохраняет нормативный контекст, если он передан через `SystemCalculationResult`; при отсутствии модели сохраняется `null`, без выдуманного нормативного значения. Нужны полноценная передача модели из workflow, restore/integration и acceptance. |
+| 13 | ЧАСТИЧНО | `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` + serializer реализованы. History snapshot v6 сохраняет структурированное состояние поверхности, нормализованное из существующих `ObjectData` Sa/St/roughness; нормативная оценка остаётся `UNKNOWN`. Нужны UI/workflow integration, restore/validation и acceptance. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; environment/technology/compatibility/explanation/weights остаются. |
@@ -62,9 +62,12 @@ Code commit: `709eadea3be513fb3a2a540dc195ef93956f4b09` — immutable source-bac
 Code commit: `6d3c86145e99c8c9a653cb1dff9823639c3fef41` — structured surface preparation/profile model без hard-coded нормативных значений.
 
 ### §12/§13 — Persistence serialization foundation
-Code commit: `4a623ed5bf0b19d34bb57009135f8b96b54cb634` — добавлен `engineering_context_snapshot.py`: детерминированное source-preserving представление `NormativeModel` и `SurfaceCondition`, включая metadata источников, версии, статусы `KNOWN/UNKNOWN`, даты действия и параметры профиля. Нормативные значения не создаются автоматически.
+Code commit: `4a623ed5bf0b19d34bb57009135f8b96b54cb634` — добавлен `engineering_context_snapshot.py`: source-preserving представление `NormativeModel` и `SurfaceCondition`, включая metadata источников, версии, статусы `KNOWN/UNKNOWN`, даты действия и параметры профиля.
 
-Этот commit не закрывает §12/§13: serializer пока не подключён к сохранению `SystemCalculationResult`/History workflow, UI и validation; acceptance намеренно отложен.
+### §12/§13 — History snapshot integration
+Code commit: `7d4d40e6b6985a159b9a998438db32ca79ed4c14` — `HistoryService.save_calculation()` переведён на snapshot v6: сохраняет structured surface context из существующего `ObjectData`, а нормативную модель сохраняет только если она реально передана результатом. Отсутствующий нормативный контекст не подменяется фиктивным правилом.
+
+Тесты и runtime smoke для этих изменений намеренно не запускались по указанию пользователя. Поэтому §12/§13 остаются `ЧАСТИЧНО`.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -82,7 +85,7 @@ Code commit: `4a623ed5bf0b19d34bb57009135f8b96b54cb634` — добавлен `en
 3. §10 не считать закрытым без acceptance-доказательства.
 4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
-6. Текущий рабочий этап — §12/§13: подключить serializer к immutable History snapshot и workflow расчёта, сохраняя `UNKNOWN` и source metadata; затем перейти к §14.
+6. Текущий рабочий этап — §12/§13: довести restore/workflow integration для snapshot v6 и передать реальную `NormativeModel` из расчётного контекста; затем перейти к §14.
 7. §22 вести отдельно и не закрывать формально до полного workflow integration.
 8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
