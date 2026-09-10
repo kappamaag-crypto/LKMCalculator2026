@@ -8,7 +8,6 @@ import smtplib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
-from typing import Callable
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -65,11 +64,15 @@ class SMTPMailer:
     def __init__(self, settings: SMTPSettings):
         self.settings = settings
 
-    def send(self, recipient: str, subject: str, body: str) -> None:
+    def send(self, recipient: str, subject: str, body: str, *, idempotency_key: str | None = None) -> None:
         message = EmailMessage()
         message["From"] = self.settings.sender
         message["To"] = recipient
         message["Subject"] = subject
+        if idempotency_key:
+            # Useful for provider/log correlation; SMTP itself does not guarantee deduplication.
+            message["Message-ID"] = f"<lkm-{idempotency_key}@localhost>"
+            message["X-LKM-Idempotency-Key"] = idempotency_key
         message.set_content(body)
         with smtplib.SMTP(self.settings.host, self.settings.port, timeout=self.settings.timeout_seconds) as smtp:
             smtp.ehlo()
@@ -88,13 +91,17 @@ class NotificationService:
         if max_attempts < 1:
             raise ValueError("max_attempts must be positive")
         self.session = session
-        self.mailer = mailer or SMTPMailer(SMTPSettings.from_environment())
+        self.mailer = mailer
         self.max_attempts = max_attempts
 
     @staticmethod
     def make_idempotency_key(event: str, stable_id: str | int) -> str:
         raw = f"{event}:{stable_id}".encode("utf-8")
         return hashlib.sha256(raw).hexdigest()
+
+    @staticmethod
+    def smtp_configured() -> bool:
+        return bool(os.getenv("LKM_SMTP_HOST", "").strip() and os.getenv("LKM_SMTP_SENDER", "").strip())
 
     def enqueue(
         self,
@@ -137,13 +144,13 @@ class NotificationService:
 
     @staticmethod
     def _backoff(attempts: int) -> timedelta:
-        # 1, 2, 4, 8, 16 minutes; deterministic and bounded by max_attempts.
         return timedelta(minutes=min(16, 2 ** max(0, attempts - 1)))
 
     def process_due(self, *, now: datetime | None = None, limit: int = 20) -> int:
         """Deliver due rows; failures are retained for retry and never silently lost."""
         if limit < 1:
             return 0
+        mailer = self.mailer or SMTPMailer(SMTPSettings.from_environment())
         current = now or datetime.now(timezone.utc)
         rows = self.session.scalars(
             select(NotificationOutboxORM)
@@ -161,8 +168,8 @@ class NotificationService:
             row.updated_at = current
             self.session.flush()
             try:
-                self.mailer.send(row.recipient, row.subject, row.body)
-            except Exception as exc:  # SMTP/library errors are converted to durable retry state.
+                mailer.send(row.recipient, row.subject, row.body, idempotency_key=row.idempotency_key)
+            except Exception as exc:
                 row.last_error = str(exc)[:4000]
                 row.status = RETRY if row.attempts < self.max_attempts else FAILED
                 row.next_attempt_at = current + self._backoff(row.attempts)
