@@ -13,6 +13,7 @@
 8. После code commit — отдельный commit с фиксацией результата в этом плане.
 9. `ВЫПОЛНЕНО` ставится только при наличии реализации и тестового/CI или явного smoke-доказательства.
 10. При отсутствии исходных данных использовать `UNKNOWN`, не придумывать запрет/разрешение.
+11. GitHub Actions для текущей работы не запускаем из-за лимита; локальные/статические проверки допустимы и должны быть явно обозначены.
 
 ## Матрица статуса
 
@@ -27,8 +28,8 @@
 | 7 | ВЫПОЛНЕНО | Precision/unit invariants + независимые golden cases 2/3/4/5 layers; успешный CI. |
 | 8 | ВЫПОЛНЕНО | 2K учитывается как один смешанный материалный слой; TDS technology rules вынесены в §14. |
 | 9 | ЧАСТИЧНО | `PackagingPlanner` считает коммерческую потребность по фасовке: целые упаковки, резерв и опциональную стоимость; regression `26897211`. Складские остатки, складской учёт, резерв склада и закупочные заказы в проект не входят. Полный коммерческий workflow/UI ещё не реализован. |
-| 10 | ЧАСТИЧНО | Alembic присутствует. Добавлены SQLite-safe backup/restore helpers `de1fd6f` и regression/migration idempotency `f8adeff`; acceptance CI ещё queued. Для миграций с необратимым `downgrade` (например, `004_nullable_calculation_inputs`) rollback должен выполняться восстановлением предмиграционного backup, а не возвратом данных к вымышленным значениям. |
-| 11 | ЧАСТИЧНО | History/snapshot infrastructure есть; immutable snapshot contract остаётся. |
+| 10 | ЧАСТИЧНО | Alembic присутствует. Добавлены SQLite-safe backup/restore helpers `de1fd6f` и regression/migration idempotency `f8adeff`; acceptance CI не используем из-за исчерпанного Actions-лимита. Для миграций с необратимым `downgrade` (например, `004_nullable_calculation_inputs`) rollback должен выполняться восстановлением предмиграционного backup, а не возвратом данных к вымышленным значениям. |
+| 11 | ЧАСТИЧНО | Добавлен tamper-evident контракт snapshots: каноническая сериализация, SHA-256, проверка при чтении, отдельный snapshot API для расчёта/сравнения. Code commits `e63b4ba` и `0104553c`; regression `3b8ffab`. Полное закрытие требует локального smoke/проверки реконструкции и согласования поведения legacy snapshots без хэша. |
 | 11.1 | НЕ ВЫПОЛНЕНО | Outbox/SMTP/retry/idempotency/safe secrets. |
 | 12 | НЕ ВЫПОЛНЕНО | Versioned normative model. |
 | 13 | НЕ ВЫПОЛНЕНО | Structured Sa/St/profile model. |
@@ -67,7 +68,7 @@ Code commit: `a1e1a0a1d7fd34c6fee3537dec39e98f13f6281c`.
 Code commit: `e3ef08d3f6eae299ffe482a0dd8e557736334b2b`.
 
 ### §9 — Commercial packaging foundation
-Code commit: `8e37341cf2be000a8c346d417dc0b22268f19ae` — packaging domain очищен от складских остатков и складской логики.
+Code commit: `8e37341cf2be0000a8c346d417dc0b22268f19ae` — packaging domain очищен от складских остатков и складской логики.
 
 Regression commit: `268972115c31050797a08479110c5c69747d5932` — tests aligned with the no-inventory model.
 
@@ -78,7 +79,16 @@ Code commit: `de1fd6f9a863ecd532bef556d8a342311fd1dca8` — `backup.py` с SQLit
 
 Regression commit: `f8adeff48d6985be9cea833e4bfd0461530805bf` — backup/restore snapshot test, same-path guard и Alembic upgrade idempotency/head test.
 
-CI run `34453753830` для `f8adeff` на момент последней проверки всё ещё `queued`; поэтому §10 не закрывается.
+CI run `34453753830` для `f8adeff` ранее был `queued`. По запросу пользователя новые GitHub Actions runs не запускаются; поэтому §10 не переводится в `ВЫПОЛНЕНО` без доступного локального acceptance-доказательства.
+
+### §11 — Immutable history snapshots
+Code commit: `e63b4baaa7912cf92e9bd8b615edb2731cf1d44a` — canonical/tamper-evident snapshot helpers.
+
+Code commit: `0104553c219844dfe8c80e4c485b5a514d727cd8` — `HistoryService` seals calculation/comparison snapshots and exposes verified snapshot reads.
+
+Regression commit: `3b8ffab399e7665c4f59cb6bee9a8fc076c2bf66` — deterministic hash, tamper rejection and explicit legacy-unsealed behavior.
+
+GitHub Actions **не запускаются**: лимит Actions пользователя исчерпан. Статус §11 остаётся `ЧАСТИЧНО`, пока локальная проверка не даст достаточного acceptance-доказательства для закрытия.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -91,11 +101,11 @@ CI run `34453753830` для `f8adeff` на момент последней пр�
 5. `UNKNOWN` должен оставаться неизвестным и требовать проверки источника, а не автоматически становиться запретом.
 
 ## Порядок продолжения
-1. Не считать queued CI успешным.
-2. После завершения CI по текущему этапу исправить найденные регрессии отдельным code commit.
+1. GitHub Actions не запускать из-за лимита пользователя.
+2. §10 не считать закрытым без acceptance-доказательства; существующие backup/restore и migration tests сохранять.
 3. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
-4. §10 довести до acceptance backup/migration/restore после зелёного CI.
-5. Затем идти по матрице: §11, §11.1 и далее.
+4. Текущий рабочий этап — §11: закончить immutable snapshot acceptance локальными/статическими проверками, не используя Actions.
+5. После acceptance §11 перейти к §11.1, затем далее по матрице.
 6. §22 вести отдельно и не закрывать формально до полного workflow integration.
 7. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
@@ -107,10 +117,10 @@ CI run `34453753830` для `f8adeff` на момент последней пр�
 - `34451490167` — commit `e3ef08d3`, был queued.
 - `34453199922` — commit `42bc3b6`, queued на момент фиксации.
 - `34453210684` — commit `1f9cbd6`, queued на момент фиксации.
-- `34453753830` — commit `f8adeff`, при последней проверке queued.
+- `34453753830` — commit `f8adeff`, queued; новые Actions runs по текущей работе не запускаются.
 
 ## Последняя проверка
-`2026-09-10` — run `34453753830`, job `pytest`: `queued`, `conclusion=null`. Новых code-изменений по §10 без результата CI не вносилось; §11 не начат, чтобы не нарушать порядок плана.
+`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. §10 не закрыт. По §11 реализированы hash-sealed snapshots и regression tests; требуется локальное acceptance-доказательство перед `ВЫПОЛНЕНО`.
 
 ## Следующий рабочий фокус
-Текущий фокус — §10: дождаться зелёного CI, затем при необходимости исправить регрессии отдельным code commit и только после acceptance зафиксировать §10 как `ВЫПОЛНЕНО`. После этого перейти к §11. §22 сохранять отдельно и не закрывать до workflow integration.
+Закончить §11 без GitHub Actions: локально проверить создание/чтение sealed snapshot, обнаружение изменения JSON и независимость от текущего каталога; затем отдельным plan/docs commit закрыть §11 только при наличии доказательства. После этого перейти к §11.1.
