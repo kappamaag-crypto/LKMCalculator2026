@@ -43,6 +43,9 @@ class SystemsView(QWidget):
         self.list_systems.currentIndexChanged.connect(self._load_selected)
         self.btn_new = QPushButton("Новая система")
         self.btn_new.clicked.connect(self._new)
+        self.btn_copy = QPushButton("Копировать")
+        self.btn_copy.setToolTip("Создать новый несохранённый черновик из выбранной системы")
+        self.btn_copy.clicked.connect(self._copy_selected)
         self.btn_from_calculation = QPushButton("Из текущего расчёта")
         self.btn_from_calculation.setToolTip("Создать несохранённый черновик системы из последнего расчёта")
         self.btn_from_calculation.clicked.connect(self._from_calculation)
@@ -52,6 +55,7 @@ class SystemsView(QWidget):
         top.addWidget(QLabel("Система:"))
         top.addWidget(self.list_systems, 1)
         top.addWidget(self.btn_new)
+        top.addWidget(self.btn_copy)
         top.addWidget(self.btn_from_calculation)
         top.addWidget(self.btn_reload)
         root.addLayout(top)
@@ -131,6 +135,41 @@ class SystemsView(QWidget):
     def set_calculation_result(self, result):
         self._calculation_result = result
         self.btn_from_calculation.setEnabled(result is not None and bool(getattr(result, "layers", None)))
+
+    def _copy_selected(self):
+        sid = self.list_systems.currentData()
+        orm = next((item for item in self._systems if item.id == sid), None)
+        if orm is None:
+            QMessageBox.warning(self, "Система", "Выберите сохранённую систему для копирования")
+            return
+
+        self._current_id = None
+        self.list_systems.blockSignals(True)
+        self.list_systems.setCurrentIndex(0)
+        self.list_systems.blockSignals(False)
+        self.ed_name.setText(f"{orm.system_name or 'Пользовательская система'} — копия")
+        self.ed_manufacturer.setText(orm.manufacturer or "")
+        self.ed_description.setText(orm.description or "")
+        self.ed_substrate.setText(orm.substrate or "")
+        self.ed_standards.setText(orm.standards or "")
+        self.ed_certificate.setText(orm.certificate or "")
+
+        self.table.blockSignals(True)
+        self.table.setRowCount(0)
+        for layer in sorted(orm.layers, key=lambda item: item.layer_number):
+            material = next((m for m in self._materials if m.id == layer.material_id), None)
+            self._append_row(
+                layer.layer_number,
+                material,
+                layer.dft_min,
+                layer.target_dft,
+                layer.dft_max,
+                layer.thinner_percent,
+            )
+        self.table.blockSignals(False)
+        if self.table.rowCount():
+            self.table.selectRow(0)
+        self.status_message(f"Создан черновик копии системы: {self.table.rowCount()} слоёв. Проверьте и сохраните его.")
 
     def _from_calculation(self):
         result = self._calculation_result
