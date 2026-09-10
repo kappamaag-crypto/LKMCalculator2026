@@ -12,6 +12,12 @@ from sqlalchemy.orm import Session
 from app.infrastructure.database.models import CalculationORM, CalculationLayerORM, ComparisonORM
 from app.infrastructure.database.repositories import CalculationRepository
 from app.domain.models import SystemCalculationResult, ComparisonResult
+from app.domain.surface_profile import SurfaceCondition, SurfacePreparation, SurfaceProfile
+from app.domain.normative import UNKNOWN
+from app.services.engineering_context_snapshot import (
+    normative_model_to_dict,
+    surface_condition_to_dict,
+)
 from app.services.snapshot_utils import load_and_verify_snapshot, seal_snapshot
 
 
@@ -78,11 +84,37 @@ class HistoryService:
             "notes": material.notes,
         }
 
+    @staticmethod
+    def _surface_condition_snapshot(obj) -> dict:
+        """Normalize legacy object surface inputs into the structured §13 shape.
+
+        Existing Sa/St and roughness values are preserved, but their normative
+        assessment remains UNKNOWN until a source-backed rule is attached.
+        """
+        preparation_value = getattr(obj.preparation, "value", obj.preparation) if obj.preparation else ""
+        method = "Sa" if str(preparation_value).startswith("Sa ") else "St" if str(preparation_value).startswith("St ") else "UNKNOWN"
+        condition = SurfaceCondition(
+            preparation=SurfacePreparation(
+                method=method,
+                grade=str(preparation_value or ""),
+                assessment=UNKNOWN,
+            ),
+            profile=SurfaceProfile(
+                measurement="UNKNOWN",
+                nominal_um=obj.roughness,
+                assessment=UNKNOWN,
+            ),
+            substrate=obj.substrate or "",
+            contamination_status=UNKNOWN,
+            moisture_status=UNKNOWN,
+        )
+        return surface_condition_to_dict(condition) or {}
+
     def save_calculation(self, result: SystemCalculationResult, notes: str = "") -> int:
         """Сохранить расчёт как неизменяемый снимок входных данных и результата."""
         obj = result.object_data
         snapshot = {
-            "snapshot_version": 5,
+            "snapshot_version": 6,
             "object": {
                 "object_name": obj.object_name,
                 "customer": obj.customer,
@@ -91,6 +123,17 @@ class HistoryService:
                 "area_m2": obj.area_m2,
                 "corrosion_category": obj.corrosion_category.value if obj.corrosion_category else None,
                 "durability": obj.durability.value if obj.durability else None,
+                "substrate": obj.substrate,
+                "surface_type": obj.surface_type.value if obj.surface_type else None,
+                "preparation": obj.preparation.value if obj.preparation else None,
+                "roughness": obj.roughness,
+                "surface_temperature": obj.surface_temperature,
+                "air_temperature": obj.air_temperature,
+                "relative_humidity": obj.relative_humidity,
+                "dew_point": obj.dew_point,
+                "dew_point_margin_c": obj.dew_point_margin_c,
+                "surface_condition": self._surface_condition_snapshot(obj),
+                "normative_model": normative_model_to_dict(getattr(result, "normative_model", None)),
             },
             "system": {
                 "name": result.system.system_name,
