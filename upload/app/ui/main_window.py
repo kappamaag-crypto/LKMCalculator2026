@@ -1,14 +1,13 @@
 """Главное окно приложения."""
 from __future__ import annotations
-from PySide6.QtWidgets import QMainWindow,QTabWidget,QStatusBar,QMessageBox,QLabel
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMainWindow,QTabWidget,QStatusBar,QMessageBox
 from PySide6.QtGui import QAction
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app import __version__,__app_name__
 from app.config import AppSettings
 from app.domain.models import Material,CoatingSystem,LayerDefinition
-from app.domain.enums import MaterialType,BinderType,CorrosionCategory,DurabilityLevel,SurfaceType,EnvironmentType
+from app.domain.enums import MaterialType,BinderType,DurabilityLevel
 from app.services.calculation_service import CalculationService
 from app.services.recommendation_service import RecommendationService
 from app.ui.styles import APP_STYLE
@@ -50,7 +49,6 @@ def _load_systems_from_db(materials,fallback):
                 if layers:systems.append(CoatingSystem(id=orm.id,system_name=orm.system_name,manufacturer=orm.manufacturer or "",description=orm.description or "",durability=_enum_or_none(DurabilityLevel,orm.durability),substrate=orm.substrate or "",total_dft_min=orm.total_dft_min,total_dft_target=orm.total_dft_target,total_dft_max=orm.total_dft_max,number_of_layers=len(layers),temperature_min=orm.temperature_min,temperature_max=orm.temperature_max,standards=orm.standards or "",certificate=orm.certificate or "",technical_document=orm.technical_document or "",notes=orm.notes or "",layers=layers))
         return systems or fallback
     except Exception:return fallback
-
 def dft_fallback(material):
     value=getattr(material,"recommended_dft_min",None);return value if value is not None and value>0 else 100
 def _demo_systems():
@@ -74,7 +72,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Расчёт выполнен: {result.total_dft:.0f} мкм, {self._money(result.total_cost_per_m2)} руб/м², объект {self._money(result.total_cost,0)} руб",10000)
         try:self.history_view.save_result(result)
         except Exception as exc:self.statusBar().showMessage(f"Не удалось сохранить расчёт в историю: {exc}",10000)
-    def _on_add_to_comparison(self,result):self.cmp_view.add_from_calculation(result);self.tabs.setCurrentWidget(self.cmp_view);self.statusBar().showMessage("Система добавлена в сравнение. Добавьте другие варианты и нажмите «Сравнить`.",10000)
+    def _on_add_to_comparison(self,result):self.cmp_view.add_from_calculation(result);self.tabs.setCurrentWidget(self.cmp_view);self.statusBar().showMessage("Система добавлена в сравнение. Добавьте другие варианты и нажмите «Сравнить».",10000)
     def _on_history_load(self,snapshot):
         try:self.calc_view.restore_snapshot(snapshot);self.tabs.setCurrentWidget(self.calc_view);self.statusBar().showMessage("Снимок истории восстановлен и доступен для редактирования.",10000)
         except (TypeError,ValueError,KeyError) as exc:QMessageBox.warning(self,"История",f"Не удалось восстановить снимок: {exc}")
