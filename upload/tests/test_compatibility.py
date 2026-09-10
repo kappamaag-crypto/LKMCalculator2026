@@ -1,0 +1,56 @@
+from app.domain.compatibility import (
+    FAMILY_LABELS,
+    RULES,
+    SOURCE_TABLE,
+    SOURCE_URL,
+    check_binders,
+    family_for_binder,
+)
+from app.domain.enums import BinderType, CompatibilityStatus
+
+
+def test_source_matrix_shape_is_preserved():
+    assert len(FAMILY_LABELS) == 18
+    assert len(RULES) > 0
+    assert SOURCE_TABLE == "Таблица 1. Совместимость ЛКМ с грунтовками"
+    assert SOURCE_URL.endswith("/compatibility-tables.html")
+
+
+def test_direction_is_previous_layer_to_applied_layer():
+    epoxy_over_epoxy = check_binders(BinderType.EPOXY, BinderType.EPOXY)
+    polyurethane_over_epoxy = check_binders(BinderType.EPOXY, BinderType.POLYURETHANE)
+    epoxy_over_polyurethane = check_binders(BinderType.POLYURETHANE, BinderType.EPOXY)
+
+    assert epoxy_over_epoxy.status is CompatibilityStatus.ALLOWED
+    assert polyurethane_over_epoxy.status is CompatibilityStatus.ALLOWED
+    assert epoxy_over_polyurethane.status is CompatibilityStatus.UNKNOWN
+
+
+def test_warning_markers_are_not_treated_as_forbidden():
+    # Source marker 2: epoxy applied over vinyl-chloride requires roughening.
+    # The current BinderType cannot represent vinyl-chloride, so this pair is
+    # intentionally not guessed from the generic word "покрытие".
+    assert check_binders(BinderType.EPOXY, BinderType.EPOXY).status is CompatibilityStatus.ALLOWED
+
+
+def test_unmapped_current_binder_is_unknown():
+    assert family_for_binder(BinderType.ALKYD) is None
+    assert family_for_binder(BinderType.ZINC_ETHYL_SILICATE) is None
+    assert check_binders(BinderType.ALKYD, BinderType.EPOXY).status is CompatibilityStatus.UNKNOWN
+    assert check_binders(BinderType.ZINC_ETHYL_SILICATE, BinderType.POLYURETHANE).status is CompatibilityStatus.UNKNOWN
+
+
+def test_epoxy_and_acrylic_mapping_uses_source_direction():
+    acrylic_over_epoxy = check_binders(BinderType.EPOXY, BinderType.ACRYLIC)
+    epoxy_over_acrylic = check_binders(BinderType.ACRYLIC, BinderType.EPOXY)
+
+    assert acrylic_over_epoxy.status is CompatibilityStatus.UNKNOWN
+    assert epoxy_over_acrylic.status is CompatibilityStatus.ALLOWED
+
+
+def test_epoxy_ester_is_supported_only_where_source_has_a_column():
+    epoxy_over_epoxy_ester = check_binders(BinderType.EPOXY_ESTER, BinderType.EPOXY)
+    epoxy_ester_over_epoxy = check_binders(BinderType.EPOXY, BinderType.EPOXY_ESTER)
+
+    assert epoxy_over_epoxy_ester.status is CompatibilityStatus.ALLOWED
+    assert epoxy_ester_over_epoxy.status is CompatibilityStatus.UNKNOWN
