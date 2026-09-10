@@ -41,7 +41,7 @@
 | 19 | НЕ ВЫПОЛНЕНО | Legacy parity matrix. |
 | 20 | НЕ ВЫПОЛНЕНО | Indexed KB из `books/`. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix есть; applicability к реальной chemistry/TDS остаётся. |
-| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` и tests существуют, но не подключены к `CalculationView`/`SystemsView`; нужны workflow integration, UI regression и TDS-backed conditions. `UNKNOWN` не превращать в запрет. |
+| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` подключён к `CalculationService.format_summary()`, поэтому обычный `CalculationView` уже получает source-backed результат проверки соседних слоёв после расчёта. Проверка не блокирует расчёт и `UNKNOWN` не превращается в запрет. Остаётся прямое workflow-подключение `SystemsView`, UI regression и TDS-backed conditions. |
 | 23 | НЕ ВЫПОЛНЕНО | — |
 | 24 | НЕ ВЫПОЛНЕНО | — |
 | 25 | НЕ ВЫПОЛНЕНО | — |
@@ -106,17 +106,20 @@ Code commit: `6db6da2b5a72d9d93a2bbd6ea8a4572c2dc0e916` — восстановл
 ### §12 — Verified source-backed rule import boundary
 Code commit: `f425ab1ed46697807f0c0c1414429f2ac631e872` — добавлен `verified_normative_loader.py`: human-reviewed JSON sidecar принимается только при наличии source-файла, совпадении SHA-256, валидной схеме model/rules и явных значениях для `KNOWN` правил. Loader не извлекает значения из PDF и не делает инженерных предположений.
 
-Тесты, runtime smoke и GitHub Actions для этих этапов намеренно не запускались по указанию пользователя. Поэтому §12/§13 остаются `ЧАСТИЧНО`.
+### §22 — Calculation workflow integration
+Code commit: `2ea726933b859c8e00dd17069be437cb6251a302` — `CalculationService` получил `LayerCompatibilityEngine`; добавлен `compatibility_report()` и source-backed блок совместимости в `format_summary()`. После расчёта `CalculationView` получает статус и сообщения по каждому переходу между соседними слоями. Проверка информационная: `UNKNOWN` не блокирует расчёт и не превращается в запрет. TDS-specific cure/recoat conditions намеренно не выводятся из общих предположений.
+
+Тесты, runtime smoke и GitHub Actions для этих этапов намеренно не запускались по указанию пользователя. Поэтому §22 остаётся `ЧАСТИЧНО`.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
 
 Минимум для закрытия:
-1. интеграция проверки в `CalculationView`;
-2. интеграция проверки в `SystemsView`/редактор системы;
-3. UI regression на положительный, отрицательный и `UNKNOWN` сценарии;
-4. условия `previous_is_cured`, `recoat_elapsed_h`, `surface_prepared` только если они подтверждены TDS/источником;
-5. `UNKNOWN` должен оставаться неизвестным и требовать проверки источника, а не автоматически становиться запретом.
+1. интеграция проверки в `CalculationView` — выполнена через `CalculationService.format_summary()`;
+2. интеграция проверки в `SystemsView`/редактор системы — остаётся;
+3. UI regression на положительный, отрицательный и `UNKNOWN` сценарии — остаётся;
+4. условия `previous_is_cured`, `recoat_elapsed_h`, `surface_prepared` только если они подтверждены TDS/источником — остаётся в §14;
+5. `UNKNOWN` должен оставаться неизвестным и требовать проверки источника, а не автоматически становиться запретом — выполнено на уровне compatibility workflow.
 
 ## Порядок продолжения
 1. GitHub Actions не запускать из-за лимита пользователя.
@@ -126,7 +129,7 @@ Code commit: `f425ab1ed46697807f0c0c1414429f2ac631e872` — добавлен `ve
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
 6. §12/§13: механизм безопасной загрузки verified source-backed rules создан. Следующий шаг — добавить только фактически проверенные sidecar-манифесты для выбранных документов (с SHA-256 исходного PDF и без придуманных значений), затем подключить их к `NormativeRegistry`/инженерному workflow.
 7. После фактического набора verified rules перейти к §14 TDS-backed technological validation.
-8. §22 вести отдельно и не закрывать формально до полного workflow integration.
+8. §22 вести отдельно: CalculationView workflow integration выполнена, следующий шаг — SystemsView и UI regression; формально не закрывать до полного workflow integration.
 9. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
 ## Контроль
