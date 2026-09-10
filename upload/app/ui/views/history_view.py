@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from PySide6.QtWidgets import (
@@ -13,6 +14,7 @@ from PySide6.QtCore import Qt, Signal
 
 from app.infrastructure.database.engine import get_session_factory, session_scope, init_db, get_engine
 from app.services.history_service import HistoryService
+from app.services.notification_service import enqueue_event
 from app.config import DB_PATH
 
 
@@ -184,6 +186,19 @@ class HistoryView(QWidget):
             sf = self._get_session_factory()
             with session_scope(sf) as session:
                 calc_id = HistoryService(session).save_calculation(result)
+                recipient = os.getenv("LKM_NOTIFICATION_RECIPIENT", "").strip()
+                if recipient:
+                    enqueue_event(
+                        session,
+                        "calculation_saved",
+                        calc_id,
+                        recipient,
+                        f"LKM Calculator: сохранён расчёт №{result.object_data.calculation_number or calc_id}",
+                        "Сохранён расчёт в истории LKM Calculator.\n"
+                        f"ID: {calc_id}\n"
+                        f"Объект: {result.object_data.object_name or '—'}\n"
+                        f"Система: {result.system.system_name or '—'}",
+                    )
             self.refresh()
             return calc_id
         except Exception as e:
