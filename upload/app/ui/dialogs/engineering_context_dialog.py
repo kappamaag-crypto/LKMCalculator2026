@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from app.domain.engineering_context import EngineeringContext
 from app.domain.normative import NormativeModel, NormativeSource, UNKNOWN
 from app.domain.surface_profile import SurfaceCondition, SurfacePreparation, SurfaceProfile
+from app.services.engineering_source_registry import EngineeringSourceRegistry, EngineeringSource
 
 
 class EngineeringContextDialog(QDialog):
@@ -31,6 +32,7 @@ class EngineeringContextDialog(QDialog):
         self.setWindowTitle("Инженерный контекст")
         self.setMinimumWidth(620)
         self._context = context or EngineeringContext()
+        self._source_registry = EngineeringSourceRegistry()
         self._build_ui()
         self._load_context(self._context)
 
@@ -63,6 +65,12 @@ class EngineeringContextDialog(QDialog):
             self.norm_issuer,
             self.norm_uri,
         ) = self._source_fields(normative_source)
+        self.norm_source_combo = QComboBox()
+        self.norm_source_combo.addItem("— выбрать документ из реестра —", None)
+        for item in self._source_registry.by_category("Нормативный документ"):
+            self.norm_source_combo.addItem(item.source.title or item.source.document_id, item)
+        self.norm_source_combo.currentIndexChanged.connect(self._on_norm_source_selected)
+        normative_source.layout().insertRow(0, "Реестр источников:", self.norm_source_combo)
         normative_layout.addWidget(normative_source)
 
         normative_form = QFormLayout()
@@ -71,7 +79,6 @@ class EngineeringContextDialog(QDialog):
         self.norm_description = QLineEdit()
         self.norm_status = QComboBox()
         self.norm_status.addItem("Источник выбран, правила пока UNKNOWN", UNKNOWN)
-        self.norm_status.addItem("Правила подтверждены источником", "KNOWN")
         normative_form.addRow("ID модели:", self.norm_model_id)
         normative_form.addRow("Версия модели:", self.norm_version)
         normative_form.addRow("Описание:", self.norm_description)
@@ -180,11 +187,30 @@ class EngineeringContextDialog(QDialog):
             source_uri=uri.text().strip(),
         )
 
+    def _on_norm_source_selected(self, index: int) -> None:
+        item = self.norm_source_combo.itemData(index)
+        if not isinstance(item, EngineeringSource):
+            return
+        source = item.source
+        self.norm_document_id.setText(source.document_id)
+        self.norm_title.setText(source.title)
+        self.norm_revision.setText(source.revision)
+        self.norm_issuer.setText(source.issuer)
+        self.norm_uri.setText(source.source_uri)
+        if not self.norm_model_id.text().strip():
+            self.norm_model_id.setText(source.document_id)
+        if not self.norm_version.text().strip():
+            self.norm_version.setText(source.revision or "source")
+
     def _load_source(self, source: NormativeSource | None, fields: tuple[QLineEdit, QLineEdit, QLineEdit, QLineEdit, QLineEdit]) -> None:
         if source is None:
             return
         for widget, value in zip(fields, (source.document_id, source.title, source.revision, source.issuer, source.source_uri)):
             widget.setText(value)
+        if fields == (self.norm_document_id, self.norm_title, self.norm_revision, self.norm_issuer, self.norm_uri):
+            idx = self.norm_source_combo.findText(source.title or source.document_id)
+            if idx >= 0:
+                self.norm_source_combo.setCurrentIndex(idx)
 
     def _load_context(self, context: EngineeringContext) -> None:
         model = context.normative_model
@@ -192,7 +218,6 @@ class EngineeringContextDialog(QDialog):
             self.norm_model_id.setText(model.model_id)
             self.norm_version.setText(model.version)
             self.norm_description.setText(model.description)
-            self.norm_status.setCurrentIndex(1 if model.known_rules() else 0)
             first_source = next((rule.source for rule in model.rules.values() if rule.source is not None), None)
             self._load_source(first_source, (self.norm_document_id, self.norm_title, self.norm_revision, self.norm_issuer, self.norm_uri))
 
@@ -222,8 +247,6 @@ class EngineeringContextDialog(QDialog):
         if model_id or version or norm_source:
             if not model_id or not version:
                 raise ValueError("Для нормативной модели укажите ID модели и версию.")
-            if norm_source is None and self.norm_status.currentData() == "KNOWN":
-                raise ValueError("Известные нормативные правила требуют источника.")
             model = NormativeModel(
                 model_id=model_id,
                 version=version,
