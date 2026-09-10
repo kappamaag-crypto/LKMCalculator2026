@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from app.domain.engineering_context import EngineeringContext
 from app.domain.normative import NormativeModel, NormativeRule, NormativeSource, UNKNOWN
 from app.domain.surface_profile import SurfaceCondition, SurfacePreparation, SurfaceProfile
 
@@ -135,4 +136,23 @@ def surface_condition_from_dict(data: dict[str, Any] | None) -> SurfaceCondition
         substrate=str(data.get("substrate", "")),
         contamination_status=str(data.get("contamination_status", UNKNOWN)),
         moisture_status=str(data.get("moisture_status", UNKNOWN)),
+    )
+
+
+def engineering_context_to_dict(context: EngineeringContext | None) -> dict[str, Any] | None:
+    if context is None:
+        return None
+    return {
+        "normative_model": normative_model_to_dict(context.normative_model),
+        "surface_condition": surface_condition_to_dict(context.surface_condition),
+    }
+
+
+def engineering_context_from_dict(data: dict[str, Any] | None) -> EngineeringContext | None:
+    if not data:
+        return None
+    surface = surface_condition_from_dict(data.get("surface_condition"))
+    return EngineeringContext(
+        normative_model=normative_model_from_dict(data.get("normative_model")),
+        surface_condition=surface or SurfaceCondition(),
     )
