@@ -20,11 +20,69 @@ class HistoryService:
         self.session = session
         self.repo = CalculationRepository(session)
 
+    @staticmethod
+    def _material_snapshot(material) -> dict:
+        """Capture all material fields needed to restore a calculation independently."""
+        def enum_value(value):
+            return value.value if hasattr(value, "value") else value
+
+        return {
+            "material_id": material.id,
+            "material_name": material.material_name,
+            "manufacturer": material.manufacturer,
+            "brand": material.brand,
+            "material_type": enum_value(material.material_type),
+            "binder": enum_value(material.binder_type),
+            "description": material.description,
+            "density": material.density,
+            "solids_percent": material.solids_percent,
+            "solids_by_volume_percent": material.solids_by_volume_percent,
+            "voc": material.voc,
+            "color": material.color,
+            "ral": material.ral,
+            "price_per_kg": material.price_per_kg,
+            "price_per_liter": material.price_per_liter,
+            "prices_include_vat": material.prices_include_vat,
+            "theoretical_coverage": material.theoretical_coverage,
+            "application_method": enum_value(material.application_method),
+            "min_application_temperature": material.min_application_temperature,
+            "max_application_temperature": material.max_application_temperature,
+            "min_recoat_time_h": material.min_recoat_time_h,
+            "max_recoat_time_h": material.max_recoat_time_h,
+            "drying_time_h": material.drying_time_h,
+            "full_cure_time_h": material.full_cure_time_h,
+            "pot_life_h": material.pot_life_h,
+            "induction_time_min": material.induction_time_min,
+            "max_relative_humidity": material.max_relative_humidity,
+            "min_dew_point_margin_c": material.min_dew_point_margin_c,
+            "recommended_dft_min": material.recommended_dft_min,
+            "recommended_dft_max": material.recommended_dft_max,
+            "max_single_layer_dft": material.max_single_layer_dft,
+            "thinner_required": material.thinner_required,
+            "thinner_name": material.thinner_name,
+            "thinner_percent_min": material.thinner_percent_min,
+            "thinner_percent_max": material.thinner_percent_max,
+            "thinner_basis": material.thinner_basis,
+            "packaging_kg": material.packaging_kg,
+            "packaging_l": material.packaging_l,
+            "is_two_component": material.is_two_component,
+            "datasheet": material.datasheet,
+            "datasheet_version": material.datasheet_version,
+            "datasheet_date": material.datasheet_date,
+            "safety_data_sheet": material.safety_data_sheet,
+            "certificate": material.certificate,
+            "certificate_version": material.certificate_version,
+            "test_protocol": material.test_protocol,
+            "is_active": material.is_active,
+            "is_incomplete": material.is_incomplete,
+            "notes": material.notes,
+        }
+
     def save_calculation(self, result: SystemCalculationResult, notes: str = "") -> int:
         """Сохранить расчёт как неизменяемый снимок входных данных и результата."""
         obj = result.object_data
         snapshot = {
-            "snapshot_version": 4,
+            "snapshot_version": 5,
             "object": {
                 "object_name": obj.object_name,
                 "customer": obj.customer,
@@ -50,22 +108,11 @@ class HistoryService:
             "layers": [],
         }
         for lr in result.layers:
-            snapshot["layers"].append({
-                "material_id": lr.material.id,
-                "material_name": lr.material.material_name,
-                "manufacturer": lr.material.manufacturer,
-                "brand": lr.material.brand,
-                "material_type": lr.material.material_type.value if hasattr(lr.material.material_type, "value") else str(lr.material.material_type),
-                "binder": lr.material.binder_type.value if hasattr(lr.material.binder_type, "value") else str(lr.material.binder_type),
-                "density": lr.material.density,
-                "solids_percent": lr.material.solids_percent,
-                "solids_by_volume_percent": lr.material.solids_by_volume_percent,
-                "price_per_kg": lr.material.price_per_kg,
-                "price_per_liter": lr.material.price_per_liter,
+            layer = self._material_snapshot(lr.material)
+            layer.update({
                 "target_dft": lr.target_dft,
                 "losses_percent": lr.losses_percent,
                 "thinner_percent": lr.thinner_percent,
-                "thinner_name": lr.thinner.material_name if lr.thinner else None,
                 "thinner_id": lr.thinner.id if lr.thinner else None,
                 "thinner_density": lr.thinner.density if lr.thinner else None,
                 "thinner_price_per_kg": lr.thinner.price_per_kg if lr.thinner else None,
@@ -82,6 +129,7 @@ class HistoryService:
                 "total_consumption_l": lr.total_consumption_l,
                 "total_cost": lr.total_cost,
             })
+            snapshot["layers"].append(layer)
         snapshot = seal_snapshot(snapshot)
 
         now = datetime.now(timezone.utc)
