@@ -31,8 +31,8 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance отложен из-за запрета на Actions/тесты. Необратимые downgrade требуют восстановления backup. |
 | 11 | ЧАСТИЧНО | Self-contained immutable material snapshots v5, verified reads и integrity hashing реализованы; acceptance/runtime smoke отложен. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox интегрирован с `calculation_saved`; opt-in worker/trigger, idempotency metadata и env-only SMTP реализованы. SMTP/runtime smoke и тесты отложены. |
-| 12 | ЧАСТИЧНО | Добавлен immutable versioned normative foundation: `NormativeSource`, `NormativeRule`, `NormativeModel`, `NormativeRegistry`. Известные правила требуют source metadata; отсутствующие правила возвращаются как `UNKNOWN`. Code commit `709eadea`. Нормативные значения и конкретные стандарты намеренно не выдумывались; persistence/integration/regression ещё не выполнены. |
-| 13 | НЕ ВЫПОЛНЕНО | Structured Sa/St/profile model. |
+| 12 | ЧАСТИЧНО | `NormativeSource`, `NormativeRule`, `NormativeModel`, `NormativeRegistry`: immutable versioned source/rule foundation, явный `UNKNOWN`. Code `709eadea`. Persistence/integration/acceptance ещё отсутствуют. |
+| 13 | ЧАСТИЧНО | Добавлены immutable `SurfacePreparation` (Sa/St/OTHER/UNKNOWN), `SurfaceProfile` (Rz/Ry5/Rmax/UNKNOWN) и объединяющий `SurfaceCondition`. Известная оценка требует source metadata; отсутствие данных остаётся `UNKNOWN`. Code `6d3c8614`. Интеграция с `ObjectData`/UI/normative validation и acceptance ещё не выполнены. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; environment/technology/compatibility/explanation/weights остаются. |
@@ -55,15 +55,15 @@
 
 ## Последние code-этапы
 
-### §11.1 — Notification outbox foundation and application integration
-Code commits: `2685f1f`, `dd7d600`, `138145f`, `9d10e914`, `4fdec2dd`, `fbe980e`, `baee2aa`.
-
-Реальный SMTP/runtime smoke и тесты не запускаются по указанию пользователя; §11.1 остаётся `ЧАСТИЧНО`.
-
 ### §12 — Versioned normative model foundation
-Code commit: `709eadea3be513fb3a2a540dc195ef93956f4b09` — добавлен immutable source-backed normative model с версиями, правилами, registry и явным `UNKNOWN`.
+Code commit: `709eadea3be513fb3a2a540dc195ef93956f4b09` — immutable source-backed normative model с версиями, правилами, registry и явным `UNKNOWN`.
 
 Этот commit не закрывает §12: пока нет persistence, интеграции с расчётным snapshot/result и acceptance-прогона.
+
+### §13 — Structured Sa/St/profile foundation
+Code commit: `6d3c86145e99c8c9a653cb1dff9823639c3fef41` — structured surface preparation/profile model без hard-coded нормативных значений.
+
+Этот commit не закрывает §13: интеграция с расчётным вводом, UI, normative validation и acceptance остаются впереди.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -81,7 +81,7 @@ Code commit: `709eadea3be513fb3a2a540dc195ef93956f4b09` — добавлен imm
 3. §10 не считать закрытым без acceptance-доказательства.
 4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
-6. Текущий рабочий этап — §12: довести versioned normative model до persistence/integration, затем перейти к §13.
+6. Текущий рабочий этап — §12/§13: довести normative/surface models до persistence и workflow integration, не добавляя вымышленных нормативных значений; затем перейти к §14.
 7. §22 вести отдельно и не закрывать формально до полного workflow integration.
 8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
