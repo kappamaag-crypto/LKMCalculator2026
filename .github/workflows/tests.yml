@@ -19,8 +19,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Qt runtime dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1
+        working-directory: .
       - name: Install LibreOffice
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice-calc
+        run: sudo apt-get install -y --no-install-recommends libreoffice-calc
         working-directory: .
       - name: Setup Python
         uses: actions/setup-python@v5
