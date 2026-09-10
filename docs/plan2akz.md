@@ -145,7 +145,7 @@ PDF строится из `SystemCalculationResult`, поддерживает 2/
 
 Коммиты:
 - `8598365345d000c884978642cde4e916c0fbf7a0` — `test: strengthen precision and unit invariants`;
-- `5662a6f39c6e2312ee30f8bc236a25d0f8bc7` — `test: add independent multilayer system golden cases`.
+- `5662a6f39c6e2312ee30f8bc236a25d8d3c339e9` — `test: add independent multilayer system golden cases`.
 
 CI:
 - `34439245472` — **success**;
