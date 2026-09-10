@@ -186,6 +186,11 @@ class EngineeringExcelExporter:
             ("ЛКМ + разбавитель, руб/м²", [s.total_cost_per_m2 for s in comparison.systems]),
             ("Стоимость объекта, руб", [s.total_cost for s in comparison.systems]),
         ]
+        technology = [self._technology_values(s) for s in comparison.systems]
+        if technology:
+            for indicator in technology[0]:
+                rows.append((indicator, [item[indicator] for item in technology]))
+
         max_layers = max(len(s.layers) for s in comparison.systems)
         for index in range(max_layers):
             rows.extend([
@@ -238,3 +243,29 @@ class EngineeringExcelExporter:
         ws.print_area = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
         wb.save(path)
         return path
+
+    @staticmethod
+    def _technology_values(result: SystemCalculationResult) -> dict[str, object]:
+        layers = result.layers
+        binders = []
+        for layer in layers:
+            value = layer.material.binder_type.value if hasattr(layer.material.binder_type, "value") else str(layer.material.binder_type or "")
+            if value and value not in binders:
+                binders.append(value)
+        min_application = [layer.material.min_application_temperature for layer in layers if layer.material.min_application_temperature is not None]
+        max_application = [layer.material.max_application_temperature for layer in layers if layer.material.max_application_temperature is not None]
+        min_recoat = [layer.material.min_recoat_time_h for layer in layers if layer.material.min_recoat_time_h is not None]
+        max_recoat = [layer.material.max_recoat_time_h for layer in layers if layer.material.max_recoat_time_h is not None]
+        cure = [layer.material.full_cure_time_h for layer in layers if layer.material.full_cure_time_h is not None]
+        humidity = [layer.material.max_relative_humidity for layer in layers if layer.material.max_relative_humidity is not None]
+        dew_margin = [layer.material.min_dew_point_margin_c for layer in layers if layer.material.min_dew_point_margin_c is not None]
+        return {
+            "Связующие": ", ".join(binders) if binders else "—",
+            "Мин. температура нанесения, °C": max(min_application) if min_application else None,
+            "Макс. температура нанесения, °C": min(max_application) if max_application else None,
+            "Мин. межслойная выдержка, ч": max(min_recoat) if min_recoat else None,
+            "Макс. межслойная выдержка, ч": min(max_recoat) if max_recoat else None,
+            "Полное отверждение, ч": max(cure) if cure else None,
+            "Макс. относительная влажность, %": min(humidity) if humidity else None,
+            "Мин. запас до точки росы, °C": max(dew_margin) if dew_margin else None,
+        }
