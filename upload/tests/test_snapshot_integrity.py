@@ -36,3 +36,25 @@ def test_unsealed_legacy_snapshot_is_not_presented_as_immutable():
     assert not verify_snapshot(legacy)
     with pytest.raises(ValueError, match="не содержит контрольной суммы"):
         load_and_verify_snapshot(json.dumps(legacy, ensure_ascii=False))
+
+
+def test_individual_layer_snapshot_is_sealed_and_detects_changes():
+    layer = {
+        "material_id": 17,
+        "material_name": "ЭП-150",
+        "density": 1.35,
+        "price_per_kg": 607.0,
+        "target_dft": 120.0,
+    }
+    sealed_layer = seal_snapshot(layer)
+
+    assert verify_snapshot(sealed_layer)
+
+    changed_catalog_value = dict(sealed_layer)
+    changed_catalog_value["price_per_kg"] = 999.0
+    assert not verify_snapshot(changed_catalog_value)
+
+    restored = load_and_verify_snapshot(json.dumps(sealed_layer, ensure_ascii=False))
+    assert restored["material_name"] == "ЭП-150"
+    assert restored["price_per_kg"] == 607.0
+    assert restored["target_dft"] == 120.0
