@@ -31,7 +31,7 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance отложен из-за запрета на Actions/тесты. Необратимые downgrade требуют восстановления backup. |
 | 11 | ЧАСТИЧНО | Self-contained immutable material snapshots v5, verified reads и integrity hashing реализованы; acceptance/runtime smoke отложен. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox интегрирован с `calculation_saved`; opt-in worker/trigger, idempotency metadata и env-only SMTP реализованы. SMTP/runtime smoke и тесты отложены. |
-| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v7 реализованы. `SystemCalculationResult` типизированно содержит `EngineeringContext`; `SystemCalculator`, `CalculationService` и `CalculationView` принимают/переносят его явно. History умеет сохранять и восстанавливать typed context, включая legacy v6. В UI есть редактор source identity и реестр доступных source-документов с выбором из каталога. Добавлен безопасный loader проверенного sidecar-манифеста: он требует существующий source-файл и SHA-256, не извлекает и не угадывает нормативные значения. Фактический набор verified rules/manifest пока не добавлен. Acceptance отложен. |
+| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v7 реализованы. `SystemCalculationResult` типизированно содержит `EngineeringContext`; `SystemCalculator`, `CalculationService` и `CalculationView` принимают/переносят его явно. History умеет сохранять и восстанавливать typed context, включая legacy v6. В UI есть редактор source identity и реестр доступных source-документов с выбором из каталога. Добавлен безопасный loader проверенного sidecar-манифеста: он требует существующий source-файл и SHA-256, не извлекает и не угадывает нормативные значения. Loader теперь умеет загружать явно перечисленные verified sidecars в строгий `NormativeRegistry` с защитой от дубликатов. Фактический набор verified rules/manifest пока не добавлен. Acceptance отложен. |
 | 13 | ЧАСТИЧНО | `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` + serializer и History snapshot v7 реализованы. `CalculationView` хранит/принимает typed surface context и восстанавливает его из history; legacy object surface сохраняется как fallback. В UI есть редактор подготовки/профиля и их источников. Без источника assessment остаётся `UNKNOWN`. Acceptance отложен. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. Начинать после появления проверяемого source-backed rule pipeline. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
@@ -106,6 +106,9 @@ Code commit: `6db6da2b5a72d9d93a2bbd6ea8a4572c2dc0e916` — восстановл
 ### §12 — Verified source-backed rule import boundary
 Code commit: `f425ab1ed46697807f0c0c1414429f2ac631e872` — добавлен `verified_normative_loader.py`: human-reviewed JSON sidecar принимается только при наличии source-файла, совпадении SHA-256, валидной схеме model/rules и явных значениях для `KNOWN` правил. Loader не извлекает значения из PDF и не делает инженерных предположений.
 
+### §12 — Verified sidecar registry assembly
+Code commit: `76f5c6ad5f65ac339a98382eb50d7f21ef200142` — verified loader теперь умеет принимать явно заданный набор sidecar-манифестов и регистрировать проверенные `NormativeModel` в `NormativeRegistry`; дубликаты `model_id:version` отклоняются. Автопоиск манифестов и подстановка нормативных значений не добавлялись. Фактические SHA-256 и rule values по PDF пока не внесены.
+
 ### §22 — Calculation workflow integration
 Code commit: `2ea726933b859c8e00dd17069be437cb6251a302` — `CalculationService` получил `LayerCompatibilityEngine`; добавлен `compatibility_report()` и source-backed блок совместимости в `format_summary()`. После расчёта `CalculationView` получает статус и сообщения по каждому переходу между соседними слоями. Проверка информационная: `UNKNOWN` не блокирует расчёт и не превращается в запрет. TDS-specific cure/recoat conditions намеренно не выводятся из общих предположений.
 
@@ -127,7 +130,7 @@ Code commit: `2ea726933b859c8e00dd17069be437cb6251a302` — `CalculationService`
 3. §10 не считать закрытым без acceptance-доказательства.
 4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
-6. §12/§13: механизм безопасной загрузки verified source-backed rules создан. Следующий шаг — добавить только фактически проверенные sidecar-манифесты для выбранных документов (с SHA-256 исходного PDF и без придуманных значений), затем подключить их к `NormativeRegistry`/инженерному workflow.
+6. §12/§13: механизм безопасной загрузки verified source-backed rules создан; добавлена сборка явно перечисленного набора sidecar-манифестов в `NormativeRegistry`. Следующий шаг — добавить только фактически проверенные sidecar-манифесты для выбранных документов (с SHA-256 исходного PDF и без придуманных значений), затем подключить фактический registry к инженерному workflow.
 7. После фактического набора verified rules перейти к §14 TDS-backed technological validation.
 8. §22 вести отдельно: CalculationView workflow integration выполнена, следующий шаг — SystemsView и UI regression; формально не закрывать до полного workflow integration.
 9. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
