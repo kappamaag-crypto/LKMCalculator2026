@@ -1,4 +1,6 @@
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from app.domain.models import Material, MaterialComponent, MaterialMix, ObjectData
 from app.domain.enums import BinderType, MaterialType
@@ -10,6 +12,13 @@ from app.domain.two_component import (
     TwoComponentService,
 )
 from app.services.calculation_service import CalculationService
+from app.infrastructure.database.engine import Base
+from app.infrastructure.database.models import MaterialORM, MaterialComponentORM, MaterialMixORM
+from app.infrastructure.database.repositories import (
+    MaterialComponentRepository,
+    MaterialMixRepository,
+    material_orm_to_domain,
+)
 
 
 def test_two_component_is_information_only():
@@ -88,3 +97,34 @@ def test_two_component_material_calculates_as_one_layer_in_multilayer_system():
     assert result.layers[0].practical_consumption_kg > 0
     assert result.layers[0].practical_consumption_l > 0
     assert result.total_practical_consumption_kg > result.layers[0].practical_consumption_kg
+
+
+def test_two_component_database_metadata_round_trip_is_informational_only():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        material = MaterialORM(
+            manufacturer="Blank", material_name="2К Эпоксидный материал",
+            material_type=MaterialType.PRIMER_ENAMEL.value, binder_type=BinderType.EPOXY.value,
+            density=1.45, solids_by_volume_percent=72.0, price_per_kg=500.0,
+            is_two_component=True,
+        )
+        session.add(material)
+        session.flush()
+        session.add_all([
+            MaterialComponentORM(material_id=material.id, component_code="A", name="Основа", density_kg_l=1.5),
+            MaterialComponentORM(material_id=material.id, component_code="B", name="Отвердитель", density_kg_l=1.1),
+            MaterialMixORM(material_id=material.id, mix_ratio_a=4.0, mix_ratio_b=1.0, ratio_basis=RATIO_MASS, working_time_minutes=40),
+        ])
+        session.commit()
+
+        loaded = material_orm_to_domain(session.get(MaterialORM, material.id))
+        components = MaterialComponentRepository(session).list_for_material(material.id)
+        mix = MaterialMixRepository(session).get_for_material(material.id)
+
+    assert loaded.is_two_component is True
+    assert [component.component_code for component in components] == ["A", "B"]
+    assert mix is not None
+    assert (mix.mix_ratio_a, mix.mix_ratio_b, mix.ratio_basis) == (4.0, 1.0, RATIO_MASS)
+    assert not hasattr(mix, "purchase_a_kg")
+    assert not hasattr(mix, "sets")
