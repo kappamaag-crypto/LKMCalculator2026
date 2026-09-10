@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 from .enums import MaterialType, BinderType, CorrosionCategory, DurabilityLevel, SurfaceType, PreparationGrade, ApplicationMethod, EnvironmentType
+from .engineering_context import EngineeringContext
 
 
 @dataclass
@@ -79,9 +80,7 @@ class LayerDefinition:
     layer_type: MaterialType = MaterialType.OTHER
     dft_min: Optional[float] = None
     dft_max: Optional[float] = None
-    # None означает «DFT не задан», 0 — это уже явно заданное нулевое значение.
     target_dft: Optional[float] = None
-    # 0 % разбавления — валидное значение «без разбавления», поэтому не трактуется как UNKNOWN.
     thinner_percent: float = 0.0
     thinner_material_id: Optional[int] = None
     thinner_basis: Optional[str] = None
@@ -147,7 +146,6 @@ class ObjectData:
     customer: str = ""
     project: str = ""
     calculation_number: str = ""
-    # None означает «площадь не задана»; положительное значение — реальная площадь расчёта.
     area_m2: Optional[float] = None
     structure_type: str = ""
     substrate: str = ""
@@ -186,6 +184,7 @@ class SystemCalculationResult:
     total_cost: Optional[float] = None
     total_thinner_cost: Optional[float] = None
     calculated_at: datetime = field(default_factory=datetime.now)
+    engineering_context: EngineeringContext = field(default_factory=EngineeringContext)
 
 
 @dataclass
