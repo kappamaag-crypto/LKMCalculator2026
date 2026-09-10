@@ -29,8 +29,8 @@
 | 8 | ВЫПОЛНЕНО | 2K учитывается как один смешанный материалный слой; TDS technology rules вынесены в §14. |
 | 9 | ЧАСТИЧНО | `PackagingPlanner` считает коммерческую потребность по фасовке: целые упаковки, резерв и опциональную стоимость; regression `26897211`. Складские остатки, складской учёт, резерв склада и закупочные заказы в проект не входят. Полный коммерческий workflow/UI ещё не реализован. |
 | 10 | ЧАСТИЧНО | Alembic присутствует. Добавлены SQLite-safe backup/restore helpers `de1fd6f` и regression/migration idempotency `f8adeff`; acceptance CI не используем из-за исчерпанного Actions-лимита. Для миграций с необратимым `downgrade` (например, `004_nullable_calculation_inputs`) rollback должен выполняться восстановлением предмиграционного backup, а не возвратом данных к вымышленным значениям. |
-| 11 | ЧАСТИЧНО | Immutable snapshots усилены: `HistoryService` теперь формирует self-contained material payload (включая инженерные/технологические поля), `snapshot_version` поднят до 5; `snapshot_service` восстанавливает современные snapshots без зависимости от mutable catalog, сохраняя fallback только для legacy-полей. `HistoryView` больше не читает `snapshot_json` напрямую и открывает только проверенный snapshot через `HistoryService.get_calculation_snapshot`. Code commits `e63b4ba`, `0104553c`, `012bff6`, `a75311d`, `3a799e2`, `30f8b20`; regression `3b8ffab`, `4b232ece`. §11 всё ещё не закрыт: acceptance/runtime smoke и фактическая проверка восстановления не запускались по текущему указанию пользователя; Actions не используются. |
-| 11.1 | НЕ ВЫПОЛНЕНО | Outbox/SMTP/retry/idempotency/safe secrets. Начинать после acceptance §11. |
+| 11 | ЧАСТИЧНО | Immutable snapshots усилены: `HistoryService` формирует self-contained material payload, `snapshot_version` поднят до 5; `snapshot_service` восстанавливает современные snapshots без зависимости от mutable catalog, с fallback только для legacy-полей. `HistoryView` открывает snapshot через `HistoryService.get_calculation_snapshot`. Code commits `e63b4ba`, `0104553c`, `012bff6`, `a75311d`, `3a799e2`, `30f8b20`; regression `3b8ffab`, `4b232ece`. Acceptance/runtime smoke намеренно отложен до общего прогона; Actions не используются. |
+| 11.1 | ЧАСТИЧНО | Добавлен durable notification outbox: Alembic `005_notification_outbox`, уникальный `idempotency_key`, статусы `pending/sending/retry/sent/failed`, счётчик попыток, `next_attempt_at`, `last_error`, `sent_at`. Добавлен `NotificationService` с deterministic idempotency key, повторным enqueue без дублей, exponential backoff и ограничением `max_attempts`. SMTP-credentials читаются только из environment и не сохраняются в БД. Code commits `2685f1f`, `dd7d600`, `138145f`. Реальный SMTP smoke и runtime проверки пока намеренно не выполнялись; §11.1 не закрывать до общего прогона. |
 | 12 | НЕ ВЫПОЛНЕНО | Versioned normative model. |
 | 13 | НЕ ВЫПОЛНЕНО | Structured Sa/St/profile model. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
@@ -98,7 +98,14 @@ Code commit: `3a799e2a49fcfa7af92c1ab5a8b3103043f76b19` — material payload sna
 
 Code commit: `30f8b20aa5b6ec4e371792413829ae2b9eea05fb` — `snapshot_service` восстанавливает современные material snapshots из snapshot-данных; catalog fallback оставлен только для отсутствующих legacy-полей.
 
-GitHub Actions **не запускаются**: лимит Actions пользователя исчерпан. Новые проверки в Actions не создавались.
+### §11.1 — Notification outbox foundation
+Code commit: `2685f1f27c654d3fe79b3746f108984cd35dba24` — Alembic migration `005_notification_outbox` с durable queue, статусами retry lifecycle и уникальным idempotency key.
+
+Code commit: `dd7d600885c6c911a2760eb74daee90008d46796` — ORM adapter `NotificationOutboxORM`; SMTP credentials отсутствуют в persistent model.
+
+Code commit: `138145f1708f3c587576ba24aa1984b03edea57a` — `NotificationService`: deterministic idempotency, durable enqueue, bounded retry/backoff и SMTP adapter с credentials только из environment.
+
+Реальный SMTP/runtime smoke и тесты сейчас не запускаются по указанию пользователя; поэтому §11.1 остаётся `ЧАСТИЧНО`.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -114,9 +121,9 @@ GitHub Actions **не запускаются**: лимит Actions пользо�
 1. GitHub Actions не запускать из-за лимита пользователя.
 2. §10 не считать закрытым без acceptance-доказательства; существующие backup/restore и migration tests сохранять.
 3. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
-4. Текущий рабочий этап — §11: кодовая часть self-contained snapshot/verified-load завершена на текущем шаге, но acceptance/runtime smoke отложен до общего прогона.
-5. Не переводить §11 в `ВЫПОЛНЕНО` до общего прогона: создание/чтение через `HistoryService`, изменение каталога после сохранения и восстановление снимка без mutable catalog dependency.
-6. После acceptance §11 перейти к §11.1, затем далее по матрице.
+4. §11 остаётся `ЧАСТИЧНО` до общего runtime acceptance; написанный код не считать заменой прогона.
+5. Текущий рабочий этап — §11.1: notification outbox, идемпотентность, retry и безопасные SMTP secrets реализованы кодово, но runtime/SMTP acceptance отложен.
+6. После acceptance §11.1 перейти к §12, затем далее по матрице.
 7. §22 вести отдельно и не закрывать формально до полного workflow integration.
 8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
@@ -131,7 +138,7 @@ GitHub Actions **не запускаются**: лимит Actions пользо�
 - `34453753830` — commit `f8adeff`, queued; новые Actions runs по текущей работе не запускаются.
 
 ## Последняя проверка
-`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. В §11 добавлены verified-load в UI и self-contained material snapshots v5. Тесты и runtime smoke намеренно не запускались; §11 остаётся `ЧАСТИЧНО` до общего прогона.
+`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. Тесты и runtime smoke намеренно не запускались. §11 остаётся `ЧАСТИЧНО`; §11.1 получил кодовую основу durable outbox/SMTP/retry/idempotency, но также остаётся `ЧАСТИЧНО` до общего прогона.
 
 ## Следующий рабочий фокус
-После общего прогона §11 перейти к §11.1: outbox для уведомлений, безопасное хранение секретов, retry и идемпотентность. До этого не расширять §22 и не перескакивать через порядок плана.
+§11.1: довести notification workflow до интеграционного уровня без запуска Actions — привязать enqueue к реальному событию приложения, определить безопасный lifecycle worker/trigger и затем после общего прогона закрыть acceptance. После этого перейти к §12.
