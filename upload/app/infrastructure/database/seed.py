@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from app.infrastructure.database.models import MaterialORM, MaterialComponentORM, MaterialMixORM, CoatingSystemORM, CoatingSystemLayerORM, LayerCompatibilityORM, DictionaryORM
 from app.domain.enums import MaterialType, BinderType, CompatibilityStatus
+from app.domain.compatibility import check_binders
 
 CATALOG_PATH = Path(__file__).resolve().parents[3] / "data" / "spkeffa_catalog.json"
 
@@ -38,8 +39,6 @@ def seed_demo_materials(session: Session) -> dict[str, int]:
     for data in demo:
         existing = session.query(MaterialORM).filter_by(material_name=data["material_name"]).first()
         if existing:
-            # Backfill fields required by the calculation engine for databases
-            # created before solids_by_volume_percent was introduced.
             changed = False
             for key in ("density", "solids_percent", "solids_by_volume_percent", "price_per_kg", "recommended_dft_min", "recommended_dft_max"):
                 value = data.get(key)
@@ -105,9 +104,39 @@ def seed_demo_system(session: Session, name_to_id: dict[str, int]) -> None:
 
 
 def seed_compatibility(session: Session) -> None:
-    rules = [("эпоксид","эпоксид",CompatibilityStatus.ALLOWED.value,"Стандартная совместимость"),("эпоксид","полиуретан",CompatibilityStatus.ALLOWED.value,"Стандартная совместимость"),("полиуретан","полиуретан",CompatibilityStatus.ALLOWED.value,""),("алкид","эпоксид",CompatibilityStatus.WARNING.value,"Требуется проверка совместимости"),("алкид","полиуретан",CompatibilityStatus.WARNING.value,"Требуется проверка совместимости")]
-    for from_b,to_b,status,notes in rules:
-        if not session.query(LayerCompatibilityORM).filter_by(from_binder=from_b,to_binder=to_b).first(): session.add(LayerCompatibilityORM(from_binder=from_b,to_binder=to_b,status=status,notes=notes))
+    """Persist only compatibility pairs backed by the source matrix.
+
+    The source table is directional (previous -> applied). Blank cells are
+    unknown and therefore are not inserted as permissive rules.
+    """
+    supported = [BinderType.EPOXY, BinderType.POLYURETHANE, BinderType.ACRYLIC]
+    for previous in supported:
+        for applied in supported:
+            rule = check_binders(previous, applied)
+            existing = session.query(LayerCompatibilityORM).filter_by(
+                from_binder=previous.value,
+                to_binder=applied.value,
+            ).first()
+            if rule.status is CompatibilityStatus.UNKNOWN:
+                if existing:
+                    session.delete(existing)
+                continue
+            if existing is None:
+                session.add(LayerCompatibilityORM(
+                    from_binder=previous.value,
+                    to_binder=applied.value,
+                    status=rule.status.value,
+                    notes=f"{rule.note}. Источник: {rule.source}.",
+                ))
+            else:
+                existing.status = rule.status.value
+                existing.notes = f"{rule.note}. Источник: {rule.source}."
+    # These rules existed before the source matrix was introduced and were
+    # generic assumptions rather than source-backed entries.
+    for from_binder, to_binder in ((BinderType.ALKYD.value, BinderType.EPOXY.value), (BinderType.ALKYD.value, BinderType.POLYURETHANE.value)):
+        stale = session.query(LayerCompatibilityORM).filter_by(from_binder=from_binder, to_binder=to_binder).first()
+        if stale:
+            session.delete(stale)
     session.flush()
 
 
