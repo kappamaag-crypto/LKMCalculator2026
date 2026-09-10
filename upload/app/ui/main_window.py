@@ -69,6 +69,8 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _money(value,decimals=2):return "—" if value is None else f"{value:,.{decimals}f}".replace(","," ")
     def _on_calc_done(self,result):
+        self._last_calculation_result=result
+        self.systems_view.set_calculation_result(result)
         self.statusBar().showMessage(f"Расчёт выполнен: {result.total_dft:.0f} мкм, {self._money(result.total_cost_per_m2)} руб/м², объект {self._money(result.total_cost,0)} руб",10000)
         try:self.history_view.save_result(result)
         except Exception as exc:self.statusBar().showMessage(f"Не удалось сохранить расчёт в историю: {exc}",10000)
