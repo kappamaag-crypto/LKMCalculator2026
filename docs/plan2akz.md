@@ -23,7 +23,7 @@
 
 # КОНТРОЛЬНЫЙ АУДИТ 10.09.2026
 
-Текущий рабочий HEAD после отдельного этапа §4: `2ad50af7c4de6b0b5ddbb0ef5113dbb023de2d8f` (`test: add comparison view headless smoke regression`). Предыдущий этап §3: `42bb7fb282774e6f2c1691557ceba86d77795d21`; план по нему обновлялся отдельным commit. Аудит зафиксирован commit `8d4b74f691de7b211d12c661813ba11a032c8c8e`.
+Текущий рабочий HEAD после отдельного этапа §5: `a1e1a0a1d7fd34c6fee3537dec39e98f13f6281c` (`test: preserve unknown prices in engineering Excel export`). Предыдущий этап §4: `2ad50af7c4de6b0b5ddbb0ef5113dbb023de2d8f`; plan commit после него: `2dbe38d2dcb2bc1d58aaba2ab74a4c86bb967e42`. Этап §3: `42bb7fb282774e6f2c1691557ceba86d77795d21`.
 
 Последовательность последнего блока §22 подтверждена: `bb1d4ef → 1073f9c → c2c795c → 8d2059e → a82d7a7 → 2ba6b0e → 084d989 → a43d5ec → f6354fb → b079786 → 937d633`. CI для каждого нового этапа проверяется отдельно; queued не считается успешным.
 
@@ -35,9 +35,9 @@
 |---|---|---|---|
 | 1 | **ВЫПОЛНЕНО (core)** | `CalculationService`, multilayer, precision/unit regression | downstream workflow |
 | 2 | **ЧАСТИЧНО** | `CalculationView`, `SystemsView`, динамические слои, load/create/copy, UI regression | встроенная compatibility-check + визуальный smoke |
-| 3 | **ВЫПОЛНЕНО** | `AdHocMaterialDialog`; `test_ad_hoc_material_dialog.py`: normalization, duplicate reuse, все ключевые поля, SQLite persistence | следующий незакрытый §4 |
-| 4 | **ЧАСТИЧНО** | `ComparisonEngine`, `ComparisonView`, multilayer/2K, technology block, comparison Excel; добавлен headless UI smoke regression | фактическая визуальная проверка + финальная проверка формулировок технологических ограничений |
-| 5 | **ЧАСТИЧНО** | customer/engineering Excel + regression | визуальная проверка, печать/PDF conversion, missing prices |
+| 3 | **ВЫПОЛНЕНО** | `AdHocMaterialDialog`; normalization, duplicate reuse, ключевые поля, SQLite persistence regression | следующий незакрытый §4 |
+| 4 | **ЧАСТИЧНО** | `ComparisonEngine`, `ComparisonView`, multilayer/2K, technology block, comparison Excel; headless UI smoke regression добавлен | фактическая визуальная проверка + финальная проверка формулировок технологических ограничений |
+| 5 | **ЧАСТИЧНО** | customer/engineering Excel + regression; добавлен missing-price regression | визуальная проверка, печать/PDF conversion |
 | 6 | **ЧАСТИЧНО** | PDF из `SystemCalculationResult`, multilayer/comparison/2K regression | визуальная проверка, печать, Excel↔PDF |
 | 7 | **ВЫПОЛНЕНО** | precision/unit invariants + independent 2/3/4/5-layer golden cases + успешные CI | — |
 | 8 | **ВЫПОЛНЕНО** | 2K как один mixed-material layer; comparison/Excel/PDF regression | TDS technology rules только в §14 |
@@ -67,7 +67,7 @@
 | 31 | **НЕ ВЫПОЛНЕНО** | scenario layer отсутствует | scenarios поверх `CalculationService` |
 | 32 | **НЕ ВЫПОЛНЕНО** | §17 незавершён | полноценный inspection workflow |
 
-**Порядок продолжения:** после текущего smoke-этапа §4 остаются незакрытыми его визуальная проверка и проверка формулировок. После §4 первым следующим реально незакрытым пунктом по номеру будет §5. §22 остаётся частично закрытым и не может считаться завершённым до интеграции в workflow.
+**Порядок продолжения:** §4 и §5 остаются частично закрытыми до фактического визуального/печатаемого smoke-check. Следующим по номеру незакрытым пунктом остаётся §5; его automated missing-price regression уже добавлен. После закрытия §5 переходим к §6. §22 остаётся частично закрытым и не может считаться завершённым до интеграции в workflow.
 
 ---
 
@@ -106,7 +106,7 @@ Evidence: `upload/app/ui/dialogs/ad_hoc_material_dialog.py`, `upload/tests/test_
 
 ## 4. Сравнение систем АКЗ
 
-**[ЧАСТИЧНО — ЭТАП SMOKE ДОБАВЛЕН]**
+**[ЧАСТИЧНО — SMOKE ДОБАВЛЕН]**
 
 Есть `ComparisonEngine`, сравнение без повторного расчёта, multilayer/2K, запрет смешения площадей, technology block и comparison Excel. Добавлен headless Qt smoke regression, который строит `ComparisonView`, выполняет реальное сравнение 2- и 4-слойной системы и проверяет наличие колонок, multilayer-строк, технологических показателей и доступность экспорта.
 
@@ -120,7 +120,13 @@ Evidence: `upload/app/ui/views/comparison_view.py`, `upload/tests/test_compariso
 
 ## 5. Excel — customer-facing экспорт
 
-**[ЧАСТИЧНО]** Есть mapping spec, customer/engineering exporters, 2/3/4+ layers, mixed thinner, long names, Commercial/Full, 2K и print settings regression. Остались визуальная проверка, реальная печать/PDF conversion и missing prices.
+**[ЧАСТИЧНО — MISSING PRICE REGRESSION ДОБАВЛЕН]**
+
+Есть mapping spec, customer/engineering exporters, 2/3/4+ layers, mixed thinner, long names, Commercial/Full, 2K и print settings regression. Добавлен отдельный regression для материала без цены: расчёт не получает выдуманную стоимость, а Excel показывает `—` в инженерных итогах/слоях.
+
+Evidence: `upload/app/infrastructure/export/excel_exporter.py`, `upload/tests/test_comparison_excel_export.py`, `upload/tests/test_excel_missing_price.py`, commit `a1e1a0a1d7fd34c6fee3537dec39e98f13f6281c`.
+
+Осталось: визуальная проверка, реальная печать/PDF conversion.
 
 ## 6. PDF — клиентский экспорт
 
@@ -275,4 +281,5 @@ Evidence: `2ba6b0e0ad73c953ee194c87bba8266857f1520e`, `002bbe65e979c1b9e2dc9d807
 - §22 не считать закрытым до фактической интеграции в `CalculationView`/`SystemsView` и TDS-backed правил.
 - Не закрывать этап только по наличию файла или старой записи в плане; требуется сопоставление `код → тест → commit → CI/smoke`.
 - Каждый новый этап: отдельный commit; после него отдельная запись в этом плане.
-- Для §4 headless smoke не заменяет фактическую визуальную проверку; после CI следующим шагом остаётся финализация §4 либо переход к §5, если визуальный smoke подтверждён отдельно.
+- Для §4 headless smoke не заменяет фактическую визуальную проверку.
+- Для §5 missing-price regression не заменяет визуальную проверку и реальную печать/PDF conversion.
