@@ -31,7 +31,7 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance отложен из-за запрета на Actions/тесты. Необратимые downgrade требуют восстановления backup. |
 | 11 | ЧАСТИЧНО | Self-contained immutable material snapshots v5, verified reads и integrity hashing реализованы; acceptance/runtime smoke отложен. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox интегрирован с `calculation_saved`; opt-in worker/trigger, idempotency metadata и env-only SMTP реализованы. SMTP/runtime smoke и тесты отложены. |
-| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v7 реализованы. `SystemCalculationResult` типизированно содержит `EngineeringContext`; `SystemCalculator`, `CalculationService` и `CalculationView` принимают/переносят его явно. History умеет сохранять и восстанавливать typed context, включая legacy v6. В UI есть редактор source identity и реестр доступных source-документов с выбором из каталога. Добавлен безопасный loader проверенного sidecar-манифеста: он требует существующий source-файл и SHA-256, не извлекает и не угадывает нормативные значения. Loader теперь умеет загружать явно перечисленные verified sidecars в строгий `NormativeRegistry` с защитой от дубликатов. Фактический набор verified rules/manifest пока не добавлен. Acceptance отложен. |
+| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v7 реализованы. `SystemCalculationResult` типизированно содержит `EngineeringContext`; `SystemCalculator`, `CalculationService` и `CalculationView` принимают/переносят его явно. History умеет сохранять и восстанавливать typed context, включая legacy v6. В UI есть редактор source identity и реестр доступных source-документов с выбором из каталога. Добавлен безопасный loader проверенного sidecar-манифеста: он требует существующий source-файл и SHA-256, не извлекает и не угадывает нормативные значения. Loader умеет загружать явно перечисленные verified sidecars в строгий `NormativeRegistry` с защитой от дубликатов. Фактический набор verified rules/manifest пока не добавлен. Acceptance отложен. |
 | 13 | ЧАСТИЧНО | `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` + serializer и History snapshot v7 реализованы. `CalculationView` хранит/принимает typed surface context и восстанавливает его из history; legacy object surface сохраняется как fallback. В UI есть редактор подготовки/профиля и их источников. Без источника assessment остаётся `UNKNOWN`. Acceptance отложен. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. Начинать после появления проверяемого source-backed rule pipeline. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
@@ -39,7 +39,7 @@
 | 17 | НЕ ВЫПОЛНЕНО | Inspection workflow. |
 | 18 | НЕ ВЫПОЛНЕНО | Release/regression/smoke/DB backup/docs acceptance. |
 | 19 | НЕ ВЫПОЛНЕНО | Legacy parity matrix. |
-| 20 | НЕ ВЫПОЛНЕНО | Indexed KB из `books/`. |
+| 20 | ЧАСТИЧНО | Добавлен `book_index.py`: детерминированный индекс repository-resident файлов `books/` с относительным путём, названием, типом, размером и SHA-256. Индекс не извлекает нормативные значения и не интерпретирует PDF; полноценная поисковая/контентная KB остаётся следующим этапом. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix есть; applicability к реальной chemistry/TDS остаётся. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` подключён к `CalculationService.format_summary()`, поэтому обычный `CalculationView` уже получает source-backed результат проверки соседних слоёв после расчёта. Проверка не блокирует расчёт и `UNKNOWN` не превращается в запрет. Остаётся прямое workflow-подключение `SystemsView`, UI regression и TDS-backed conditions. |
 | 23 | НЕ ВЫПОЛНЕНО | — |
@@ -109,13 +109,14 @@ Code commit: `f425ab1ed46697807f0c0c1414429f2ac631e872` — добавлен `ve
 ### §12 — Verified sidecar registry assembly
 Code commit: `76f5c6ad5f65ac339a98382eb50d7f21ef200142` — verified loader теперь умеет принимать явно заданный набор sidecar-манифестов и регистрировать проверенные `NormativeModel` в `NormativeRegistry`; дубликаты `model_id:version` отклоняются. Автопоиск манифестов и подстановка нормативных значений не добавлялись. Фактические SHA-256 и rule values по PDF пока не внесены.
 
+### §20 — Repository book source index
+Code commit: `1c0fe4e83d4d02c7fd9828547bc7e45a669ffc28` — добавлен детерминированный `book_index.py`: индексирует файлы `books/`, считает SHA-256 и сохраняет source identity/integrity metadata; PDF не интерпретируются и нормативные значения не выводятся автоматически.
+
 ### §22 — Calculation workflow integration
 Code commit: `2ea726933b859c8e00dd17069be437cb6251a302` — `CalculationService` получил `LayerCompatibilityEngine`; добавлен `compatibility_report()` и source-backed блок совместимости в `format_summary()`. После расчёта `CalculationView` получает статус и сообщения по каждому переходу между соседними слоями. Проверка информационная: `UNKNOWN` не блокирует расчёт и не превращается в запрет. TDS-specific cure/recoat conditions намеренно не выводятся из общих предположений.
 
-Тесты, runtime smoke и GitHub Actions для этих этапов намеренно не запускались по указанию пользователя. Поэтому §22 остаётся `ЧАСТИЧНО`.
-
 ## §22 — Критическое ограничение
-Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
+Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine недостаточно.
 
 Минимум для закрытия:
 1. интеграция проверки в `CalculationView` — выполнена через `CalculationService.format_summary()`;
@@ -130,10 +131,11 @@ Code commit: `2ea726933b859c8e00dd17069be437cb6251a302` — `CalculationService`
 3. §10 не считать закрытым без acceptance-доказательства.
 4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
-6. §12/§13: механизм безопасной загрузки verified source-backed rules создан; добавлена сборка явно перечисленного набора sidecar-манифестов в `NormativeRegistry`. Следующий шаг — добавить только фактически проверенные sidecar-манифесты для выбранных документов (с SHA-256 исходного PDF и без придуманных значений), затем подключить фактический registry к инженерному workflow.
+6. §12/§13: механизм безопасной загрузки verified source-backed rules создан; добавлена сборка явно перечисленного набора sidecar-манифестов в `NormativeRegistry`. Следующий шаг — добавить только фактически проверенные sidecar-манифесты для выбранных документов с SHA-256 исходного PDF и без придуманных значений, затем подключить фактический registry к инженерному workflow.
 7. После фактического набора verified rules перейти к §14 TDS-backed technological validation.
-8. §22 вести отдельно: CalculationView workflow integration выполнена, следующий шаг — SystemsView и UI regression; формально не закрывать до полного workflow integration.
-9. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
+8. §20: source/integrity index создан; следующий шаг — построить контентный индекс/поиск по `books/` без подмены нормативных правил и с сохранением source identity.
+9. §22 вести отдельно: CalculationView workflow integration выполнена, следующий шаг — SystemsView и UI regression; формально не закрывать до полного workflow integration.
+10. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
 ## Контроль
 Новые GitHub Actions runs не запускаются. Тесты/runtime smoke намеренно отложены по указанию пользователя.
