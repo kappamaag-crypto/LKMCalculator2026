@@ -16,9 +16,9 @@ def material(name: str, binder: BinderType) -> Material:
 def test_engine_checks_every_adjacent_transition_in_a_four_layer_system():
     layers = [
         LayerDefinition(material=material("Epoxy primer", BinderType.EPOXY)),
-        LayerDefinition(material=material("PU intermediate", BinderType.POLYURETHANE)),
+        LayerDefinition(material=material("Epoxy intermediate", BinderType.EPOXY)),
         LayerDefinition(material=material("Acrylic intermediate", BinderType.ACRYLIC)),
-        LayerDefinition(material=material("PU finish", BinderType.POLYURETHANE)),
+        LayerDefinition(material=material("Acrylic finish", BinderType.ACRYLIC)),
     ]
 
     report = LayerCompatibilityEngine().check_layers(layers)
@@ -33,15 +33,15 @@ def test_engine_checks_every_adjacent_transition_in_a_four_layer_system():
 
 
 def test_engine_preserves_source_warning_and_explains_the_transition():
-    previous = material("Vinyl chloride primer", BinderType.EPOXY_ESTER)
-    applied = material("Epoxy finish", BinderType.EPOXY)
+    previous = material("Epoxy primer", BinderType.EPOXY)
+    applied = material("PU finish", BinderType.POLYURETHANE)
 
     report = LayerCompatibilityEngine().check_material_sequence([previous, applied])
 
     assert report.status is CompatibilityStatus.WARNING
     assert report.transitions[0].rule.note == "Требуется придание шероховатости"
     assert "Слой 2" in report.transitions[0].message
-    assert "Epoxy finish" in report.transitions[0].message
+    assert "PU finish" in report.transitions[0].message
 
 
 def test_engine_returns_unknown_for_unmapped_binder_without_inventing_a_rule():
@@ -59,7 +59,7 @@ def test_engine_returns_unknown_for_unmapped_binder_without_inventing_a_rule():
 def test_engine_worst_case_is_unknown_when_one_transition_is_unresolved():
     materials = [
         material("Epoxy primer", BinderType.EPOXY),
-        material("PU finish", BinderType.POLYURETHANE),
+        material("Epoxy intermediate", BinderType.EPOXY),
         material("Alkyd material", BinderType.ALKYD),
     ]
     contexts = [
