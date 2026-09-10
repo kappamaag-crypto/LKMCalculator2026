@@ -31,8 +31,8 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance отложен из-за запрета на Actions/тесты. Необратимые downgrade требуют восстановления backup. |
 | 11 | ЧАСТИЧНО | Self-contained immutable material snapshots v5, verified reads и integrity hashing реализованы; acceptance/runtime smoke отложен. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox интегрирован с `calculation_saved`; opt-in worker/trigger, idempotency metadata и env-only SMTP реализованы. SMTP/runtime smoke и тесты отложены. |
-| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v6 реализованы. `SystemCalculator.calculate()` и `calculate_from_system()` теперь принимают явно переданный `NormativeModel` и несут его в `SystemCalculationResult`; отсутствие модели остаётся `None`. Нужны реальная передача модели из UI/service, restore и acceptance. |
-| 13 | ЧАСТИЧНО | `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` + serializer и History snapshot v6 реализованы. Существующие Sa/St/roughness сохраняются в structured snapshot, но normative assessment остаётся `UNKNOWN`. Нужны UI/workflow integration, restore/validation и acceptance. |
+| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v7 реализованы. `SystemCalculationResult` теперь типизированно содержит `EngineeringContext`; `SystemCalculator` и `CalculationService` принимают/передают его явно, при этом legacy `normative_model` в calculator сохранён для обратной совместимости. History умеет сохранять и восстанавливать типизированный context; отсутствие source-backed модели остаётся `None`/`UNKNOWN`. Нужна фактическая передача выбранной модели из UI и acceptance. |
+| 13 | ЧАСТИЧНО | `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` + serializer и History snapshot v7 реализованы. Явный `EngineeringContext` переносит structured surface state через calculator/service; History восстанавливает его и сохраняет legacy object surface как fallback. Normative assessment без источника остаётся `UNKNOWN`. Нужны UI/workflow integration, validation и acceptance. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; environment/technology/compatibility/explanation/weights остаются. |
@@ -68,9 +68,24 @@ Code commit: `4a623ed5bf0b19d34bb57009135f8b96b54cb634` — source-preserving se
 Code commit: `7d4d40e6b6985a159b9a998438db32ca79ed4c14` — History snapshot v6 сохраняет structured surface context и нормативную модель только при фактической передаче.
 
 ### §12 — Normative workflow propagation
-Code commit: `135843fcb40ac57b9db795731e68a1a9b2fa9e8a` — `SystemCalculator` принимает `NormativeModel` как явный контекст расчёта и переносит его в `SystemCalculationResult`; существующие вызовы сохраняют обратную совместимость благодаря `None` по умолчанию.
+Code commit: `135843fcb40ac57b9db795731e68a1a9b2fa9e8` — переходный этап: `SystemCalculator` принимает `NormativeModel` и переносит его в результат; затем формализован типизированный context.
 
-Тесты и runtime smoke для этого этапа намеренно не запускались по указанию пользователя. §12 остаётся `ЧАСТИЧНО`, пока реальный UI/service не передаёт выбранную source-backed модель и не выполнен restore/acceptance.
+### §12/§13 — Typed engineering context
+Code commit: `70ec88eb28101e3a78f332f9be10303c22a9b320` — `SystemCalculationResult.engineering_context` с immutable `EngineeringContext` и без динамического атрибута `normative_model`.
+
+### §12/§13 — Typed calculator propagation
+Code commit: `d31971c5b725da2b2ff351500c70b4d269ac5ceb` — `SystemCalculator` нормализует legacy `normative_model` в typed context и поддерживает явную передачу `EngineeringContext` для обычного и template расчёта.
+
+### §12/§13 — Context serializer round-trip
+Code commit: `c63fc757fed36249f25b7eb6384fb6f69bd00547` — добавлен source-preserving round-trip `EngineeringContext` serializer/deserializer.
+
+### §12/§13 — History typed-context persistence/restore
+Code commit: `6e112c2621af2adef23b4d72c4025bfdb627543c` — History snapshot v7 хранит типизированный engineering context и добавлен `get_calculation_engineering_context()` с обратной совместимостью для v6.
+
+### §12 — Application service propagation
+Code commit: `b545603bef83dfb10b346516f9f19a7b305d8494` — `CalculationService.calculate_system()` и `calculate_from_template()` принимают явный `EngineeringContext` и передают его в domain calculator.
+
+Тесты, runtime smoke и GitHub Actions для этих этапов намеренно не запускались по указанию пользователя. Поэтому §12/§13 остаются `ЧАСТИЧНО`.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -88,7 +103,7 @@ Code commit: `135843fcb40ac57b9db795731e68a1a9b2fa9e8a` — `SystemCalculator` �
 3. §10 не считать закрытым без acceptance-доказательства.
 4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
-6. Текущий рабочий этап — §12/§13: подключить реальную source-backed `NormativeModel` к service/UI контексту и добавить restore structured engineering context; затем перейти к §14.
+6. §12/§13: после формализации domain/service context следующий шаг — фактическое подключение выбранного source-backed `NormativeModel` и `SurfaceCondition` в UI workflow без вымышленных нормативных значений; затем TDS-backed §14.
 7. §22 вести отдельно и не закрывать формально до полного workflow integration.
 8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
