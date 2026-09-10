@@ -29,8 +29,8 @@
 | 8 | ВЫПОЛНЕНО | 2K учитывается как один смешанный материалный слой; TDS technology rules вынесены в §14. |
 | 9 | ЧАСТИЧНО | `PackagingPlanner` считает коммерческую потребность по фасовке: целые упаковки, резерв и опциональную стоимость; regression `26897211`. Складские остатки, складской учёт, резерв склада и закупочные заказы в проект не входят. Полный коммерческий workflow/UI ещё не реализован. |
 | 10 | ЧАСТИЧНО | Alembic присутствует. Добавлены SQLite-safe backup/restore helpers `de1fd6f` и regression/migration idempotency `f8adeff`; acceptance CI не используем из-за исчерпанного Actions-лимита. Для миграций с необратимым `downgrade` (например, `004_nullable_calculation_inputs`) rollback должен выполняться восстановлением предмиграционного backup, а не возвратом данных к вымышленным значениям. |
-| 11 | ЧАСТИЧНО | Tamper-evident snapshots: каноническая сериализация, SHA-256, проверка при чтении, отдельный snapshot API для расчёта/сравнения; теперь и каждый сохранённый `CalculationLayerORM.snapshot_json` sealed независимо. Code commits `e63b4ba`, `0104553c`, `012bff6`; regression `3b8ffab` и обновление `4b232ece`. Полное закрытие требует фактического acceptance smoke создания/чтения через `HistoryService`, проверки реконструкции без mutable catalog dependency и согласования поведения legacy snapshots без хэша. |
-| 11.1 | НЕ ВЫПОЛНЕНО | Outbox/SMTP/retry/idempotency/safe secrets. |
+| 11 | ЧАСТИЧНО | Immutable snapshots усилены: `HistoryService` теперь формирует self-contained material payload (включая инженерные/технологические поля), `snapshot_version` поднят до 5; `snapshot_service` восстанавливает современные snapshots без зависимости от mutable catalog, сохраняя fallback только для legacy-полей. `HistoryView` больше не читает `snapshot_json` напрямую и открывает только проверенный snapshot через `HistoryService.get_calculation_snapshot`. Code commits `e63b4ba`, `0104553c`, `012bff6`, `a75311d`, `3a799e2`, `30f8b20`; regression `3b8ffab`, `4b232ece`. §11 всё ещё не закрыт: acceptance/runtime smoke и фактическая проверка восстановления не запускались по текущему указанию пользователя; Actions не используются. |
+| 11.1 | НЕ ВЫПОЛНЕНО | Outbox/SMTP/retry/idempotency/safe secrets. Начинать после acceptance §11. |
 | 12 | НЕ ВЫПОЛНЕНО | Versioned normative model. |
 | 13 | НЕ ВЫПОЛНЕНО | Structured Sa/St/profile model. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
@@ -92,6 +92,12 @@ Code commit: `012bff67f013601be715ec8ea5dedc284f28e9d6` — individual calculati
 
 Regression commit: `4b232ecef956811a554568032a11fae9f1f81f5d` — nested/layer snapshot integrity regression, including detection of changed catalog-like values.
 
+Code commit: `a75311d46a5f75364d139965fb7a231c503e99bd` — `HistoryView` загружает только verified snapshot через `HistoryService`, без прямого `json.loads` из ORM.
+
+Code commit: `3a799e2a49fcfa7af92c1ab5a8b3103043f76b19` — material payload snapshot v5 стал self-contained: сохраняются все поля `Material`, включая инженерные/технологические ограничения и документы.
+
+Code commit: `30f8b20aa5b6ec4e371792413829ae2b9eea05fb` — `snapshot_service` восстанавливает современные material snapshots из snapshot-данных; catalog fallback оставлен только для отсутствующих legacy-полей.
+
 GitHub Actions **не запускаются**: лимит Actions пользователя исчерпан. Новые проверки в Actions не создавались.
 
 ## §22 — Критическое ограничение
@@ -108,8 +114,8 @@ GitHub Actions **не запускаются**: лимит Actions пользо�
 1. GitHub Actions не запускать из-за лимита пользователя.
 2. §10 не считать закрытым без acceptance-доказательства; существующие backup/restore и migration tests сохранять.
 3. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
-4. Текущий рабочий этап — §11: закончить immutable snapshot acceptance локальными/статическими проверками, не используя Actions.
-5. Не переводить §11 в `ВЫПОЛНЕНО` только на основании написанных тестов; требуется фактическое локальное smoke-доказательство или иное явное acceptance-доказательство.
+4. Текущий рабочий этап — §11: кодовая часть self-contained snapshot/verified-load завершена на текущем шаге, но acceptance/runtime smoke отложен до общего прогона.
+5. Не переводить §11 в `ВЫПОЛНЕНО` до общего прогона: создание/чтение через `HistoryService`, изменение каталога после сохранения и восстановление снимка без mutable catalog dependency.
 6. После acceptance §11 перейти к §11.1, затем далее по матрице.
 7. §22 вести отдельно и не закрывать формально до полного workflow integration.
 8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
@@ -125,7 +131,7 @@ GitHub Actions **не запускаются**: лимит Actions пользо�
 - `34453753830` — commit `f8adeff`, queued; новые Actions runs по текущей работе не запускаются.
 
 ## Последняя проверка
-`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. По §11 добавлено независимое sealing для layer snapshots и regression. Эти тесты добавлены, но фактический локальный runtime smoke в текущем окружении не выполнен; §11 остаётся `ЧАСТИЧНО`.
+`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. В §11 добавлены verified-load в UI и self-contained material snapshots v5. Тесты и runtime smoke намеренно не запускались; §11 остаётся `ЧАСТИЧНО` до общего прогона.
 
 ## Следующий рабочий фокус
-Продолжить §11 без GitHub Actions: обеспечить фактический acceptance smoke создания/чтения snapshot через `HistoryService`, проверить независимость от изменения каталога и определить безопасную стратегию чтения legacy snapshots без хэша. Только после этого закрыть §11 и перейти к §11.1.
+После общего прогона §11 перейти к §11.1: outbox для уведомлений, безопасное хранение секретов, retry и идемпотентность. До этого не расширять §22 и не перескакивать через порядок плана.
