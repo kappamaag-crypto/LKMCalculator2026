@@ -14,6 +14,7 @@ from app.domain.models import (
 from app.domain.calculator import SystemCalculator, LayerInput, LayerCalculator
 from app.domain.comparison import ComparisonEngine
 from app.domain.engineering_context import EngineeringContext
+from app.domain.layer_compatibility import LayerCompatibilityEngine
 from app.domain.validation import ValidationResult
 
 
@@ -29,10 +30,12 @@ class CalculationService:
         self,
         calculator: Optional[SystemCalculator] = None,
         comparison_engine: Optional[ComparisonEngine] = None,
+        compatibility_engine: Optional[LayerCompatibilityEngine] = None,
         default_losses: float = 0.0,
     ):
         self.calculator = calculator or SystemCalculator(default_losses=default_losses)
         self.comparison = comparison_engine or ComparisonEngine(self.calculator)
+        self.compatibility = compatibility_engine or LayerCompatibilityEngine()
 
     def calculate_layer(
         self,
@@ -49,8 +52,8 @@ class CalculationService:
             target_dft=target_dft,
             losses_percent=losses_percent,
             thinner_percent=thinner_percent,
-            thinner=thinner,
             thinner_basis=thinner_basis,
+            thinner=thinner,
             area_m2=area_m2,
         )
 
@@ -91,8 +94,17 @@ class CalculationService:
     ) -> ComparisonResult:
         return self.comparison.compare(obj, systems)
 
+    def compatibility_report(self, result: SystemCalculationResult):
+        """Return source-backed adjacent-layer compatibility without blocking calculation.
+
+        ``UNKNOWN`` is deliberately surfaced to the caller instead of being
+        converted into a prohibition. TDS-specific cure/recoat conditions are
+        not inferred here.
+        """
+        return self.compatibility.check_result(result)
+
     def format_summary(self, result: SystemCalculationResult) -> str:
-        """Краткая текстовая сводка расчёта, включая расход разбавителя."""
+        """Краткая текстовая сводка расчёта, включая расход разбавителя и совместимость."""
         thinner_l_m2 = sum(lr.thinner_consumption_l for lr in result.layers)
         thinner_kg_m2 = sum(lr.thinner_consumption_kg for lr in result.layers)
         area = result.object_data.area_m2
@@ -124,4 +136,13 @@ class CalculationService:
                 f"{lr.thinner_consumption_kg} кг/м² ({lr.thinner_consumption_l} л/м²), "
                 f"стоимость={lr.cost_per_m2} руб/м²"
             )
+
+        report = self.compatibility_report(result)
+        lines.extend(["", "Совместимость соседних слоёв:"])
+        if not report.transitions:
+            lines.append("  UNKNOWN — недостаточно слоёв для проверки")
+        else:
+            lines.append(f"  Итоговый статус: {report.status.value}")
+            for transition in report.transitions:
+                lines.append(f"  • {transition.message}")
         return "\n".join(lines)
