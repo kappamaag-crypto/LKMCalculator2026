@@ -65,7 +65,7 @@ Code commit: `6d3c86145e99c8c9a653cb1dff9823639c3fef41` — structured surface p
 Code commit: `4a623ed5bf0b19d34bb57009135f8b96b54cb634` — source-preserving serializer для `NormativeModel` и `SurfaceCondition`.
 
 ### §12/§13 — History snapshot integration
-Code commit: `7d4d40e6b6985a159b9a998438e1da8f7bb9af89` — History snapshot v6 сохраняет structured surface context и нормативную модель только при фактической передаче.
+Code commit: `7d4d40e6b6985a159b9a998438db32ca79ed4c14` — History snapshot v6 сохраняет structured surface context и нормативную модель только при фактической передаче.
 
 ### §12 — Normative workflow propagation
 Code commit: `135843fcb40ac57b9db795731e68a1a9b2fa9e8` — переходный этап: `SystemCalculator` принимает `NormativeModel` и переносит его в результат; затем формализован типизированный context.
