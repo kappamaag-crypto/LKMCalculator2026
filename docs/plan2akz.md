@@ -30,7 +30,7 @@
 | 9 | ЧАСТИЧНО | `PackagingPlanner` считает коммерческую потребность по фасовке: целые упаковки, резерв и опциональную стоимость; regression `26897211`. Складские остатки, складской учёт, резерв склада и закупочные заказы в проект не входят. Полный коммерческий workflow/UI ещё не реализован. |
 | 10 | ЧАСТИЧНО | Alembic присутствует. Добавлены SQLite-safe backup/restore helpers `de1fd6f` и regression/migration idempotency `f8adeff`; acceptance CI не используем из-за исчерпанного Actions-лимита. Для миграций с необратимым `downgrade` (например, `004_nullable_calculation_inputs`) rollback должен выполняться восстановлением предмиграционного backup, а не возвратом данных к вымышленным значениям. |
 | 11 | ЧАСТИЧНО | Immutable snapshots усилены: `HistoryService` формирует self-contained material payload, `snapshot_version` поднят до 5; `snapshot_service` восстанавливает современные snapshots без зависимости от mutable catalog, с fallback только для legacy-полей. `HistoryView` открывает snapshot через `HistoryService.get_calculation_snapshot`. Code commits `e63b4ba`, `0104553c`, `012bff6`, `a75311d`, `3a799e2`, `30f8b20`; regression `3b8ffab`, `4b232ece`. Acceptance/runtime smoke намеренно отложен до общего прогона; Actions не используются. |
-| 11.1 | ЧАСТИЧНО | Добавлен durable notification outbox: Alembic `005_notification_outbox`, уникальный `idempotency_key`, статусы `pending/sending/retry/sent/failed`, счётчик попыток, `next_attempt_at`, `last_error`, `sent_at`. Добавлен `NotificationService` с deterministic idempotency key, повторным enqueue без дублей, exponential backoff и ограничением `max_attempts`. SMTP-credentials читаются только из environment и не сохраняются в БД. Code commits `2685f1f`, `dd7d600`, `138145f`. Реальный SMTP smoke и runtime проверки пока намеренно не выполнялись; §11.1 не закрывать до общего прогона. |
+| 11.1 | ЧАСТИЧНО | Durable notification outbox реализован: Alembic `005_notification_outbox`, уникальный `idempotency_key`, статусы `pending/sending/retry/sent/failed`, retry/backoff и env-only SMTP credentials. Интеграционный слой теперь привязан к реальному событию `calculation_saved`: `HistoryView.save_result()` атомарно сохраняет расчёт и ставит уведомление в outbox при наличии `LKM_NOTIFICATION_RECIPIENT`. `NotificationService` отделён от обязательной SMTP-конфигурации на этапе enqueue; для SMTP добавлены детерминированные `Message-ID`/`X-LKM-Idempotency-Key` для корреляции, без заявления о гарантированной дедупликации SMTP. Добавлен opt-in одноразовый `NotificationWorker`, вызываемый при старте приложения только при `LKM_NOTIFICATIONS_ENABLED=1`; постоянный daemon/thread не создаётся. Code commits `2685f1f`, `dd7d600`, `138145f`, `9d10e914`, `4fdec2d`, `fbe980e`, `baee2aa`. Реальный SMTP/runtime smoke и тесты сейчас намеренно не выполнялись; §11.1 не закрывать до общего прогона. |
 | 12 | НЕ ВЫПОЛНЕНО | Versioned normative model. |
 | 13 | НЕ ВЫПОЛНЕНО | Structured Sa/St/profile model. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
@@ -90,7 +90,7 @@ Regression commit: `3b8ffab399e7665c4f59cb6bee9a8fc076c2bf66` — deterministic 
 
 Code commit: `012bff67f013601be715ec8ea5dedc284f28e9d6` — individual calculation-layer snapshots are now sealed as independent immutable records.
 
-Regression commit: `4b232ecef956811a554568032a11fae9f1f81f5d` — nested/layer snapshot integrity regression, including detection of changed catalog-like values.
+Regression commit: `4b232ecef956811a554568032a11fa9f1f81f5d` — nested/layer snapshot integrity regression, including detection of changed catalog-like values.
 
 Code commit: `a75311d46a5f75364d139965fb7a231c503e99bd` — `HistoryView` загружает только verified snapshot через `HistoryService`, без прямого `json.loads` из ORM.
 
@@ -98,14 +98,22 @@ Code commit: `3a799e2a49fcfa7af92c1ab5a8b3103043f76b19` — material payload sna
 
 Code commit: `30f8b20aa5b6ec4e371792413829ae2b9eea05fb` — `snapshot_service` восстанавливает современные material snapshots из snapshot-данных; catalog fallback оставлен только для отсутствующих legacy-полей.
 
-### §11.1 — Notification outbox foundation
+### §11.1 — Notification outbox foundation and application integration
 Code commit: `2685f1f27c654d3fe79b3746f108984cd35dba24` — Alembic migration `005_notification_outbox` с durable queue, статусами retry lifecycle и уникальным idempotency key.
 
 Code commit: `dd7d600885c6c911a2760eb74daee90008d46796` — ORM adapter `NotificationOutboxORM`; SMTP credentials отсутствуют в persistent model.
 
 Code commit: `138145f1708f3c587576ba24aa1984b03edea57a` — `NotificationService`: deterministic idempotency, durable enqueue, bounded retry/backoff и SMTP adapter с credentials только из environment.
 
-Реальный SMTP/runtime smoke и тесты сейчас не запускаются по указанию пользователя; поэтому §11.1 остаётся `ЧАСТИЧНО`.
+Code commit: `9d10e9148e8328315063eda573233f08c314a8a3` — enqueue больше не требует SMTP-конфигурации; SMTP delivery получает deterministic Message-ID/X-LKM idempotency metadata для корреляции.
+
+Code commit: `4fdec2dd9f83e8b933d7dc6d6ffdbee7a3f969e8` — `NotificationWorker`: opt-in одноразовый lifecycle trigger, bounded batch, rollback при ошибке; без постоянного daemon/thread.
+
+Code commit: `fbe980e1f594ec26b7f1fc78e62f87085df2acd2` — реальное событие `calculation_saved` в `HistoryView.save_result()`, атомарный enqueue вместе с сохранением расчёта, opt-in через `LKM_NOTIFICATION_RECIPIENT`.
+
+Code commit: `baee2aa0a25b31397cde397ae0de94d97338d175` — запуск `NotificationWorker.run_once()` при старте приложения, только при явном `LKM_NOTIFICATIONS_ENABLED=1`.
+
+Реальный SMTP/runtime smoke и тесты сейчас не запускаются по указанию пользователя; поэтому §11.1 остаётся `ЧАСТИЧНО`. Кодовая интеграция выполнена, acceptance будет проведён позже общим прогоном.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -122,7 +130,7 @@ Code commit: `138145f1708f3c587576ba24aa1984b03edea57a` — `NotificationService
 2. §10 не считать закрытым без acceptance-доказательства; существующие backup/restore и migration tests сохранять.
 3. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 4. §11 остаётся `ЧАСТИЧНО` до общего runtime acceptance; написанный код не считать заменой прогона.
-5. Текущий рабочий этап — §11.1: notification outbox, идемпотентность, retry и безопасные SMTP secrets реализованы кодово, но runtime/SMTP acceptance отложен.
+5. §11.1: кодовая интеграция notification workflow выполнена, но acceptance/runtime/SMTP тестирование отложено до общего прогона.
 6. После acceptance §11.1 перейти к §12, затем далее по матрице.
 7. §22 вести отдельно и не закрывать формально до полного workflow integration.
 8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
@@ -138,7 +146,7 @@ Code commit: `138145f1708f3c587576ba24aa1984b03edea57a` — `NotificationService
 - `34453753830` — commit `f8adeff`, queued; новые Actions runs по текущей работе не запускаются.
 
 ## Последняя проверка
-`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. Тесты и runtime smoke намеренно не запускались. §11 остаётся `ЧАСТИЧНО`; §11.1 получил кодовую основу durable outbox/SMTP/retry/idempotency, но также остаётся `ЧАСТИЧНО` до общего прогона.
+`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. Тесты и runtime smoke намеренно не запускались. §11 остаётся `ЧАСТИЧНО`; §11.1 получил кодовую основу durable outbox/SMTP/retry/idempotency и теперь также интегрирован с событием сохранения расчёта и opt-in startup worker, но остаётся `ЧАСТИЧНО` до общего прогона.
 
 ## Следующий рабочий фокус
-§11.1: довести notification workflow до интеграционного уровня без запуска Actions — привязать enqueue к реальному событию приложения, определить безопасный lifecycle worker/trigger и затем после общего прогона закрыть acceptance. После этого перейти к §12.
+§11.1 acceptance отложен до общего прогона. До него не переводить §11.1 в `ВЫПОЛНЕНО` и не запускать Actions/тесты. После acceptance перейти к §12. Параллельно §22 вести отдельно и не закрывать до полного workflow integration.
