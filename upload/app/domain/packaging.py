@@ -1,9 +1,4 @@
-"""Commercial packaging and procurement calculations.
-
-This module deliberately does not alter engineering consumption. It converts an
-already calculated requirement into purchasable package units and exposes the
-result as a separate commercial value object.
-"""
+"""Commercial packaging planning, kept separate from engineering calculation."""
 
 from __future__ import annotations
 
@@ -16,23 +11,22 @@ from .models import Package
 
 @dataclass(frozen=True)
 class PackagingPlan:
-    """Purchase plan for one package option."""
+    """Purchase requirement for one package option."""
 
     package: Package
     required_quantity: float
     reserve_percent: float
-    quantity_with_reserve: float
+    quantity_to_purchase: float
     purchase_units: int
-    purchased_quantity: float
-    remainder_quantity: float
     estimated_material_cost: float | None
 
 
 class PackagingPlanner:
-    """Translate an engineering requirement into package quantities.
+    """Translate an already calculated requirement into package units.
 
-    The planner is intentionally separate from the calculation engine. It never
-    changes DFT, consumption, losses, or any other engineering result.
+    This is a commercial purchasing aid only. It does not model warehouse stock,
+    stock balances, inventory reservations, or procurement orders, and it never
+    changes the engineering calculation result.
     """
 
     @staticmethod
@@ -53,22 +47,15 @@ class PackagingPlanner:
         reserve_percent: float = 0.0,
         unit_price: float | None = None,
     ) -> PackagingPlan:
-        """Return the minimum whole package count covering requirement + reserve.
-
-        ``unit_price`` is the price of one physical package. When it is not
-        supplied, the estimated purchase cost remains ``None`` rather than being
-        inferred from an engineering consumption price.
-        """
+        """Return the minimum whole package count covering requirement + reserve."""
         if required_quantity < 0:
             raise ValueError("required_quantity must be non-negative")
         if reserve_percent < 0:
             raise ValueError("reserve_percent must be non-negative")
 
         package_quantity = cls._package_quantity(package)
-        quantity_with_reserve = required_quantity * (1.0 + reserve_percent / 100.0)
-        purchase_units = ceil(quantity_with_reserve / package_quantity)
-        purchased_quantity = purchase_units * package_quantity
-        remainder_quantity = purchased_quantity - required_quantity
+        quantity_to_purchase = required_quantity * (1.0 + reserve_percent / 100.0)
+        purchase_units = ceil(quantity_to_purchase / package_quantity)
 
         estimated_cost = None
         if unit_price is not None:
@@ -80,10 +67,8 @@ class PackagingPlanner:
             package=package,
             required_quantity=required_quantity,
             reserve_percent=reserve_percent,
-            quantity_with_reserve=quantity_with_reserve,
+            quantity_to_purchase=quantity_to_purchase,
             purchase_units=purchase_units,
-            purchased_quantity=purchased_quantity,
-            remainder_quantity=remainder_quantity,
             estimated_material_cost=estimated_cost,
         )
 
@@ -96,12 +81,7 @@ class PackagingPlanner:
         reserve_percent: float = 0.0,
         unit_prices: dict[int, float] | None = None,
     ) -> list[PackagingPlan]:
-        """Build independent plans for all valid package options.
-
-        Options are sorted by purchase units and then by remainder, making the
-        smallest operational plan the first candidate without pretending that a
-        global procurement optimisation has been performed.
-        """
+        """Build independent purchasable package options without inventory logic."""
         prices = unit_prices or {}
         plans: list[PackagingPlan] = []
         for package in packages:
@@ -116,4 +96,4 @@ class PackagingPlanner:
                 continue
             plans.append(plan)
 
-        return sorted(plans, key=lambda item: (item.purchase_units, item.remainder_quantity))
+        return sorted(plans, key=lambda item: (item.purchase_units, item.quantity_to_purchase))
