@@ -31,8 +31,8 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance отложен из-за запрета на Actions/тесты. Необратимые downgrade требуют восстановления backup. |
 | 11 | ЧАСТИЧНО | Self-contained immutable material snapshots v5, verified reads и integrity hashing реализованы; acceptance/runtime smoke отложен. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox интегрирован с `calculation_saved`; opt-in worker/trigger, idempotency metadata и env-only SMTP реализованы. SMTP/runtime smoke и тесты отложены. |
-| 12 | ЧАСТИЧНО | `NormativeSource`, `NormativeRule`, `NormativeModel`, `NormativeRegistry`: immutable versioned source/rule foundation, явный `UNKNOWN`. Code `709eadea`. Persistence/integration/acceptance ещё отсутствуют. |
-| 13 | ЧАСТИЧНО | Добавлены immutable `SurfacePreparation` (Sa/St/OTHER/UNKNOWN), `SurfaceProfile` (Rz/Ry5/Rmax/UNKNOWN) и объединяющий `SurfaceCondition`. Известная оценка требует source metadata; отсутствие данных остаётся `UNKNOWN`. Code `6d3c8614`. Интеграция с `ObjectData`/UI/normative validation и acceptance ещё не выполнены. |
+| 12 | ЧАСТИЧНО | `NormativeSource`, `NormativeRule`, `NormativeModel`, `NormativeRegistry` реализованы; добавлена source-preserving сериализация/десериализация для persistence (`4a623ed5`). Реальная запись нормативного контекста из workflow и acceptance ещё отсутствуют. |
+| 13 | ЧАСТИЧНО | Immutable `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` реализованы; добавлена source-preserving сериализация/десериализация (`4a623ed5`). Интеграция с `ObjectData`/History workflow, UI, normative validation и acceptance ещё не завершены. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; environment/technology/compatibility/explanation/weights остаются. |
@@ -58,12 +58,13 @@
 ### §12 — Versioned normative model foundation
 Code commit: `709eadea3be513fb3a2a540dc195ef93956f4b09` — immutable source-backed normative model с версиями, правилами, registry и явным `UNKNOWN`.
 
-Этот commit не закрывает §12: пока нет persistence, интеграции с расчётным snapshot/result и acceptance-прогона.
-
 ### §13 — Structured Sa/St/profile foundation
 Code commit: `6d3c86145e99c8c9a653cb1dff9823639c3fef41` — structured surface preparation/profile model без hard-coded нормативных значений.
 
-Этот commit не закрывает §13: интеграция с расчётным вводом, UI, normative validation и acceptance остаются впереди.
+### §12/§13 — Persistence serialization foundation
+Code commit: `4a623ed5bf0b19d34bb57009135f8b96b54cb634` — добавлен `engineering_context_snapshot.py`: детерминированное source-preserving представление `NormativeModel` и `SurfaceCondition`, включая metadata источников, версии, статусы `KNOWN/UNKNOWN`, даты действия и параметры профиля. Нормативные значения не создаются автоматически.
+
+Этот commit не закрывает §12/§13: serializer пока не подключён к сохранению `SystemCalculationResult`/History workflow, UI и validation; acceptance намеренно отложен.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -81,7 +82,7 @@ Code commit: `6d3c86145e99c8c9a653cb1dff9823639c3fef41` — structured surface p
 3. §10 не считать закрытым без acceptance-доказательства.
 4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
-6. Текущий рабочий этап — §12/§13: довести normative/surface models до persistence и workflow integration, не добавляя вымышленных нормативных значений; затем перейти к §14.
+6. Текущий рабочий этап — §12/§13: подключить serializer к immutable History snapshot и workflow расчёта, сохраняя `UNKNOWN` и source metadata; затем перейти к §14.
 7. §22 вести отдельно и не закрывать формально до полного workflow integration.
 8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
