@@ -1,6 +1,6 @@
 from app.domain.enums import BinderType, CompatibilityStatus, MaterialType
 from app.domain.layer_compatibility import LayerCompatibilityContext, LayerCompatibilityEngine
-from app.domain.models import LayerDefinition, Material
+from app.domain.models import CoatingSystem, LayerDefinition, LayerResult, Material, ObjectData, SystemCalculationResult
 
 
 def material(name: str, binder: BinderType) -> Material:
@@ -75,6 +75,25 @@ def test_engine_worst_case_is_unknown_when_one_transition_is_unresolved():
     assert report.transitions[1].status is CompatibilityStatus.UNKNOWN
     assert report.status is CompatibilityStatus.UNKNOWN
     assert len(report.blocking_transitions) == 1
+
+
+def test_engine_checks_system_calculation_result_without_recalculation():
+    layers = [
+        LayerResult(material=material("Epoxy primer", BinderType.EPOXY), target_dft=100.0),
+        LayerResult(material=material("PU finish", BinderType.POLYURETHANE), target_dft=80.0),
+    ]
+    result = SystemCalculationResult(
+        system=CoatingSystem(number_of_layers=2),
+        object_data=ObjectData(area_m2=100.0),
+        layers=layers,
+    )
+
+    report = LayerCompatibilityEngine().check_result(result)
+
+    assert len(report.transitions) == 1
+    assert report.transitions[0].previous_material is layers[0].material
+    assert report.transitions[0].applied_material is layers[1].material
+    assert report.status is CompatibilityStatus.WARNING
 
 
 def test_engine_requires_one_context_per_transition():
