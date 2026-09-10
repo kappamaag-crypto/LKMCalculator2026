@@ -102,6 +102,7 @@ class HistoryService:
             updated_at=now,
         )
         for i, lr in enumerate(result.layers):
+            layer_snapshot = seal_snapshot(snapshot["layers"][i])
             calc.layers.append(CalculationLayerORM(
                 layer_number=i + 1,
                 material_name=lr.material.material_name,
@@ -110,7 +111,7 @@ class HistoryService:
                 consumption_kg=lr.practical_consumption_kg,
                 consumption_l=lr.practical_consumption_l,
                 cost_per_m2=lr.cost_per_m2 if lr.cost_per_m2 is not None else null(),
-                snapshot_json=json.dumps(snapshot["layers"][i], ensure_ascii=False),
+                snapshot_json=json.dumps(layer_snapshot, ensure_ascii=False),
             ))
         self.session.add(calc)
         self.session.flush()
