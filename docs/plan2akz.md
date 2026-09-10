@@ -31,9 +31,9 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance отложен из-за запрета на Actions/тесты. Необратимые downgrade требуют восстановления backup. |
 | 11 | ЧАСТИЧНО | Self-contained immutable material snapshots v5, verified reads и integrity hashing реализованы; acceptance/runtime smoke отложен. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox интегрирован с `calculation_saved`; opt-in worker/trigger, idempotency metadata и env-only SMTP реализованы. SMTP/runtime smoke и тесты отложены. |
-| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v7 реализованы. `SystemCalculationResult` типизированно содержит `EngineeringContext`; `SystemCalculator`, `CalculationService` и `CalculationView` принимают/переносят его явно. History умеет сохранять и восстанавливать typed context, включая legacy v6. В UI есть редактор source identity и реестр доступных source-документов с выбором из каталога; реальные нормативные правила по-прежнему не загружаются автоматически. Acceptance отложен. |
+| 12 | ЧАСТИЧНО | Normative foundation + source-preserving serializer + History snapshot v7 реализованы. `SystemCalculationResult` типизированно содержит `EngineeringContext`; `SystemCalculator`, `CalculationService` и `CalculationView` принимают/переносят его явно. History умеет сохранять и восстанавливать typed context, включая legacy v6. В UI есть редактор source identity и реестр доступных source-документов с выбором из каталога. Добавлен безопасный loader проверенного sidecar-манифеста: он требует существующий source-файл и SHA-256, не извлекает и не угадывает нормативные значения. Фактический набор verified rules/manifest пока не добавлен. Acceptance отложен. |
 | 13 | ЧАСТИЧНО | `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` + serializer и History snapshot v7 реализованы. `CalculationView` хранит/принимает typed surface context и восстанавливает его из history; legacy object surface сохраняется как fallback. В UI есть редактор подготовки/профиля и их источников. Без источника assessment остаётся `UNKNOWN`. Acceptance отложен. |
-| 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
+| 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. Начинать после появления проверяемого source-backed rule pipeline. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; environment/technology/compatibility/explanation/weights остаются. |
 | 17 | НЕ ВЫПОЛНЕНО | Inspection workflow. |
@@ -100,6 +100,12 @@ Code commit: `608f84c0501cd57f147c876a23417990fca13ab8` — добавлен р�
 ### §12/§13 — Source registry UI integration
 Code commit: `27d7cff3194564728682bf330a651b31163e0a34` — диалог инженерного контекста подключён к реестру нормативных документов; выбор source-документа заполняет только его идентичность, без генерации нормативных значений.
 
+### §12 — EngineeringContext restoration and status semantics
+Code commit: `6db6da2b5a72d9d93a2bbd6ea8a4572c2dc0e916` — восстановлен отсутствующий в текущем дереве `upload/app/domain/engineering_context.py`; `normative_status` больше не объявляет source identity «KNOWN» без хотя бы одного явного known rule.
+
+### §12 — Verified source-backed rule import boundary
+Code commit: `f425ab1ed46697807f0c0c1414429f2ac631e872` — добавлен `verified_normative_loader.py`: human-reviewed JSON sidecar принимается только при наличии source-файла, совпадении SHA-256, валидной схеме model/rules и явных значениях для `KNOWN` правил. Loader не извлекает значения из PDF и не делает инженерных предположений.
+
 Тесты, runtime smoke и GitHub Actions для этих этапов намеренно не запускались по указанию пользователя. Поэтому §12/§13 остаются `ЧАСТИЧНО`.
 
 ## §22 — Критическое ограничение
@@ -118,9 +124,10 @@ Code commit: `27d7cff3194564728682bf330a651b31163e0a34` — диалог инж�
 3. §10 не считать закрытым без acceptance-доказательства.
 4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
-6. §12/§13: следующий шаг — безопасно загружать/регистрировать фактические source-backed правила из выбранных документов (без генерации нормативных значений), после чего перейти к §14 TDS-backed validation.
-7. §22 вести отдельно и не закрывать формально до полного workflow integration.
-8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
+6. §12/§13: механизм безопасной загрузки verified source-backed rules создан. Следующий шаг — добавить только фактически проверенные sidecar-манифесты для выбранных документов (с SHA-256 исходного PDF и без придуманных значений), затем подключить их к `NormativeRegistry`/инженерному workflow.
+7. После фактического набора verified rules перейти к §14 TDS-backed technological validation.
+8. §22 вести отдельно и не закрывать формально до полного workflow integration.
+9. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
 ## Контроль
 Новые GitHub Actions runs не запускаются. Тесты/runtime smoke намеренно отложены по указанию пользователя.
