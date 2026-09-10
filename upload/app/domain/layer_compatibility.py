@@ -16,7 +16,7 @@ from typing import Optional, Sequence
 
 from .compatibility import CompatibilityRule, check_materials
 from .enums import CompatibilityStatus
-from .models import LayerDefinition, Material
+from .models import LayerDefinition, Material, SystemCalculationResult
 
 
 _STATUS_PRIORITY = {
@@ -149,6 +149,15 @@ class LayerCompatibilityEngine:
                 )
             )
         return LayerCompatibilityReport(transitions=tuple(transitions))
+
+    def check_result(
+        self,
+        result: SystemCalculationResult,
+        contexts: Sequence[LayerCompatibilityContext] | None = None,
+    ) -> LayerCompatibilityReport:
+        """Check an already calculated system without recalculating it."""
+        layers = [LayerDefinition(material=layer.material) for layer in result.layers]
+        return self.check_layers(layers, contexts=contexts)
 
     def check_material_sequence(
         self,
