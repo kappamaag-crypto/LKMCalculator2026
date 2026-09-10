@@ -13,6 +13,7 @@ from app.domain.models import (
 )
 from app.domain.calculator import SystemCalculator, LayerInput, LayerCalculator
 from app.domain.comparison import ComparisonEngine
+from app.domain.engineering_context import EngineeringContext
 from app.domain.validation import ValidationResult
 
 
@@ -58,8 +59,14 @@ class CalculationService:
         obj: ObjectData,
         layers: Sequence[LayerInput],
         system: Optional[CoatingSystem] = None,
+        engineering_context: EngineeringContext | None = None,
     ) -> tuple[SystemCalculationResult, ValidationResult]:
-        return self.calculator.calculate(obj, layers, system=system)
+        return self.calculator.calculate(
+            obj,
+            layers,
+            system=system,
+            engineering_context=engineering_context,
+        )
 
     def calculate_from_template(
         self,
@@ -67,9 +74,14 @@ class CalculationService:
         system: CoatingSystem,
         materials_by_id: dict[int, Material],
         losses_percent: float | None = None,
+        engineering_context: EngineeringContext | None = None,
     ) -> tuple[SystemCalculationResult, ValidationResult]:
         return self.calculator.calculate_from_system(
-            obj, system, materials_by_id, losses_percent=losses_percent
+            obj,
+            system,
+            materials_by_id,
+            losses_percent=losses_percent,
+            engineering_context=engineering_context,
         )
 
     def compare_systems(
