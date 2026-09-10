@@ -70,6 +70,15 @@ def test_comparison_result_path_preserves_precalculated_results():
     assert [len(result.layers) for result in comparison.systems] == [4, 4]
 
 
+def test_comparison_result_path_rejects_mixed_areas():
+    engine = ComparisonEngine()
+    first = engine.compare(ObjectData(area_m2=100.0), [("A", _layers(2)), ("B", _layers(3))]).systems[0]
+    second = engine.compare(ObjectData(area_m2=250.0), [("C", _layers(2)), ("D", _layers(4))]).systems[1]
+
+    with pytest.raises(ValueError, match="разной площадью"):
+        engine.compare_results(ObjectData(area_m2=100.0), [first, second])
+
+
 def test_comparison_table_does_not_double_count_thinner_cost():
     comparison = _comparison([2, 3])
     rows = {row["indicator"]: row for row in ComparisonEngine().to_table(comparison)}
