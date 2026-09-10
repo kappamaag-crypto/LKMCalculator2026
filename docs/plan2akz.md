@@ -24,14 +24,14 @@
 | 3 | ВЫПОЛНЕНО | `AdHocMaterialDialog`: нормализация, duplicate reuse, persistence; regression `42bb7fb`. |
 | 4 | ЧАСТИЧНО | ComparisonEngine/View, 2K/многослойность и headless UI smoke `2ad50af`; остаются визуальный smoke и финальная source-backed проверка wording. |
 | 5 | ЧАСТИЧНО | Инженерный Excel и regression missing-price `a1e1a0a`; остаются визуальный/печать/PDF-конверсионный smoke. |
-| 6 | ЧАСТИЧНО | PDF строится из `SystemCalculationResult`; multilayer/comparison/2K/unknown-price покрыты; cross-export regression `e3ef08d`; остаются визуальный/печать smoke. CI для `e3ef08d` был queued и не является доказательством успеха до завершения run. |
+| 6 | ЧАСТИЧНО | PDF строится из `SystemCalculationResult`; multilayer/comparison/2K/unknown-price покрыты; cross-export regression `e3ef08d`; остаются визуальный/печать smoke. |
 | 7 | ВЫПОЛНЕНО | Precision/unit invariants + независимые golden cases 2/3/4/5 layers; успешный CI. |
 | 8 | ВЫПОЛНЕНО | 2K учитывается как один смешанный материалный слой; TDS technology rules вынесены в §14. |
-| 9 | ЧАСТИЧНО | `PackagingPlanner` считает коммерческую потребность по фасовке: целые упаковки, резерв и опциональную стоимость; regression `26897211`. Складские остатки, складской учёт, резерв склада и закупочные заказы в проект не входят. Полный коммерческий workflow/UI ещё не реализован. |
-| 10 | ЧАСТИЧНО | Alembic присутствует. Добавлены SQLite-safe backup/restore helpers `de1fd6f` и regression/migration idempotency `f8adeff`; acceptance CI не используем из-за исчерпанного Actions-лимита. Для миграций с необратимым `downgrade` (например, `004_nullable_calculation_inputs`) rollback должен выполняться восстановлением предмиграционного backup, а не возвратом данных к вымышленным значениям. |
-| 11 | ЧАСТИЧНО | Immutable snapshots усилены: `HistoryService` формирует self-contained material payload, `snapshot_version` поднят до 5; `snapshot_service` восстанавливает современные snapshots без зависимости от mutable catalog, с fallback только для legacy-полей. `HistoryView` открывает snapshot через `HistoryService.get_calculation_snapshot`. Code commits `e63b4ba`, `0104553c`, `012bff6`, `a75311d`, `3a799e2`, `30f8b20`; regression `3b8ffab`, `4b232ece`. Acceptance/runtime smoke намеренно отложен до общего прогона; Actions не используются. |
-| 11.1 | ЧАСТИЧНО | Durable notification outbox реализован: Alembic `005_notification_outbox`, уникальный `idempotency_key`, статусы `pending/sending/retry/sent/failed`, retry/backoff и env-only SMTP credentials. Интеграционный слой теперь привязан к реальному событию `calculation_saved`: `HistoryView.save_result()` атомарно сохраняет расчёт и ставит уведомление в outbox при наличии `LKM_NOTIFICATION_RECIPIENT`. `NotificationService` отделён от обязательной SMTP-конфигурации на этапе enqueue; для SMTP добавлены детерминированные `Message-ID`/`X-LKM-Idempotency-Key` для корреляции, без заявления о гарантированной дедупликации SMTP. Добавлен opt-in одноразовый `NotificationWorker`, вызываемый при старте приложения только при `LKM_NOTIFICATIONS_ENABLED=1`; постоянный daemon/thread не создаётся. Code commits `2685f1f`, `dd7d600`, `138145f`, `9d10e914`, `4fdec2d`, `fbe980e`, `baee2aa`. Реальный SMTP/runtime smoke и тесты сейчас намеренно не выполнялись; §11.1 не закрывать до общего прогона. |
-| 12 | НЕ ВЫПОЛНЕНО | Versioned normative model. |
+| 9 | ЧАСТИЧНО | `PackagingPlanner` считает коммерческую потребность по фасовке: целые упаковки, резерв и опциональную стоимость. Складские остатки, складской учёт, резерв склада и закупочные заказы не входят. |
+| 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance отложен из-за запрета на Actions/тесты. Необратимые downgrade требуют восстановления backup. |
+| 11 | ЧАСТИЧНО | Self-contained immutable material snapshots v5, verified reads и integrity hashing реализованы; acceptance/runtime smoke отложен. |
+| 11.1 | ЧАСТИЧНО | Durable notification outbox интегрирован с `calculation_saved`; opt-in worker/trigger, idempotency metadata и env-only SMTP реализованы. SMTP/runtime smoke и тесты отложены. |
+| 12 | ЧАСТИЧНО | Добавлен immutable versioned normative foundation: `NormativeSource`, `NormativeRule`, `NormativeModel`, `NormativeRegistry`. Известные правила требуют source metadata; отсутствующие правила возвращаются как `UNKNOWN`. Code commit `709eadea`. Нормативные значения и конкретные стандарты намеренно не выдумывались; persistence/integration/regression ещё не выполнены. |
 | 13 | НЕ ВЫПОЛНЕНО | Structured Sa/St/profile model. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
@@ -55,65 +55,15 @@
 
 ## Последние code-этапы
 
-### §3 — Ad hoc materials
-Code commit: `42bb7fb282774e6f2c1691557ceba86d77795d21`.
-
-### §4 — Comparison UI regression
-Code commit: `2ad50af7c4de6b0b5ddbb0ef5113dbb023de2d8f`.
-
-### §5 — Missing-price regression
-Code commit: `a1e1a0a1d7fd34c6fee3537dec39e98f13f6281c`.
-
-### §6 — Cross-export regression
-Code commit: `e3ef08d3f6eae299ffe482a0dd8e557736334b2b`.
-
-### §9 — Commercial packaging foundation
-Code commit: `8e37341cf2be0000a8c346d417dc0b22268f19ae` — packaging domain очищен от складских остатков и складской логики.
-
-Regression commit: `268972115c31050797a08479110c5c69747d5932` — tests aligned with the no-inventory model.
-
-`PackagingPlanner` работает только с уже рассчитанной потребностью: фасовка, целые упаковки, коммерческий резерв и явно переданная цена. Складские остатки/резервы/заказы не моделируются.
-
-### §10 — Database safety foundation
-Code commit: `de1fd6f9a863ecd532bef556d8a342311fd1dca8` — `backup.py` с SQLite online backup/restore.
-
-Regression commit: `f8adeff48d6985be9cea833e4bfd0461530805bf` — backup/restore snapshot test, same-path guard и Alembic upgrade idempotency/head test.
-
-CI run `34453753830` для `f8adeff` ранее был `queued`. По запросу пользователя новые GitHub Actions runs не запускаются; поэтому §10 не переводится в `ВЫПОЛНЕНО` без доступного локального acceptance-доказательства.
-
-### §11 — Immutable history snapshots
-Code commit: `e63b4baaa7912cf92e9bd8b615edb2731cf1d44a` — canonical/tamper-evident snapshot helpers.
-
-Code commit: `0104553c219844dfe8c80e4c485b5a514d727cd8` — `HistoryService` seals calculation/comparison snapshots and exposes verified snapshot reads.
-
-Regression commit: `3b8ffab399e7665c4f59cb6bee9a8fc076c2bf66` — deterministic hash, tamper rejection and explicit legacy-unsealed behavior.
-
-Code commit: `012bff67f013601be715ec8ea5dedc284f28e9d6` — individual calculation-layer snapshots are now sealed as independent immutable records.
-
-Regression commit: `4b232ecef956811a554568032a11fa9f1f81f5d` — nested/layer snapshot integrity regression, including detection of changed catalog-like values.
-
-Code commit: `a75311d46a5f75364d139965fb7a231c503e99bd` — `HistoryView` загружает только verified snapshot через `HistoryService`, без прямого `json.loads` из ORM.
-
-Code commit: `3a799e2a49fcfa7af92c1ab5a8b3103043f76b19` — material payload snapshot v5 стал self-contained: сохраняются все поля `Material`, включая инженерные/технологические ограничения и документы.
-
-Code commit: `30f8b20aa5b6ec4e371792413829ae2b9eea05fb` — `snapshot_service` восстанавливает современные material snapshots из snapshot-данных; catalog fallback оставлен только для отсутствующих legacy-полей.
-
 ### §11.1 — Notification outbox foundation and application integration
-Code commit: `2685f1f27c654d3fe79b3746f108984cd35dba24` — Alembic migration `005_notification_outbox` с durable queue, статусами retry lifecycle и уникальным idempotency key.
+Code commits: `2685f1f`, `dd7d600`, `138145f`, `9d10e914`, `4fdec2dd`, `fbe980e`, `baee2aa`.
 
-Code commit: `dd7d600885c6c911a2760eb74daee90008d46796` — ORM adapter `NotificationOutboxORM`; SMTP credentials отсутствуют в persistent model.
+Реальный SMTP/runtime smoke и тесты не запускаются по указанию пользователя; §11.1 остаётся `ЧАСТИЧНО`.
 
-Code commit: `138145f1708f3c587576ba24aa1984b03edea57a` — `NotificationService`: deterministic idempotency, durable enqueue, bounded retry/backoff и SMTP adapter с credentials только из environment.
+### §12 — Versioned normative model foundation
+Code commit: `709eadea3be513fb3a2a540dc195ef93956f4b09` — добавлен immutable source-backed normative model с версиями, правилами, registry и явным `UNKNOWN`.
 
-Code commit: `9d10e9148e8328315063eda573233f08c314a8a3` — enqueue больше не требует SMTP-конфигурации; SMTP delivery получает deterministic Message-ID/X-LKM idempotency metadata для корреляции.
-
-Code commit: `4fdec2dd9f83e8b933d7dc6d6ffdbee7a3f969e8` — `NotificationWorker`: opt-in одноразовый lifecycle trigger, bounded batch, rollback при ошибке; без постоянного daemon/thread.
-
-Code commit: `fbe980e1f594ec26b7f1fc78e62f87085df2acd2` — реальное событие `calculation_saved` в `HistoryView.save_result()`, атомарный enqueue вместе с сохранением расчёта, opt-in через `LKM_NOTIFICATION_RECIPIENT`.
-
-Code commit: `baee2aa0a25b31397cde397ae0de94d97338d175` — запуск `NotificationWorker.run_once()` при старте приложения, только при явном `LKM_NOTIFICATIONS_ENABLED=1`.
-
-Реальный SMTP/runtime smoke и тесты сейчас не запускаются по указанию пользователя; поэтому §11.1 остаётся `ЧАСТИЧНО`. Кодовая интеграция выполнена, acceptance будет проведён позже общим прогоном.
+Этот commit не закрывает §12: пока нет persistence, интеграции с расчётным snapshot/result и acceptance-прогона.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -127,26 +77,13 @@ Code commit: `baee2aa0a25b31397cde397ae0de94d97338d175` — запуск `Notifi
 
 ## Порядок продолжения
 1. GitHub Actions не запускать из-за лимита пользователя.
-2. §10 не считать закрытым без acceptance-доказательства; существующие backup/restore и migration tests сохранять.
-3. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
-4. §11 остаётся `ЧАСТИЧНО` до общего runtime acceptance; написанный код не считать заменой прогона.
-5. §11.1: кодовая интеграция notification workflow выполнена, но acceptance/runtime/SMTP тестирование отложено до общего прогона.
-6. После acceptance §11.1 перейти к §12, затем далее по матрице.
+2. Тесты пока не запускать; общий прогон выполнить позже.
+3. §10 не считать закрытым без acceptance-доказательства.
+4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
+5. §11 и §11.1 не закрывать до общего runtime acceptance.
+6. Текущий рабочий этап — §12: довести versioned normative model до persistence/integration, затем перейти к §13.
 7. §22 вести отдельно и не закрывать формально до полного workflow integration.
 8. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
-## CI / контрольные точки
-- `34439245472`
-- `34439280625`
-- `34440681323`
-- `34437813196`
-- `34451490167` — commit `e3ef08d3`, был queued.
-- `34453199922` — commit `42bc3b6`, queued на момент фиксации.
-- `34453210684` — commit `1f9cbd6`, queued на момент фиксации.
-- `34453753830` — commit `f8adeff`, queued; новые Actions runs по текущей работе не запускаются.
-
-## Последняя проверка
-`2026-09-10` — GitHub Actions не запускаются по просьбе пользователя из-за исчерпания лимита. Тесты и runtime smoke намеренно не запускались. §11 остаётся `ЧАСТИЧНО`; §11.1 получил кодовую основу durable outbox/SMTP/retry/idempotency и теперь также интегрирован с событием сохранения расчёта и opt-in startup worker, но остаётся `ЧАСТИЧНО` до общего прогона.
-
-## Следующий рабочий фокус
-§11.1 acceptance отложен до общего прогона. До него не переводить §11.1 в `ВЫПОЛНЕНО` и не запускать Actions/тесты. После acceptance перейти к §12. Параллельно §22 вести отдельно и не закрывать до полного workflow integration.
+## Контроль
+Новые GitHub Actions runs не запускаются. Тесты/runtime smoke намеренно отложены по указанию пользователя.
