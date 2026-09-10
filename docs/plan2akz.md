@@ -67,7 +67,7 @@ Code commit: `a1e1a0a1d7fd34c6fee3537dec39e98f13f6281c`.
 Code commit: `e3ef08d3f6eae299ffe482a0dd8e557736334b2b`.
 
 ### §9 — Commercial packaging foundation
-Code commit: `8e37341cf2be0000a8c346d417dc0b22268f19ae` — packaging domain очищен от складских остатков и складской логики.
+Code commit: `8e37341cf2be000a8c346d417dc0b22268f19ae` — packaging domain очищен от складских остатков и складской логики.
 
 Regression commit: `268972115c31050797a08479110c5c69747d5932` — tests aligned with the no-inventory model.
 
@@ -78,7 +78,7 @@ Code commit: `de1fd6f9a863ecd532bef556d8a342311fd1dca8` — `backup.py` с SQLit
 
 Regression commit: `f8adeff48d6985be9cea833e4bfd0461530805bf` — backup/restore snapshot test, same-path guard и Alembic upgrade idempotency/head test.
 
-CI run `34453753830` для `f8adeff` на момент фиксации находится в `queued`; поэтому §10 не закрывается.
+CI run `34453753830` для `f8adeff` на момент последней проверки всё ещё `queued`; поэтому §10 не закрывается.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -107,7 +107,10 @@ CI run `34453753830` для `f8adeff` на момент фиксации нах�
 - `34451490167` — commit `e3ef08d3`, был queued.
 - `34453199922` — commit `42bc3b6`, queued на момент фиксации.
 - `34453210684` — commit `1f9cbd6`, queued на момент фиксации.
-- `34453753830` — commit `f8adeff`, queued на момент фиксации.
+- `34453753830` — commit `f8adeff`, при последней проверке queued.
+
+## Последняя проверка
+`2026-09-10` — run `34453753830`, job `pytest`: `queued`, `conclusion=null`. Новых code-изменений по §10 без результата CI не вносилось; §11 не начат, чтобы не нарушать порядок плана.
 
 ## Следующий рабочий фокус
 Текущий фокус — §10: дождаться зелёного CI, затем при необходимости исправить регрессии отдельным code commit и только после acceptance зафиксировать §10 как `ВЫПОЛНЕНО`. После этого перейти к §11. §22 сохранять отдельно и не закрывать до workflow integration.
