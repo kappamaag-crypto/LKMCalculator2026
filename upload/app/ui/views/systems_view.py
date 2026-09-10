@@ -77,10 +77,18 @@ class SystemsView(QWidget):
         self.btn_del_layer = QPushButton("Удалить слой")
         self.btn_del_layer.setProperty("secondary", True)
         self.btn_del_layer.clicked.connect(self._delete_layer)
+        self.btn_up_layer = QPushButton("↑")
+        self.btn_up_layer.setToolTip("Переместить слой вверх")
+        self.btn_up_layer.clicked.connect(lambda: self._move_layer(-1))
+        self.btn_down_layer = QPushButton("↓")
+        self.btn_down_layer.setToolTip("Переместить слой вниз")
+        self.btn_down_layer.clicked.connect(lambda: self._move_layer(1))
         buttons.addWidget(QLabel("Материал:"))
         buttons.addWidget(self.cmb_material)
         buttons.addWidget(self.btn_add_layer)
         buttons.addWidget(self.btn_del_layer)
+        buttons.addWidget(self.btn_up_layer)
+        buttons.addWidget(self.btn_down_layer)
         buttons.addStretch()
         lv.addLayout(buttons)
 
@@ -117,7 +125,6 @@ class SystemsView(QWidget):
 
     def reload(self):
         try:
-            # Eager-load layers: _systems must remain usable after the DB session closes.
             with get_session_factory()() as session:
                 stmt = (
                     select(CoatingSystemORM)
@@ -177,7 +184,7 @@ class SystemsView(QWidget):
         self.ed_certificate.setText(orm.certificate or "")
         self.table.blockSignals(True)
         self.table.setRowCount(0)
-        for layer in orm.layers:
+        for layer in sorted(orm.layers, key=lambda item: item.layer_number):
             material = next((m for m in self._materials if m.id == layer.material_id), None)
             self._append_row(
                 layer.layer_number,
@@ -227,6 +234,26 @@ class SystemsView(QWidget):
         if row >= 0:
             self.table.removeRow(row)
             self._renumber()
+
+    def _move_layer(self, direction: int):
+        row = self.table.currentRow()
+        target = row + direction
+        if row < 0 or target < 0 or target >= self.table.rowCount():
+            return
+        self.table.blockSignals(True)
+        try:
+            cells = []
+            for col in range(self.table.columnCount()):
+                item = self.table.takeItem(row, col)
+                cells.append(item)
+            self.table.removeRow(row)
+            self.table.insertRow(target)
+            for col, item in enumerate(cells):
+                self.table.setItem(target, col, item)
+            self._renumber()
+            self.table.selectRow(target)
+        finally:
+            self.table.blockSignals(False)
 
     def _renumber(self, *args):
         self.table.blockSignals(True)
