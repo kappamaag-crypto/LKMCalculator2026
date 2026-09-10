@@ -7,7 +7,7 @@
 2. Инженерная логика находится в domain/service, а не в UI.
 3. Excel не является вторым расчётным движком.
 4. PDF и Excel получают данные из одного `CalculationResult` / `SystemCalculationResult`.
-5. Инженерные и складские/закупочные данные не смешивать без явного назначения.
+5. Инженерные и коммерческие/закупочные данные не смешивать без явного назначения.
 6. Существенный этап должен иметь regression/smoke-проверку.
 7. Каждый существенный этап — отдельный code commit.
 8. После code commit — отдельный commit с фиксацией результата в этом плане.
@@ -26,8 +26,8 @@
 | 6 | ЧАСТИЧНО | PDF строится из `SystemCalculationResult`; multilayer/comparison/2K/unknown-price покрыты; cross-export regression `e3ef08d`; остаются визуальный/печать smoke. CI для `e3ef08d` был queued и не является доказательством успеха до завершения run. |
 | 7 | ВЫПОЛНЕНО | Precision/unit invariants + независимые golden cases 2/3/4/5 layers; успешный CI. |
 | 8 | ВЫПОЛНЕНО | 2K учитывается как один смешанный материалный слой; TDS technology rules вынесены в §14. |
-| 9 | ЧАСТИЧНО | Добавлен domain-слой `PackagingPlanner`: фасовка по положительному весу/объёму, округление до целых упаковок, резерв, остаток и опциональная стоимость закупки; regression `1f9cbd6`. Полный commercial workflow с привязкой к UI/БД/складскому остатку/резерву/закупочному заказу ещё не реализован. |
-| 10 | ЧАСТИЧНО | Alembic присутствует; acceptance migration/backup/rollback остаётся. |
+| 9 | ЧАСТИЧНО | `PackagingPlanner` считает коммерческую потребность по фасовке: целые упаковки, резерв и опциональную стоимость; regression `26897211`. Складские остатки, складской учёт, резерв склада и закупочные заказы в проект не входят. Полный коммерческий workflow/UI ещё не реализован. |
+| 10 | ЧАСТИЧНО | Alembic присутствует. Добавлены SQLite-safe backup/restore helpers `de1fd6f` и regression/migration idempotency `f8adeff`; acceptance CI ещё queued. Для миграций с необратимым `downgrade` (например, `004_nullable_calculation_inputs`) rollback должен выполняться восстановлением предмиграционного backup, а не возвратом данных к вымышленным значениям. |
 | 11 | ЧАСТИЧНО | History/snapshot infrastructure есть; immutable snapshot contract остаётся. |
 | 11.1 | НЕ ВЫПОЛНЕНО | Outbox/SMTP/retry/idempotency/safe secrets. |
 | 12 | НЕ ВЫПОЛНЕНО | Versioned normative model. |
@@ -66,23 +66,19 @@ Code commit: `a1e1a0a1d7fd34c6fee3537dec39e98f13f6281c`.
 ### §6 — Cross-export regression
 Code commit: `e3ef08d3f6eae299ffe482a0dd8e557736334b2b`.
 
-### §9 — Packaging/procurement foundation
-Code commit: `42bc3b6c8985c71a8d2a862321016eb9be968d98` — `feat: add packaging and procurement planning domain layer`.
+### §9 — Commercial packaging foundation
+Code commit: `8e37341cf2be0000a8c346d417dc0b22268f19ae` — packaging domain очищен от складских остатков и складской логики.
 
-Добавлен `upload/app/domain/packaging.py`. `PackagingPlanner`:
-- работает только с уже рассчитанной потребностью и не меняет инженерный результат;
-- определяет количество целых упаковок;
-- поддерживает нетто в кг или л;
-- рассчитывает потребность с коммерческим резервом;
-- показывает закупленное количество и остаток;
-- не выдумывает закупочную цену: стоимость остаётся `None`, если цена упаковки не передана;
-- умеет выдавать независимые варианты фасовки без утверждения глобальной оптимизации закупки.
+Regression commit: `268972115c31050797a08479110c5c69747d5932` — tests aligned with the no-inventory model.
 
-Regression commit: `1f9cbd6e9fe5528173f75b91d1c790b4c2d31e81` — `test: cover packaging and procurement planning invariants`.
+`PackagingPlanner` работает только с уже рассчитанной потребностью: фасовка, целые упаковки, коммерческий резерв и явно переданная цена. Складские остатки/резервы/заказы не моделируются.
 
-Проверяются округление упаковок, резерв как коммерческий слой, переход кг/л, остаток, стоимость при явно переданной цене и отбрасывание невалидных фасовок.
+### §10 — Database safety foundation
+Code commit: `de1fd6f9a863ecd532bef556d8a342311fd1dca8` — `backup.py` с SQLite online backup/restore.
 
-§9 **не закрыт**: пока нет полноценного workflow «расчёт → фасовка → складской остаток → резерв → закупка», UI/БД-интеграции и acceptance реального коммерческого сценария.
+Regression commit: `f8adeff48d6985be9cea833e4bfd0461530805bf` — backup/restore snapshot test, same-path guard и Alembic upgrade idempotency/head test.
+
+CI run `34453753830` для `f8adeff` на момент фиксации находится в `queued`; поэтому §10 не закрывается.
 
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы. Наличие standalone engine/tests недостаточно.
@@ -96,11 +92,12 @@ Regression commit: `1f9cbd6e9fe5528173f75b91d1c790b4c2d31e81` — `test: cover p
 
 ## Порядок продолжения
 1. Не считать queued CI успешным.
-2. После завершения CI по §9 исправить найденные регрессии отдельным code commit.
-3. §9 довести от domain foundation до коммерческого workflow, не смешивая его с инженерным расчётом.
-4. Затем идти по матрице: §10, §11, §11.1 и далее.
-5. §22 вести отдельно и не закрывать формально до полного workflow integration.
-6. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
+2. После завершения CI по текущему этапу исправить найденные регрессии отдельным code commit.
+3. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
+4. §10 довести до acceptance backup/migration/restore после зелёного CI.
+5. Затем идти по матрице: §11, §11.1 и далее.
+6. §22 вести отдельно и не закрывать формально до полного workflow integration.
+7. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
 
 ## CI / контрольные точки
 - `34439245472`
@@ -110,6 +107,7 @@ Regression commit: `1f9cbd6e9fe5528173f75b91d1c790b4c2d31e81` — `test: cover p
 - `34451490167` — commit `e3ef08d3`, был queued.
 - `34453199922` — commit `42bc3b6`, queued на момент фиксации.
 - `34453210684` — commit `1f9cbd6`, queued на момент фиксации.
+- `34453753830` — commit `f8adeff`, queued на момент фиксации.
 
 ## Следующий рабочий фокус
-§9 остаётся текущим рабочим этапом: после зелёного CI продолжить commercial packaging/procurement workflow. §10 не начинать вместо незавершённого §9. §22 сохранять в статусе `ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ`.
+Текущий фокус — §10: дождаться зелёного CI, затем при необходимости исправить регрессии отдельным code commit и только после acceptance зафиксировать §10 как `ВЫПОЛНЕНО`. После этого перейти к §11. §22 сохранять отдельно и не закрывать до workflow integration.
