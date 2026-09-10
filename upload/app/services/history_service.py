@@ -15,6 +15,8 @@ from app.domain.models import SystemCalculationResult, ComparisonResult
 from app.domain.surface_profile import SurfaceCondition, SurfacePreparation, SurfaceProfile
 from app.domain.normative import UNKNOWN
 from app.services.engineering_context_snapshot import (
+    engineering_context_from_dict,
+    engineering_context_to_dict,
     normative_model_to_dict,
     surface_condition_to_dict,
 )
@@ -113,8 +115,14 @@ class HistoryService:
     def save_calculation(self, result: SystemCalculationResult, notes: str = "") -> int:
         """Сохранить расчёт как неизменяемый снимок входных данных и результата."""
         obj = result.object_data
+        context = result.engineering_context
+        explicit_surface = context.surface_condition
+        if explicit_surface == SurfaceCondition():
+            surface_snapshot = self._surface_condition_snapshot(obj)
+        else:
+            surface_snapshot = surface_condition_to_dict(explicit_surface) or {}
         snapshot = {
-            "snapshot_version": 6,
+            "snapshot_version": 7,
             "object": {
                 "object_name": obj.object_name,
                 "customer": obj.customer,
@@ -132,8 +140,9 @@ class HistoryService:
                 "relative_humidity": obj.relative_humidity,
                 "dew_point": obj.dew_point,
                 "dew_point_margin_c": obj.dew_point_margin_c,
-                "surface_condition": self._surface_condition_snapshot(obj),
-                "normative_model": normative_model_to_dict(getattr(result, "normative_model", None)),
+                "surface_condition": surface_snapshot,
+                "engineering_context": engineering_context_to_dict(context),
+                "normative_model": normative_model_to_dict(context.normative_model),
             },
             "system": {
                 "name": result.system.system_name,
@@ -220,6 +229,20 @@ class HistoryService:
         if calc is None:
             raise KeyError(calc_id)
         return load_and_verify_snapshot(calc.snapshot_json)
+
+    def get_calculation_engineering_context(self, calc_id: int):
+        """Restore typed engineering context from a verified history snapshot."""
+        snapshot = self.get_calculation_snapshot(calc_id)
+        object_data = snapshot.get("object", {})
+        context_data = object_data.get("engineering_context")
+        if context_data:
+            return engineering_context_from_dict(context_data)
+        # Backward-compatible v6 snapshots stored normative_model and surface_condition separately.
+        legacy_context = {
+            "normative_model": object_data.get("normative_model"),
+            "surface_condition": object_data.get("surface_condition"),
+        }
+        return engineering_context_from_dict(legacy_context)
 
     def delete_calculation(self, calc_id: int) -> None:
         self.repo.delete(calc_id)
