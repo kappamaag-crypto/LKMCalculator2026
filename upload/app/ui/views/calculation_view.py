@@ -9,7 +9,9 @@ from PySide6.QtGui import QAction
 from app.domain.models import Material,ObjectData,CoatingSystem
 from app.domain.enums import MaterialType
 from app.domain.calculator import LayerInput
+from app.domain.engineering_context import EngineeringContext
 from app.services.calculation_service import CalculationService
+from app.services.engineering_context_snapshot import engineering_context_from_dict
 from app.services.snapshot_service import material_from_snapshot, thinner_from_snapshot
 from app.services.snapshot_utils import snapshot_number
 from app.ui.widgets.layer_table import LayerTableWidget
@@ -22,8 +24,13 @@ class CalculationView(QWidget):
     calculation_done=Signal(object);add_to_comparison=Signal(object);material_added=Signal(object)
     REPORT_MODES=(("engineering","Инженерный"),("commercial","Коммерческий"),("full","Полный"))
     def __init__(self,service:CalculationService,parent=None):
-        super().__init__(parent);self.service=service;self.settings=AppSettings.load();self._materials=[];self._all_materials=[];self._systems=[];self._last_result=None;self._restored_system_name="";self._area_unknown=False;self._timer=QTimer(self);self._timer.setSingleShot(True);self._timer.setInterval(220);self._timer.timeout.connect(self._on_live_recalculate);self._build_ui()
+        super().__init__(parent);self.service=service;self.settings=AppSettings.load();self._materials=[];self._all_materials=[];self._systems=[];self._last_result=None;self._restored_system_name="";self._area_unknown=False;self._engineering_context=EngineeringContext();self._timer=QTimer(self);self._timer.setSingleShot(True);self._timer.setInterval(220);self._timer.timeout.connect(self._on_live_recalculate);self._build_ui()
     def set_settings(self,settings:AppSettings):self.settings=settings;self._update_export_menu_checks()
+    def set_engineering_context(self,context:EngineeringContext|None):
+        """Set source-backed engineering context supplied by the application layer."""
+        self._engineering_context=context or EngineeringContext()
+        if self._last_result is not None:self._schedule_live_recalculate()
+    def engineering_context(self)->EngineeringContext:return self._engineering_context
     def _build_ui(self):
         root=QVBoxLayout(self);root.setContentsMargins(12,12,12,12);root.setSpacing(10);t=QLabel("Расчёт системы покрытия");t.setProperty("heading",True);root.addWidget(t);sp=QSplitter(Qt.Horizontal)
         left=QWidget();ll=QVBoxLayout(left);b=QGroupBox("Объект");f=QFormLayout(b);self.ed_object=QLineEdit();self.ed_customer=QLineEdit();self.ed_project=QLineEdit();self.ed_calc_number=QLineEdit();self.ed_system_name=QLineEdit();self.ed_system_name.setPlaceholderText("Название системы");self.spin_area=QDoubleSpinBox();self.spin_area.setRange(0.01,1000000);self.spin_area.setValue(1);self.spin_area.setDecimals(2);self.spin_area.setSuffix(" м²");f.addRow("Объект:",self.ed_object);f.addRow("Заказчик:",self.ed_customer);f.addRow("Проект:",self.ed_project);f.addRow("№ расчёта:",self.ed_calc_number);f.addRow("Система:",self.ed_system_name);f.addRow("Площадь:",self.spin_area);self.spin_area.valueChanged.connect(self._on_area_changed);sysbox=QGroupBox("Сохранённая система");sf=QVBoxLayout(sysbox);self.cmb_system=QComboBox();self.cmb_system.addItem("— выбрать систему из базы —",None);self.btn_load_system=QPushButton("Загрузить систему в расчёт");self.btn_load_system.clicked.connect(self._on_load_saved_system);sf.addWidget(self.cmb_system);sf.addWidget(self.btn_load_system);ll.addWidget(b);ll.addWidget(sysbox);ll.addStretch();sp.addWidget(left)
@@ -111,7 +118,7 @@ class CalculationView(QWidget):
         if not layers:
             if dialogs:QMessageBox.warning(self,"Внимание","Добавьте хотя бы один слой")
             return False
-        try:result,validation=self.service.calculate_system(self._build_object_data(),layers,system=self._build_system())
+        try:result,validation=self.service.calculate_system(self._build_object_data(),layers,system=self._build_system(),engineering_context=self._engineering_context)
         except (ValueError,TypeError) as e:self.lbl_summary.setText(f"Ошибка расчёта: {e}");self.txt_details.clear();return False
         if validation.has_errors:
             msg="\n".join(f"• {e.message}" for e in validation.errors);self.lbl_summary.setText("Расчёт требует исправления входных данных");self.txt_details.setPlainText(msg);[b.setEnabled(False) for b in (self.btn_excel,self.btn_pdf,self.btn_to_cmp)];return False
@@ -126,7 +133,11 @@ class CalculationView(QWidget):
         self.add_to_comparison.emit(self._last_result)
     def restore_snapshot(self,snapshot:dict)->bool:
         if not isinstance(snapshot,dict):raise ValueError("Некорректный формат снимка истории")
-        obj=snapshot.get("object") or {};self._timer.stop();self.ed_object.setText(str(obj.get("object_name") or ""));self.ed_customer.setText(str(obj.get("customer") or ""));self.ed_project.setText(str(obj.get("project") or ""));self.ed_calc_number.setText(str(obj.get("calculation_number") or ""));area=snapshot_number(obj.get("area_m2"));self.spin_area.setValue(area if area is not None and area>=0.01 else 0.01);self._area_unknown=area is None or area<0.01;self._restored_system_name=str(snapshot.get("system_name") or "Пользовательская система");self.ed_system_name.setText(self._restored_system_name);materials_by_id={m.id:m for m in self._all_materials if m.id is not None};materials_by_name={m.material_name:m for m in self._all_materials if m.material_name};layers=[];missing=[]
+        obj=snapshot.get("object") or {};self._timer.stop();self.ed_object.setText(str(obj.get("object_name") or ""));self.ed_customer.setText(str(obj.get("customer") or ""));self.ed_project.setText(str(obj.get("project") or ""));self.ed_calc_number.setText(str(obj.get("calculation_number") or ""));area=snapshot_number(obj.get("area_m2"));self.spin_area.setValue(area if area is not None and area>=0.01 else 0.01);self._area_unknown=area is None or area<0.01;self._restored_system_name=str(snapshot.get("system_name") or "Пользовательская система");self.ed_system_name.setText(self._restored_system_name)
+        restored_context=engineering_context_from_dict(obj.get("engineering_context"))
+        if restored_context is not None:self._engineering_context=restored_context
+        elif obj.get("normative_model") is not None or obj.get("surface_condition") is not None:self._engineering_context=engineering_context_from_dict({"normative_model":obj.get("normative_model"),"surface_condition":obj.get("surface_condition")}) or EngineeringContext()
+        materials_by_id={m.id:m for m in self._all_materials if m.id is not None};materials_by_name={m.material_name:m for m in self._all_materials if m.material_name};layers=[];missing=[]
         for index,item in enumerate(snapshot.get("layers") or [],1):
             current=materials_by_id.get(item.get("material_id")) or materials_by_name.get(item.get("material_name"));material=material_from_snapshot(item,current);thinner=None;thinner_percent=snapshot_number(item.get("thinner_percent") if "thinner_percent" in item else 0)
             if thinner_percent and thinner_percent>0:thinner=thinner_from_snapshot(item,materials_by_id.get(item.get("thinner_id")) or materials_by_name.get(item.get("thinner_name")))
