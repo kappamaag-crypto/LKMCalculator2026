@@ -109,4 +109,10 @@ class LayerTableWidget(QTableWidget):
         for index in range(self.rowCount()):
             for column in EDITABLE_COLUMNS:self._last_valid[(index,column)]=self.item(index,column).text()
         self.layer_changed.emit()
+    def move_selected(self,direction:int):
+        """Перемещает выбранный слой на одну позицию и сохраняет модель синхронной с таблицей."""
+        row=self.currentRow();target=row+direction
+        if row<0 or row>=len(self._layer_inputs) or target<0 or target>=len(self._layer_inputs):return False
+        layers=list(self._layer_inputs);layers[row],layers[target]=layers[target],layers[row]
+        self.set_layers(layers);self.selectRow(target);self.layer_changed.emit();return True
     def clear_layers(self):self._layer_inputs.clear();self.setRowCount(0);self._last_valid.clear();self.layer_changed.emit()
