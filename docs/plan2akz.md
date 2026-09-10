@@ -49,7 +49,7 @@ Precision/regression покрывает отсутствие промежуто�
 - CI запускает Qt-тесты в headless-режиме через `QT_QPA_PLATFORM=offscreen`.
 
 Коммиты текущего этапа:
-- `c00299d766147607c2226a071832dd3958957c` — safe drag-reorder слоёв на экране расчёта;
+- `c00299d766147607c2226a07183254dd3958957c` — safe drag-reorder слоёв на экране расчёта;
 - `dcdebf1ad8cd6cd150e0792398bdbca0bbb68e6` — кнопки ↑/↓ в редакторе сохранённых систем;
 - `6f16fd66553bb6237314c1ca2088af16e236fa37` — создание черновика системы из последнего расчёта;
 - `7e80e9fea4c0ce7518917a5f105781383bdc0d58` — передача последнего `SystemCalculationResult` в редактор систем;
@@ -373,20 +373,24 @@ Hard filters отделены от score. Нужно добавить химич
 - формирует worst-case статус всей системы по приоритету `запрещено > нет подтверждённых данных > предупреждение > разрешено`;
 - сохраняет исходное правило, источник и текст причины для каждого перехода;
 - выделяет `blocking_transitions` для всех переходов, которые нельзя считать безусловно разрешёнными;
-- принимает `LayerCompatibilityContext` для будущих TDS-backed условий (`previous_is_cured`, `recoat_elapsed_h`, `surface_prepared`), но **не придумывает** правила по этим полям без источника.
+- принимает `LayerCompatibilityContext` для будущих TDS-backed условий (`previous_is_cured`, `recoat_elapsed_h`, `surface_prepared`), но **не придумывает** правила по этим полям без источника;
+- умеет проверять уже рассчитанный `SystemCalculationResult` через `check_result()` без повторного расчёта.
 
 Regression `upload/tests/test_layer_compatibility.py` покрывает:
 - многослойную систему и проверку всех соседних переходов;
 - source-backed warning `2` («требуется придание шероховатости»);
 - `UNKNOWN` для неподтверждённого/несопоставленного связующего;
 - worst-case `UNKNOWN`, если хотя бы один переход не подтверждён;
-- контроль количества контекстов для переходов.
+- контроль количества контекстов для переходов;
+- проверку `SystemCalculationResult` без запуска `CalculationService` повторно.
 
 Коммиты:
 - `2ba6b0e0ad73c953ee194c87bba8266857f1520e` — `feat: add layered coating compatibility engine`;
-- `002bbe65e979c1b9e2dc9d807ec9ab4972497b20` — `test: align compatibility cases with source matrix`.
+- `002bbe65e979c1b9e2dc9d807ec9ab4972497b20` — `test: align compatibility cases with source matrix`;
+- `f6354fb4b6cdcdc30c33a4640e8c5e3a8f47e13d` — `feat: check compatibility directly from calculation result`;
+- `b079786ecae4605fd8ed580bbab4930875e72b57` — `test: verify compatibility checks use calculated result`.
 
-Остаётся до закрытия §22: связать engine с реальными `SystemCalculationResult`/редактором системы, добавить TDS-backed условия для состояния отверждения и межслойной выдержки там, где они действительно указаны производителем, и затем добавить UI-предупреждение без скрытого изменения расчёта.
+Остаётся до закрытия §22: связать engine с редактором системы/основным workflow, добавить TDS-backed условия для состояния отверждения и межслойной выдержки там, где они действительно указаны производителем, и затем добавить UI-предупреждение без скрытого изменения расчёта.
 
 ## 23. Pre-Application Check / технологическая готовность — P1
 
