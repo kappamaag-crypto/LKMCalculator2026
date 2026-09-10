@@ -9,7 +9,7 @@ from app.domain.enums import BinderType, MaterialType
 from app.domain.models import Material, ObjectData
 
 
-def _material(number: int) -> Material:
+def _material(number: int, **kwargs) -> Material:
     return Material(
         id=number,
         manufacturer="Blank",
@@ -19,6 +19,7 @@ def _material(number: int) -> Material:
         density=1.4,
         solids_by_volume_percent=70.0,
         price_per_kg=100.0 + number,
+        **kwargs,
     )
 
 
@@ -88,3 +89,29 @@ def test_comparison_table_does_not_double_count_thinner_cost():
     assert expected_total is not None
     assert rows["Стоимость ЛКМ + разбавителя, руб/м²"]["sys_0"] == pytest.approx(expected_total)
     assert rows["Стоимость ЛКМ, руб/м²"]["sys_0"] == pytest.approx(expected_total - thinner_cost)
+
+
+def test_comparison_exposes_worst_case_technology_constraints():
+    obj = ObjectData(area_m2=100.0)
+    a = _material(1, min_application_temperature=-10.0, max_application_temperature=120.0,
+                  min_recoat_time_h=2.0, max_recoat_time_h=48.0, full_cure_time_h=24.0,
+                  max_relative_humidity=85.0, min_dew_point_margin_c=3.0)
+    b = _material(2, min_application_temperature=5.0, max_application_temperature=100.0,
+                  min_recoat_time_h=4.0, max_recoat_time_h=36.0, full_cure_time_h=30.0,
+                  max_relative_humidity=80.0, min_dew_point_margin_c=5.0)
+    engine = ComparisonEngine()
+    comparison = engine.compare(obj, [
+        ("Технологическая система", [
+            LayerInput(material=a, target_dft=100.0),
+            LayerInput(material=b, target_dft=100.0),
+        ]),
+        ("Пустая система", _layers(2)),
+    ])
+    rows = {row["indicator"]: row for row in engine.to_table(comparison)}
+    assert rows["Мин. температура нанесения, °C"]["sys_0"] == 5.0
+    assert rows["Макс. температура нанесения, °C"]["sys_0"] == 100.0
+    assert rows["Мин. межслойная выдержка, ч"]["sys_0"] == 4.0
+    assert rows["Макс. межслойная выдержка, ч"]["sys_0"] == 36.0
+    assert rows["Полное отверждение, ч"]["sys_0"] == 30.0
+    assert rows["Макс. относительная влажность, %"]["sys_0"] == 80.0
+    assert rows["Мин. запас до точки росы, °C"]["sys_0"] == 5.0
