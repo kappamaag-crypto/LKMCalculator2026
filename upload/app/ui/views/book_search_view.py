@@ -131,6 +131,29 @@ class BookSearchView(QWidget):
             source_uri="",
         )
         self.source_selected.emit(source)
+
+        # The MainWindow currently owns the engineering context. Keep the handoff
+        # explicit and source-only: no normative model/rule is fabricated.
+        parent_window = self.window()
+        if not hasattr(parent_window, "_engineering_context"):
+            self.status.setText("Источник подготовлен, но инженерный контекст недоступен.")
+            return
+
+        from app.ui.dialogs.engineering_context_dialog import EngineeringContextDialog
+
+        dialog = EngineeringContextDialog(parent_window._engineering_context, parent_window)
+        dialog.set_normative_source(source)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        try:
+            context = dialog.context()
+        except ValueError as exc:
+            self.status.setText(f"Ошибка инженерного контекста: {exc}")
+            return
+        parent_window._engineering_context = context
+        calc_view = getattr(parent_window, "calc_view", None)
+        if calc_view is not None:
+            calc_view.set_engineering_context(context)
         self.status.setText(
             "Источник передан в инженерный контекст как идентичность; нормативные правила остаются UNKNOWN."
         )
