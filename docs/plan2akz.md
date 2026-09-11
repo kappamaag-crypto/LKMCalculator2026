@@ -35,7 +35,7 @@
 | 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI; acceptance позже. |
 | 14 | ЧАСТИЧНО | All 10 SPKEFFA catalog docs have KNOWN rules + full service/UI wiring (template, calc, recommend default, History). Broader E2E acceptance remains. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
-| 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; полная scoring остаётся. |
+| 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; ScoreBreakdown сохранён в RecommendationItem и теперь прозрачно отображается в RecommendationView и текстовом отчёте. Остаются фактический pytest-run и полная scoring/E2E-проверка. |
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI; добавлен DFT UI workflow; acceptance позже. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
 | 19 | ЧАСТИЧНО | Legacy parity matrix; строки PENDING. |
@@ -77,7 +77,8 @@
 - `main_window.py` — «Инженерное → Пояснение расчёта…» открывает ExplanationDialog для последнего завершённого расчёта; без расчёта переводит пользователя на экран «Расчёт».
 - `main_window.py` — «Инженерное → Химстойкость…» открывает ChemicalResistanceDialog для текущего каталога материалов.
 - `recommendation_service.py` — opt-in chemical hard-filter; UNKNOWN rejected by default when chemical agents are explicitly supplied.
-- `recommendation_view.py` — optional chemical-agent/concentration/temperature inputs wired to the source-backed recommendation filter.
+- `recommendation_view.py` — optional chemical-agent/concentration/temperature inputs wired to the source-backed recommendation filter; ScoreBreakdown rendered in recommendation details.
+- `recommender.py` — RecommendationItem retains ScoreBreakdown; text report exposes factor-level scoring.
 - `inspection_view.py` — DFT point input, evaluation against latest SystemCalculationResult, and DFT-bound inspection record creation.
 - DFT inspection evaluate + limits_from_calculation_result (§32 partial).
 - LayerResult losses provenance + ResolvedLosses (§26/§28).
@@ -87,7 +88,7 @@
 - `test_inspection_view_smoke.py` — headless DFT InspectionView evaluation against a calculation result; test execution remains pending for the same reason.
 - `test_chemical_resistance_dialog_smoke.py` — headless ChemicalResistanceDialog UNKNOWN-preservation smoke; test execution remains pending for the same reason.
 - `test_recommendation_chemical_filter.py` — opt-in recommendation hard-filter coverage for UNKNOWN/RESISTANT/NOT_RESISTANT and explicit concentration limits; test execution remains pending for the same reason.
-- `test_recommendation_view_smoke.py` — headless RecommendationView chemical-filter input smoke; test execution remains pending for the same reason.
+- `test_recommendation_view_smoke.py` — headless RecommendationView chemical-filter input smoke and ScoreBreakdown rendering assertions; test execution remains pending for the same reason.
 
 ## TDS verification boundary — §12/§14/§25
 
