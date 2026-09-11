@@ -1,6 +1,7 @@
 """UI for the source-traceable Pre-Application Check."""
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPlainTextEdit, QPushButton
 
 from app.domain.models import SystemCalculationResult
@@ -59,7 +60,3 @@ class PreApplicationDialog(QDialog):
         check = self._run()
         self.status_label.setText(f"Статус: <b>{check.status}</b>")
         self.report.setPlainText("\n".join(check.summary_lines()))
-
-
-# Local import kept at module bottom to keep the dialog dependency surface small.
-from PySide6.QtCore import Qt
