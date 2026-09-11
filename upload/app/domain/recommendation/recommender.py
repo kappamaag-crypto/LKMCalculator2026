@@ -107,6 +107,16 @@ class RecommendationEngine:
             return None
         return self.compatibility.check_material_sequence(materials)
 
+    @staticmethod
+    def _breakdown_report_lines(breakdown: ScoreBreakdown) -> list[str]:
+        return [
+            f"   Коррозионная категория: {breakdown.corrosion:.1f}/100",
+            f"   Долговечность: {breakdown.durability:.1f}/100",
+            f"   Технологичность: {breakdown.technology:.1f}/100",
+            f"   Стоимость: {breakdown.cost:.1f}/100",
+            f"   Итоговый Score: {breakdown.total:.1f}/100",
+        ]
+
     def format_report(self, result: RecommendationResult) -> str:
         lines = [
             "═══ Подбор систем АКЗ ═══",
@@ -123,6 +133,9 @@ class RecommendationEngine:
         else:
             for item in result.items:
                 lines.append(f"{item.rank}. {item.system.system_name} — {item.score:.0f}/100")
+                if item.breakdown is not None:
+                    lines.append("   Разбивка оценки:")
+                    lines.extend(self._breakdown_report_lines(item.breakdown))
                 for reason in item.reasons[:4]:
                     lines.append(f"   ✓ {reason}")
                 for warning in item.warnings[:3]:
