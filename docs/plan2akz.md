@@ -42,7 +42,7 @@
 | 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + controlled incomplete Material. Остаются полное сопоставление и UI acceptance. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | CompatibilityEngine интегрирован; реальные TDS-backed conditions и UI acceptance остаются. |
-| 23 | НЕ ВЫПОЛНЕНО | Pre-Application Check. |
+| 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. UI/E2E acceptance remains. |
 | 24 | НЕ ВЫПОЛНЕНО | Химическая стойкость только через source-backed rules. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
@@ -68,6 +68,7 @@
 - `tds_technology_bridge.py` — DFT checks + enrich_filter_result_with_known_tds.
 - `tds_normative_bridge.py` — KNOWN TDS → NormativeModel / EngineeringContext.
 - `loss_profile` / calculator / scenario / system template stages — see prior plan entries.
+- `pre_application.py` — Pre-Application Check READY/BLOCKED/INCOMPLETE.
 
 ## TDS verification boundary — §12/§14/§25
 
@@ -93,6 +94,18 @@ Done:
 
 Still open:
 - broader end-to-end UI/runtime acceptance beyond unit/smoke coverage.
+
+## §23 — Pre-Application Check
+
+Done:
+- `domain/pre_application.py` — pure checklist: ambient, surface condition, per-material technology limits;
+- status READY / BLOCKED / INCOMPLETE; missing data = UNKNOWN (no default 3 °C dew-point margin);
+- `CalculationService.run_pre_application_check` service entry;
+- unit tests `test_pre_application.py` (8 cases).
+
+Still open:
+- UI surface for Pre-Application checklist;
+- full E2E with confirmed templates and inspection workflow (§32).
 
 ## §28 / §30 — закрыты ранее
 
