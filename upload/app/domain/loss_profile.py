@@ -36,3 +36,18 @@ class LossProfile:
     def none(cls) -> "LossProfile":
         """Profile representing an explicit zero-loss assumption."""
         return cls(name="Без потерь", percent=0.0, source="SYSTEM")
+
+
+@dataclass(frozen=True)
+class ResolvedLosses:
+    """Traceable resolved loss percent for LayerResult provenance (§28 / §26)."""
+
+    percent: float
+    source: str  # EXPLICIT | PROFILE | DEFAULT
+    profile_name: str = ""
+    note: str = ""
+
+    def __post_init__(self) -> None:
+        if self.source not in {"EXPLICIT", "PROFILE", "DEFAULT"}:
+            raise ValueError("ResolvedLosses.source must be EXPLICIT, PROFILE, or DEFAULT")
+        LossProfile._validate_percent(self.percent)
