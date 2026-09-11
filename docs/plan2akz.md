@@ -36,9 +36,9 @@
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. Начинать после появления проверяемого source-backed rule pipeline. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; `RecommendationEngine` дополнительно прогоняет разрешённые системы через `LayerCompatibilityEngine` и переносит source-backed warnings/limitations. `UNKNOWN` и отсутствие подтверждённого правила не изменяют ranking; environment/technology/весовые настройки и полноценная compatibility scoring остаются. |
-| 17 | ЧАСТИЧНО | Добавлены typed `InspectionRecord`, измерения и дефекты, `InspectionService` для создания/валидации/сводки/serialization и regression cases. UI-вкладка «Инспекция» и пункт инженерного меню подключены code commit `16c3825cb6a913dd36c216e79987c615ce476fae`. Приёмочный статус по умолчанию `UNKNOWN`; нормативные критерии не выводятся автоматически. Runtime/UI acceptance ещё не выполнены. |
-| 18 | НЕ ВЫПОЛНЕНО | Release/regression/smoke/DB backup/docs acceptance. |
-| 19 | НЕ ВЫПОЛНЕНО | Legacy parity matrix. |
+| 17 | ЧАСТИЧНО | Typed inspection domain/service, regression cases и UI-вкладка реализованы. UI commit `16c3825cb6a913dd36c216e79987c615ce476fae`. Приёмочный статус по умолчанию `UNKNOWN`; нормативные критерии не выводятся автоматически. Runtime/UI acceptance ещё не выполнены. |
+| 18 | ЧАСТИЧНО | Добавлен release acceptance checklist `docs/release_acceptance_v3.md` с отдельными пунктами regression, UI smoke, compatibility, inspection, persistence, DB backup/restore, Excel/PDF и документации. Все пункты пока `PENDING`; сам release acceptance не выполнен. |
+| 19 | ЧАСТИЧНО | Добавлен `docs/legacy_parity_matrix_v3.md` с явной матрицей сравнения v2→v3 по расчёту, 2K, persistence, history, recommendations, Excel/PDF и UI. Строки пока `PENDING`; parity acceptance не выполнен. |
 | 20 | ЧАСТИЧНО | `book_index.py` индексирует source identity/integrity файлов `books/`; `book_content_index.py` извлекает searchable content из PDF и UTF-8 text-like файлов в source-linked chunks с path/SHA-256/locator; `BookSearchService` имеет DB-backed persistence/search; `BookSearchView` подключён отдельной вкладкой и меню, показывает source/locator/SHA-256, а выбранный источник можно передать в инженерный контекст как `UNKNOWN` source identity без создания нормативного значения. Остаются acceptance/visual smoke и более глубокая интеграция KB с инженерными решениями. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix есть; applicability к реальной chemistry/TDS остаётся. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` подключён к `CalculationService.format_summary()` и напрямую к `SystemsView`: редактор показывает source-backed статус и переходы, обновляя их при изменении слоёв. `RecommendationEngine` также переносит compatibility warnings/limitations без изменения ranking. Семантика уточнена: только явно запрещённый source-backed переход является blocker; `WARNING` и `UNKNOWN` требуют инженерной проверки и не превращаются в автоматический запрет. Остаются UI regression/acceptance и TDS-backed conditions. |
@@ -91,6 +91,9 @@ Code commits: `1817249358e613bd753a431c617f7a35f24dd881`, `063ef315cd37d6bbcf1ba
 ### §17 — Inspection workflow foundation
 Code commits: `8408933facba7f93d05f4ae745cb9b4de78f70d2` — typed `InspectionRecord`, `InspectionMeasurement`, `InspectionDefect`; `9a6667d29861b122e6160990dab889eaf8c95eed` — `InspectionService`; `eab29520a26b406839bdcff8cba39a3626d827a0` — regression cases; `16c3825cb6a913dd36c216e79987c615ce476fae` — UI-вкладка и пункт меню.
 
+### §18/§19 — Release and parity acceptance foundation
+Docs commit: `fc6cbdb8286ed29fa2f2fbc52363710621373a43` — release acceptance checklist и legacy parity matrix. Acceptance evidence remains pending.
+
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического пользовательского acceptance.
 
@@ -124,4 +127,5 @@ Code commits: `8408933facba7f93d05f4ae745cb9b4de78f70d2` — typed `InspectionRe
 9. §21 не расширять generic chemistry assumptions; applicability подтверждать TDS/источником.
 10. §22: выполнить UI regression/acceptance позже; не считать WARNING/UNKNOWN запретом и не добавлять TDS-условия без источника.
 11. §17: выполнить runtime/UI acceptance; только после него считать этап закрытым.
-12. После §17 переходить к §18 → §19 и оставшимся §23–§32, сохраняя отдельные code/docs commits.
+12. §18/§19: заполнить acceptance evidence и parity results после общего локального прогона; не считать документы доказательством прохождения сами по себе.
+13. После §18/§19 переходить к §23–§32, сохраняя отдельные code/docs commits.
