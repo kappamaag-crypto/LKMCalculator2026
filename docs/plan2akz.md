@@ -43,7 +43,7 @@
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | CompatibilityEngine интегрирован; реальные TDS-backed conditions и UI acceptance остаются. |
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. Добавлен read-only UI диалог из последнего расчёта с повторной проверкой и headless smoke. Остаются фактический pytest-run и полный E2E с подтверждёнными шаблонами/источниками НД и inspection workflow (§32). |
-| 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Catalog of promoted TDS-backed agents and UI remain. |
+| 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Добавлен opt-in hard-filter химстойкости в RecommendationService и тесты; UI диалог/меню уже есть. Остаются каталог KNOWN TDS-backed agents и concentration–temperature matrix. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
 | 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests; ExplanationDialog + headless dialog smoke-test; MainWindow exposes «Пояснение расчёта…». Остаются фактический pytest-run и E2E acceptance. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
@@ -75,6 +75,7 @@
 - `pre_application_dialog.py` — read-only Qt surface for Pre-Application status/checklist; reruns the existing service against the latest calculation result.
 - `main_window.py` — «Инженерное → Pre-Application Check…» opens the checklist for the last completed calculation; no calculation => returns user to «Расчёт».
 - `main_window.py` — «Инженерное → Пояснение расчёта…» открывает ExplanationDialog для последнего завершённого расчёта; без расчёта переводит пользователя на экран «Расчёт».
+- `main_window.py` — «Инженерное → Химстойкость…» открывает ChemicalResistanceDialog для текущего каталога материалов.
 - `inspection_view.py` — DFT point input, evaluation against latest SystemCalculationResult, and DFT-bound inspection record creation.
 - DFT inspection evaluate + limits_from_calculation_result (§32 partial).
 - LayerResult losses provenance + ResolvedLosses (§26/§28).
@@ -82,6 +83,8 @@
 - `test_explanation_dialog_smoke.py` — headless ExplanationDialog rendering coverage; test execution remains pending for the same reason.
 - `test_pre_application_dialog_smoke.py` — headless Pre-Application dialog rendering/UNKNOWN preservation coverage; test execution remains pending for the same reason.
 - `test_inspection_view_smoke.py` — headless DFT InspectionView evaluation against a calculation result; test execution remains pending for the same reason.
+- `test_chemical_resistance_dialog_smoke.py` — headless ChemicalResistanceDialog UNKNOWN-preservation smoke; test execution remains pending for the same reason.
+- `test_recommendation_chemical_filter.py` — opt-in recommendation hard-filter coverage for UNKNOWN/RESISTANT/NOT_RESISTANT and explicit concentration limits; test execution remains pending for the same reason.
 
 ## TDS verification boundary — §12/§14/§25
 
@@ -132,12 +135,17 @@ Done:
 - no inference from binder type / corrosion category;
 - `services/chemical_resistance_rules.py` — promote gate + empty registry by default;
 - `CalculationService.check_chemical_resistance`;
-- tests `test_chemical_resistance.py` (9 cases).
+- tests `test_chemical_resistance.py` (9 cases);
+- `ui/dialogs/chemical_resistance_dialog.py` — material/agent/concentration/temperature input and source-backed check surface;
+- `MainWindow` menu entry `Инженерное → Химстойкость…`;
+- `tests/test_chemical_resistance_dialog_smoke.py` — headless UNKNOWN-preservation smoke;
+- `RecommendationService.filter_with_chemical_resistance` — explicit opt-in hard filter; `require_known=True` rejects UNKNOWN, while `require_known=False` preserves UNKNOWN as a visible note;
+- `tests/test_recommendation_chemical_filter.py` — hard-filter coverage for UNKNOWN, KNOWN RESISTANT, KNOWN NOT_RESISTANT and explicit concentration limit.
 
 Still open:
 - populate KNOWN rules only after verified TDS/НД excerpts;
-- recommendation filter / UI exposure;
-- concentration–temperature matrix per product family.
+- concentration–temperature matrix per product family;
+- broader recommendation/UI E2E acceptance with real promoted rules.
 
 ## §26 — Explanation Engine
 
