@@ -31,9 +31,9 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite backup/restore; acceptance позже. |
 | 11 | ЧАСТИЧНО | Material snapshots/verified reads/integrity hashing; runtime acceptance позже. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox; runtime/SMTP acceptance позже. |
-| 12 | ЧАСТИЧНО | Engineering context/source identity/History/verified loader; реальные rules ещё не подтверждены. |
+| 12 | ЧАСТИЧНО | Engineering context/source identity/History/verified loader; first KNOWN TDS rules exist, full integration remains. |
 | 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI; acceptance позже. |
-| 14 | ЧАСТИЧНО | SPKEFFA TDS document identity + measured binary SHA-256 catalog + local verify; staged rules for Blank Universal remain UNKNOWN. Rule-by-rule promotion and technology validation engine remain. |
+| 14 | ЧАСТИЧНО | Document SHA-256 catalog + explicit promote_tds_rule gate + first KNOWN rules (Blank Universal/Finish DFT, solids, density) + TDS DFT technology bridge. Still open: more materials, full tech stack wiring, UI/template tds_verified. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; полная scoring остаётся. |
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI; acceptance позже. |
@@ -44,13 +44,13 @@
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | CompatibilityEngine интегрирован; реальные TDS-backed conditions и UI acceptance остаются. |
 | 23 | НЕ ВЫПОЛНЕНО | Pre-Application Check. |
 | 24 | НЕ ВЫПОЛНЕНО | Химическая стойкость только через source-backed rules. |
-| 25 | ЧАСТИЧНО | Document-level traceability: SPKEFFA path + binary SHA-256 for 10 TDS PDFs. Rule-level KNOWN promotion and full normative chain remain. |
+| 25 | ЧАСТИЧНО | Document-level SHA-256 + first rule-level KNOWN promotions with locator/value/applicability. Full normative chain into calculation/UI remains. |
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
-| 28 | ВЫПОЛНЕНО | Controlled LossProfile: domain model + integration into SystemCalculator/LayerInput; explicit losses_percent priority over profile; LossProfile.none(); no hidden engineering defaults; regression tests in test_loss_profile.py. Commits: eac21b6 (model), d93f48e (integration), 3e3873f (tests). |
-| 29 | ЧАСТИЧНО | Catalogue → draft → editor → explicit CONFIRM → persistence boundary реализовано; persistence блокирует UNKNOWN TDS. Scenario UI подключён, а источник альтернатив ограничен подтверждёнными и TDS-verified templates. Persistence/acceptance остаются. |
-| 30 | ВЫПОЛНЕНО | Engineering Decision Log создан: `docs/engineering_decision_log_v3.md`. Зафиксированы границы domain/service, единый calculation result для PDF/Excel, семантика UNKNOWN, read-only SPKEFFA, catalogue vs TDS proof, CONFIRM gate, controlled LossProfile, TDS promotion gate и запрет GitHub Actions. Commit: 9005c30. |
-| 31 | ЧАСТИЧНО | `CalculationScenario` + `CalculationScenarioService` + UI подключены к существующему `CalculationService`; Comparison/Excel workflow используется без второго расчётного движка. Добавлен read-only bridge confirmed + `tds_verified=KNOWN` templates → scenario alternatives. Acceptance остаётся. |
+| 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
+| 29 | ЧАСТИЧНО | Catalogue → draft → editor → CONFIRM → persistence; TDS-verified templates gate remains limited by incomplete rule coverage. |
+| 30 | ВЫПОЛНЕНО | Engineering Decision Log. |
+| 31 | ЧАСТИЧНО | Scenario service/UI + confirmed-template bridge; acceptance remains. |
 | 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow. |
 
 ## Каталог `Системы 1–4`
@@ -61,74 +61,49 @@
 
 ## Реализованные code stages
 
-- `book_content_index.py` — `047839b0df403f8ae552394110408b15d219a8c6`: индекс XLS/XLSX и locator `sheet:<лист>!row:<номер>`.
-- `system_catalog_importer.py` — `d7fa8f5af2b160da8153fe0bf6d93cbfcb527aae`: review-first staging, candidates, provenance, duplicate normalization.
-- `xlrd` — `ff1142c35d09c8b10d3aa708a06cb5576de38563`: legacy XLS reader dependency.
-- `system_catalog_review_view.py` — `43257fbbbff67fb206b164c5b64baaa0ee347748`: базовый Review/Staging UI.
-- `system_template.py` — `d01b0244d46a84e321517a00fe88ed22c3d22187`: immutable draft model/statuses/DFT/provenance.
-- `system_template_service.py` — `5d610e30669d7842598b74ced9049ce433827af9`: draft builder, DB matching, `can_confirm`.
-- `system_template_models.py` — `127486c04e6a4a06d92d429c943a188ea7fb1eb1`: ORM tables.
-- `system_template_repository.py` — `b180e757c688eee8ce7e2f9ff083bc524c218108`: persistence repository boundary.
-- `007_system_templates.py` — `75b394567d64bbc33f1f8871e503c5f79c46c6b6`: Alembic schema.
-- `engine.py` — `cb2d6cc7afe2e6a45ee780be4dd7888eea8dbcb5`: ORM registration.
-- `system_template_persistence_service.py` — `da6d542c2a3c1557401ccfcf699b2bdcb42a9e56`: explicit CONFIRMED persistence; requires `tds_verified=KNOWN`.
-- `main_window.py` — `c960d9ea6e52f74f46b10a91193c31adbcb6f83b`: catalogue tab/menu and material refresh.
-- `system_template_editor_view.py` — `845be44fdbbd6417112cb89e9804b758894e1a3d`: draft editor, manual Material selection, explicit CONFIRM gate.
-- `system_catalog_review_view.py` — `8b68ce1de37c39608d73a4d2a1699d275aaf4ebb`: selected row → draft/editor, controlled incomplete Material creation, CONFIRM → persistence wiring.
-- `tds_manifest.py` — `80e75053fc237e4b0c622304f1f502d57050016b`: explicit TDS document/rule verification boundary; extracted PDF text is not promoted automatically.
-- `calculation_scenario.py` — `f301f2ae08c65c5d230c91877a48f4470658f3e3`: immutable scenario boundary with named alternatives and shared object/context.
-- `calculation_scenario_service.py` — `1623aee6e51c211191fb786a4f9ecbeb0e1fc4b6`: initial scenario orchestration; repeated-material validation fixed in `b36573abf795c1b13ba6706de6c9beb57c227816`.
-- `calculation_scenario_view.py` — `afc098441ad23130204377c8e2230330daebe8a8`: scenario UI with shared-object alternatives, result table and handoff to Comparison.
-- `main_window.py` — `ed2b1462cd03a7c09b9f5717660e471bb73cd4bb`: scenario service/view integration and engineering-context propagation.
-- `comparison_view.py` — `ce02fb4d2f07411e3575ad6156a1497e6c22b9a8`: public `clear()` boundary for scenario handoff.
-- `calculation_scenario_view.py` — `2657a414825046419d376d263574736a51af662f`: scenario uses public Comparison clear API.
-- `confirmed_system_template_service.py` — `09a6e732ff0744e200dd156904a877670d6ec27c`: read-only bridge that exposes only CONFIRMED + `tds_verified=KNOWN` templates with complete source/material/DFT data.
-- `main_window.py` — `047379bfaefb995b93e5e644bdbcdbf1d891b66e`: scenario alternatives now come only from confirmed, TDS-verified templates; ordinary catalogue systems are not promoted into scenarios.
-- `loss_profile.py` — `eac21b6df1b7989961740ec3a36f3a6dd3a0f36c`: controlled LossProfile domain model (name/percent/source, resolve, none()).
-- `calculator.py` — `d93f48e3ff999c802457d1e842f23848c37edbcb`: LossProfile integrated into SystemCalculator/LayerInput; explicit losses_percent priority; legacy default_losses preserved as 0.0 without hidden engineering values.
-- `test_loss_profile.py` — `3e3873fc9445d87694433be93701e5ed772fd27c`: regression coverage for profile usage, explicit override, none(), invalid rejection, legacy compatibility.
-- `engineering_decision_log_v3.md` — `9005c30b453ed2f23ef40f585adddebe5ae13818`: Engineering Decision Log for v3; factual architectural and engineering decisions recorded without promoting UNKNOWN data to KNOWN.
-- `spk_effa_tds_catalog.py` — `cc3fb0f57cff584363bb943ae35ed4085dd8019f`: SPKEFFA TDS document catalog with measured binary SHA-256 (not Git blob SHA-1); local verify; staged Blank Universal rules stay UNKNOWN.
-- `test_spk_effa_tds_catalog.py` — `6b8b426635633a79f28e0408e0c559d9879ecc2c`: regression for binary digests, git SHA-1 contrast, local verify, non-promotion of extracted rules.
-
-## §20/§27/§29/§31 — следующий шаг
-
-1. Проверить фактическую структуру каждого листа/строки; не угадывать заголовки.
-2. Сохранить/показать однозначные DB matches.
-3. Для отсутствующего материала использовать только явное создание incomplete Material; неизвестные поля не заполнять.
-4. Для неоднозначного match — ручной выбор.
-5. Редактор draft реализован.
-6. CONFIRM — отдельное действие.
-7. CONFIRM → persistence wiring реализован, но `tds_verified=KNOWN` обязателен.
-8. Scenario domain/service/UI реализованы; bridge к confirmed System Templates готов и безопасно отбрасывает UNKNOWN/incomplete templates.
-9. TDS document identity with binary SHA-256 is in place. Next: explicit human promotion of selected rules to KNOWN (locator+value+applicability), then wire technology validation (§14) and template `tds_verified` acceptance.
+- `tds_manifest.py` — `80e75053fc237e4b0c622304f1f502d57050016b`: TDS document/rule verification boundary.
+- `spk_effa_tds_catalog.py` — `cc3fb0f57cff584363bb943ae35ed4085dd8019f`: measured binary SHA-256 catalog for 10 SPKEFFA TDS PDFs.
+- `tds_rule_promotion.py` — `4a2b23f23255c65de148f840efbe4261731fa375`: explicit promote_tds_rule gate; parse_dft_range_um.
+- `tds_known_rules.py` — `1cddff494657dbe754ad76f9f44e192814ad3df0`: first KNOWN rules for Blank Universal and Blank Finish (DFT/solids/density).
+- `tds_technology_bridge.py` — `ce0083946158de9b45698eafd1192030db89db39`: check_target_dft_against_known_tds without invented limits.
+- `test_spk_effa_tds_catalog.py` — `6b8b426635633a79f28e0408e0c559d9879ecc2c`.
+- `test_tds_rule_promotion.py` — `445b726188000a83ba9526fb63c9c59723e81a93`.
+- `loss_profile` / calculator / scenario / system template stages — see prior plan entries.
 
 ## TDS verification boundary — §12/§14/§25
 
-`kappamaag-crypto/SPKEFFA` используется только read-only. Git blob SHA-1 **не** является SHA-256 бинарного PDF.
+`kappamaag-crypto/SPKEFFA` — read-only. Git blob SHA-1 ≠ binary PDF SHA-256.
 
-Факт измерения (пример Blank_Universal.pdf):
+Blank_Universal.pdf:
 - binary SHA-256: `9ab3872b849e523652088a3ba0d8b0788005c0134ac517305a9e2f01621b5887`
 - Git blob SHA-1: `23eb95f2d327249845ca7ddb5d8b8e116fc2dd3a`
 
-Document status may be KNOWN when source path + binary SHA-256 are recorded. Technology rules remain UNKNOWN until explicit promotion with locator, value and applicability. Extracted PDF text alone does not promote rules.
+Blank_Finish.pdf binary SHA-256: `34465e17e1e1199c94f1391ca2d776dcd377d4d363e0c4513b4e8a40f7a9a235`
 
-## §28 — Controlled LossProfile (закрыто)
+Document KNOWN requires path + binary SHA-256. Rule KNOWN requires explicit promote_tds_rule(document, rule, verified_by=...). Extracted text alone does not promote.
 
-Приоритет разрешения потерь:
-1. явный `losses_percent` (включая 0.0);
-2. `LayerInput.loss_profile` или `SystemCalculator.loss_profile`;
-3. legacy `default_losses` (по умолчанию 0.0 — не скрытое инженерное значение).
+First promoted KNOWN rules:
+- BLANK_UNIVERSAL_DFT_RANGE = 80-250 мкм
+- BLANK_UNIVERSAL_SOLIDS_BY_VOLUME = 73 ± 2%
+- BLANK_UNIVERSAL_DENSITY = 1,4 кг/л
+- BLANK_FINISH_DFT_RANGE = 50-90 мкм
+- BLANK_FINISH_SOLIDS_BY_VOLUME = 58±3%
+- BLANK_FINISH_DENSITY = 1,3 г/см³
 
-`LossProfile.none()` — явный нулевой профиль (`source=SYSTEM`). Некорректный percent отклоняется. Существующий API `LayerCalculator.calculate(..., losses_percent=0.0)` сохранён.
+## §14/§25 — progress
 
-## §30 — Engineering Decision Log (закрыто)
+Done:
+- binary SHA-256 document catalog;
+- promote gate;
+- first KNOWN rules;
+- TDS DFT technology bridge for mapped material names.
 
-`docs/engineering_decision_log_v3.md` фиксирует фактически принятые архитектурные решения и границы доверия к данным. Отдельная запись не повышает статус TDS rules: `UNKNOWN` остаётся `UNKNOWN` до явного promotion.
+Still open:
+- promote remaining SPKEFFA materials;
+- wire bridge into main calculation/UI path;
+- template `tds_verified=KNOWN` acceptance based on known rules;
+- full normative traceability into EngineeringContext/History.
 
-## §14/§25 — progress (document identity)
+## §28 / §30 — закрыты ранее
 
-- Catalogued 10 SPKEFFA TDS PDFs with measured binary SHA-256.
-- `verify_spk_effa_local_files` checks local tree against catalog digests and rejects Git blob SHA-1 collision.
-- Staged Blank Universal DFT/solids/density rules exist only as UNKNOWN evidence.
-- Not closed: rule-by-rule KNOWN promotion, technology validation engine, full normative chain into calculation/UI.
+Controlled LossProfile and Engineering Decision Log remain closed.
