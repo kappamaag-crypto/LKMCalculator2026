@@ -99,7 +99,7 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _money(value,decimals=2):return "—" if value is None else f"{value:,.{decimals}f}".replace(","," ")
     def _on_calc_done(self,result):
-        self._last_calculation_result=result;self.systems_view.set_calculation_result(result);self.statusBar().showMessage(f"Расчёт выполнен: {result.total_dft:.0f} мкм, {self._money(result.total_cost_per_m2)} руб/м², объект {self._money(result.total_cost,0)} руб",10000)
+        self._last_calculation_result=result;self.inspection_view.set_calculation_result(result);self.systems_view.set_calculation_result(result);self.statusBar().showMessage(f"Расчёт выполнен: {result.total_dft:.0f} мкм, {self._money(result.total_cost_per_m2)} руб/м², объект {self._money(result.total_cost,0)} руб",10000)
         try:self.history_view.save_result(result)
         except Exception as exc:self.statusBar().showMessage(f"Не удалось сохранить расчёт в историю: {exc}",10000)
     def _on_add_to_comparison(self,result):self.cmp_view.add_from_calculation(result);self.tabs.setCurrentWidget(self.cmp_view);self.statusBar().showMessage("Система добавлена в сравнение. Добавьте другие варианты и нажмите «Сравнить».",10000)
@@ -109,4 +109,4 @@ class MainWindow(QMainWindow):
     def _on_material_added_from_calculation(self,material):
         materials=_load_materials_from_db(self._materials);self._on_materials_changed(materials);self.statusBar().showMessage(f"Материал «{material.display_name()}» добавлен в базу и доступен во всех разделах",7000)
     def _on_materials_changed(self,materials):self._materials=materials;self.calc_view.set_materials(materials);self.systems_view.set_materials(materials);self.catalog_review_view.set_materials(materials);self._refresh_system_catalog();self.statusBar().showMessage(f"База материалов обновлена: {len(materials)} записей",5000)
-    def _on_about(self):QMessageBox.about(self,"О программе",f"<b>{__app_name__}</b> v{__version__}<br><br>Профессиональный калькулятор расхода ЛКМ<br>и предварительного подбора систем АКЗ.")
+    def _on_about(self):QMessageBox.about(self,"О программе",f"<b>{__app_name__}</b> v{__version__}<br><br>Профессиональный калькулятор расхода ЛКМ<br>и предварительного подбора систем АКЗ.</b>")
