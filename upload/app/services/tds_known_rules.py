@@ -25,6 +25,10 @@ MATERIAL_DOCUMENT_HINTS: tuple[tuple[str, str], ...] = (
     ("blank dtm", "BLANK_DTM_TDS"),
     ("blank one", "BLANK_ONE_TDS"),
     ("blank hp", "BLANK_HP_TDS"),
+    ("effa 01b", "EFFA_01B_TDS"),
+    ("effa 01б", "EFFA_01B_TDS"),
+    ("эффа 01b", "EFFA_01B_TDS"),
+    ("эффа 01б", "EFFA_01B_TDS"),
 )
 
 
@@ -144,6 +148,25 @@ def known_tds_rules() -> tuple[TDSRule, ...]:
                 "Verified against measured Blank_One.pdf binary SHA-256"),
         _density("BLANK_ONE_TDS", "BLANK_ONE", "1,3 г/см3", "Blank_One.pdf",
                  "Verified against measured Blank_One.pdf binary SHA-256"),
+        _dft("BLANK_TANK_LP_TDS", "BLANK_TANK_LP", "150-250 мкм", "Blank_Tank_LP.pdf",
+             "Verified against binary SHA-256 95a8e6a36e09f7fb09e8e8f2cbbae344f89409db20cd4ec097483d3116862588"),
+        _solids("BLANK_TANK_LP_TDS", "BLANK_TANK_LP", "58 ± 2%", "Blank_Tank_LP.pdf",
+                "Verified against measured Blank_Tank_LP.pdf binary SHA-256 95a8e6a36e09f7fb09e8e8f2cbbae344f89409db20cd4ec097483d3116862588"),
+        _density("BLANK_TANK_LP_TDS", "BLANK_TANK_LP", "1,2 кг/л", "Blank_Tank_LP.pdf",
+                 "Verified against measured Blank_Tank_LP.pdf binary SHA-256 95a8e6a36e09f7fb09e8e8f2cbbae344f89409db20cd4ec097483d3116862588"),
+        _solids("EFFA_01B_TDS", "EFFA_01B", "70±5%", "EFFA_01B.pdf",
+                "Verified against measured EFFA_01B.pdf binary SHA-256 f74b8548fa4e75f19a780dacf0c38196579ab2d9e8c840918ec7666099e92841"),
+        _density("EFFA_01B_TDS", "EFFA_01B", "1,25-1,3 кг/л", "EFFA_01B.pdf",
+                 "Verified against measured EFFA_01B.pdf binary SHA-256 f74b8548fa4e75f19a780dacf0c38196579ab2d9e8c840918ec7666099e92841"),
+        _promote(
+            "EFFA_01B_TDS",
+            "EFFA_01B_FIRE_DFT_MM",
+            "2,1-2,5 мм (REI 180, таблица ТДС)",
+            "EFFA_01B.pdf page 1, таблица «Огнезащитная эффективность для железобетона» / толщина сухого слоя",
+            "design dry-film thickness for EFFA 01B fire protection (REI 180 examples; project-specific)",
+            verified_by="engineering-review",
+            note="Verified against binary SHA-256 f74b8548fa4e75f19a780dacf0c38196579ab2d9e8c840918ec7666099e92841; not a single-layer coating µm range",
+        ),
     )
     verify_manifest(spk_effa_tds_documents(), rules)
     assert all(rule.status == "KNOWN" for rule in rules)
@@ -155,13 +178,22 @@ def known_rules_for_document(document_id: str) -> tuple[TDSRule, ...]:
 
 
 def resolve_document_id_for_material_name(material_name: str) -> str | None:
-    """Map a material display name to a catalogued TDS document when unambiguous."""
+    """Map a material display name to a catalogued TDS document when unambiguous.
+
+    Hints are ordered longest/most specific first. When several hints match
+    (e.g. "blank tank lp" contains "blank tank"), the longest matching hint wins.
+    """
     lowered = material_name.strip().lower()
     if not lowered:
         return None
-    matches = [doc_id for hint, doc_id in MATERIAL_DOCUMENT_HINTS if hint in lowered]
-    if len(matches) == 1:
-        return matches[0]
+    matches = [(hint, doc_id) for hint, doc_id in MATERIAL_DOCUMENT_HINTS if hint in lowered]
+    if not matches:
+        return None
+    matches.sort(key=lambda item: len(item[0]), reverse=True)
+    best_len = len(matches[0][0])
+    top = [doc for hint, doc in matches if len(hint) == best_len]
+    if len(set(top)) == 1:
+        return top[0]
     return None
 
 
