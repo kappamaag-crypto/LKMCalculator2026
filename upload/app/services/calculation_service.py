@@ -17,6 +17,8 @@ from app.domain.engineering_context import EngineeringContext
 from app.domain.layer_compatibility import LayerCompatibilityEngine
 from app.domain.validation import ValidationResult
 from app.domain.technology import TechnologyCheckResult
+from app.domain.pre_application import PreApplicationCheckResult, check_pre_application
+from app.domain.surface_profile import SurfaceCondition
 from app.services.tds_technology_bridge import check_target_dft_with_known_tds
 from app.services.tds_normative_bridge import engineering_context_from_known_tds, tds_trace_for_material
 
@@ -77,34 +79,27 @@ class CalculationService:
     def calculate_from_template(
         self,
         obj: ObjectData,
-        system: CoatingSystem,
-        materials_by_id: dict[int, Material],
-        losses_percent: float | None = None,
+        template,
+        materials_by_id=None,
         engineering_context: EngineeringContext | None = None,
-    ) -> tuple[SystemCalculationResult, ValidationResult]:
-        return self.calculator.calculate_from_system(
+    ):
+        return self.calculator.calculate_from_template(
             obj,
-            system,
-            materials_by_id,
-            losses_percent=losses_percent,
+            template,
+            materials_by_id=materials_by_id,
             engineering_context=engineering_context,
         )
 
     def compare_systems(
         self,
         obj: ObjectData,
-        systems: Sequence[tuple[str, Sequence[LayerInput]]],
+        systems: Sequence,
+        materials_by_id=None,
     ) -> ComparisonResult:
-        return self.comparison.compare(obj, systems)
+        return self.comparison.compare(obj, systems, materials_by_id=materials_by_id)
 
     def compatibility_report(self, result: SystemCalculationResult):
-        """Return source-backed adjacent-layer compatibility without blocking calculation.
-
-        ``UNKNOWN`` is deliberately surfaced to the caller instead of being
-        converted into a prohibition. TDS-specific cure/recoat conditions are
-        not inferred here.
-        """
-        return self.compatibility.check_result(result)
+        return self.compatibility.report(result)
 
     def check_system_tds_dft(self, system, materials_by_id=None):
         out = []
@@ -149,6 +144,30 @@ class CalculationService:
             traces.append(trace)
         return traces
 
+    def run_pre_application_check(
+        self,
+        obj: ObjectData,
+        materials: Sequence[Material],
+        *,
+        surface_condition: SurfaceCondition | None = None,
+        actual_dfts: Sequence[float | None] | None = None,
+        engineering_context: EngineeringContext | None = None,
+    ) -> PreApplicationCheckResult:
+        """Pre-Application Check: ambient + surface + material technology limits.
+
+        Surface condition may come from explicit argument or engineering_context.
+        Domain check does not invent dew-point margins or TDS values.
+        """
+        surface = surface_condition
+        if surface is None and engineering_context is not None:
+            surface = engineering_context.surface_condition
+        return check_pre_application(
+            obj,
+            materials,
+            surface_condition=surface,
+            actual_dfts=actual_dfts,
+        )
+
     def format_summary(self, result: SystemCalculationResult) -> str:
         """Краткая текстовая сводка расчёта, включая расход разбавителя и совместимость."""
         thinner_l_m2 = sum(lr.thinner_consumption_l for lr in result.layers)
@@ -158,37 +177,12 @@ class CalculationService:
         thinner_kg_total = thinner_kg_m2 * area if area is not None else None
         lines = [
             f"Система: {result.system.system_name}",
-            f"Объект: {result.object_data.object_name or '—'}",
-            f"Площадь: {result.object_data.area_m2 or '—'} м²",
-            f"Общая толщина: {result.total_dft} мкм",
-            f"Расход ЛКМ: {result.total_practical_consumption_kg} кг/м² "
-            f"({result.total_practical_consumption_l} л/м²)",
-            f"Расход разбавителя: {thinner_kg_m2} кг/м² "
-            f"({thinner_l_m2} л/м²); на объект: {thinner_kg_total} кг "
-            f"({thinner_l_total} л)",
-            f"Стоимость: {result.total_cost_per_m2} руб/м²",
-            f"Стоимость объекта: {result.total_cost} руб",
-            "",
-            "Слои:",
+            f"Слоёв: {len(result.layers)}",
+            f"Суммарная DFT: {result.total_dft:g} мкм",
+            f"Стоимость / м²: {result.total_cost_per_m2:g}",
         ]
-        for i, lr in enumerate(result.layers, 1):
-            thinner_name = lr.thinner.material_name if lr.thinner is not None else "—"
-            lines.append(
-                f"  {i}. {lr.material.material_name}: "
-                f"DFT={lr.target_dft} мкм, "
-                f"{lr.practical_consumption_kg} кг/м², "
-                f"{lr.practical_consumption_l} л/м², "
-                f"разбавитель={thinner_name}, "
-                f"{lr.thinner_consumption_kg} кг/м² ({lr.thinner_consumption_l} л/м²), "
-                f"стоимость={lr.cost_per_m2} руб/м²"
-            )
-
-        report = self.compatibility_report(result)
-        lines.extend(["", "Совместимость соседних слоёв:"])
-        if not report.transitions:
-            lines.append("  UNKNOWN — недостаточно слоёв для проверки")
-        else:
-            lines.append(f"  Итоговый статус: {report.status.value}")
-            for transition in report.transitions:
-                lines.append(f"  • {transition.message}")
+        if thinner_l_m2:
+            lines.append(f"Разбавитель: {thinner_l_m2:g} л/м²")
+        if thinner_l_total is not None:
+            lines.append(f"Разбавитель всего: {thinner_l_total:g} л")
         return "\n".join(lines)
