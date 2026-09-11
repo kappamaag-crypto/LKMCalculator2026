@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Optional
 
 from app.domain.models import Material
-from app.domain.technology import TechnologyCheckResult
+from app.domain.technology import TechnologyCheckResult, check_target_dft
 from app.services.tds_known_rules import known_dft_rule_for_material_name
 from app.services.tds_manifest import TDSRule
 from app.services.tds_rule_promotion import parse_dft_range_um
@@ -82,4 +82,41 @@ def check_target_dft_against_known_tds(
             f"{dft_min:g}–{dft_max:g} мкм ({rule.rule_id}).",
             "target_dft",
         )
+    return result
+
+
+def check_target_dft_with_known_tds(
+    material: Material,
+    target_dft: Optional[float],
+) -> TechnologyCheckResult:
+    """Combine material-card DFT checks with KNOWN TDS bounds when available.
+
+    Domain check_target_dft stays free of service imports; this service resolves
+    KNOWN rules and passes explicit numeric bounds into the domain function.
+    """
+    rule = known_dft_rule_for_material_name(material.material_name or material.display_name())
+    tds_min = tds_max = None
+    rule_id = locator = None
+    if rule is not None and rule.status == "KNOWN":
+        parsed = parse_dft_range_um(str(rule.value))
+        if parsed is not None:
+            tds_min, tds_max = parsed
+            rule_id = rule.rule_id
+            locator = rule.locator
+
+    result = check_target_dft(
+        material,
+        target_dft,
+        tds_dft_min=tds_min,
+        tds_dft_max=tds_max,
+        tds_rule_id=rule_id,
+        tds_locator=locator,
+    )
+    if rule is None or rule.status != "KNOWN" or tds_min is None:
+        if target_dft is not None and target_dft >= 0:
+            result.add_info(
+                "TECH_TDS_DFT_UNKNOWN",
+                "Нет KNOWN TDS-правила по DFT для материала — TDS-проверка толщины невозможна.",
+                "target_dft",
+            )
     return result
