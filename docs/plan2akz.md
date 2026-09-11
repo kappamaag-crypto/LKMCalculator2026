@@ -48,9 +48,9 @@
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | НЕ ВЫПОЛНЕНО | Управляемый LossProfile. |
-| 29 | ЧАСТИЧНО | Catalogue → draft → editor → explicit CONFIRM → persistence boundary реализовано; persistence блокирует UNKNOWN TDS. Calculation Scenarios остаются. |
+| 29 | ЧАСТИЧНО | Catalogue → draft → editor → explicit CONFIRM → persistence boundary реализовано; persistence блокирует UNKNOWN TDS. Calculation Scenarios теперь имеют domain/service boundary, но UI/persistence/acceptance ещё остаются. |
 | 30 | НЕ ВЫПОЛНЕНО | Engineering Decision Log. |
-| 31 | НЕ ВЫПОЛНЕНО | Calculation Scenarios на едином CalculationService. |
+| 31 | ЧАСТИЧНО | Добавлены `CalculationScenario` и `CalculationScenarioService`: альтернативы считаются через существующий `CalculationService`; остаются UI, сценарии из confirmed templates и acceptance. |
 | 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow. |
 
 ## Каталог `Системы 1–4`
@@ -76,6 +76,8 @@
 - `system_template_editor_view.py` — `845be44fdbbd6417112cb89e9804b758894e1a3d`: draft editor, manual Material selection, explicit CONFIRM gate.
 - `system_catalog_review_view.py` — `8b68ce1de37c39608d73a4d2a1699d275aaf4ebb`: selected row → draft/editor, controlled incomplete Material creation, CONFIRM → persistence wiring.
 - `tds_manifest.py` — `80e75053fc237e4b0c622304f1f502d57050016b`: explicit TDS document/rule verification boundary; extracted PDF text is not promoted automatically.
+- `calculation_scenario.py` — `f301f2ae08c65c5d230c91877a48f4470658f3e3`: immutable scenario boundary with named alternatives and shared object/context.
+- `calculation_scenario_service.py` — `1623aee6e51c211191fb786a4f9ecbeb0e1fc4b6`: scenario orchestration through the existing `CalculationService`; no second calculation engine.
 
 ## §20/§27/§29 — следующий шаг
 
@@ -86,7 +88,7 @@
 5. Редактор draft реализован.
 6. CONFIRM — отдельное действие.
 7. CONFIRM → persistence wiring реализован, но `tds_verified=KNOWN` обязателен.
-8. Следующий крупный этап — Calculation Scenarios на существующем CalculationService.
+8. Scenario domain/service boundary реализована; следующий шаг — подключить UI к существующему CalculationService и дать сценариям confirmed System Templates как источник альтернатив.
 
 ## TDS verification boundary — §12/§14/§25
 
