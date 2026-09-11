@@ -27,7 +27,7 @@ from app.domain.chemical_resistance import (
     check_chemical_resistance,
 )
 from app.services.chemical_resistance_rules import list_known_chemical_resistance_rules
-from app.domain.explanation import ExplanationReport, explain_system_calculation, format_explanation_text
+from app.domain.explanation import ExplanationReport, explain_system_calculation, format_explanation_text, explain_engineering_bundle
 
 
 class CalculationService:
@@ -199,6 +199,26 @@ class CalculationService:
         Domain-only logic; no invented values. Missing data → UNKNOWN_DATA.
         """
         return explain_system_calculation(result)
+
+    def explain_engineering_bundle(
+        self,
+        result: SystemCalculationResult,
+        *,
+        pre_app: PreApplicationCheckResult | None = None,
+        chem: ChemicalResistanceCheckResult | None = None,
+        recommendation_reasons: Sequence[str] | None = None,
+        recommendation_warnings: Sequence[str] | None = None,
+        recommendation_limitations: Sequence[str] | None = None,
+    ) -> ExplanationReport:
+        """§26 integration: calculation + optional pre-app / chem / recommendation signals."""
+        return explain_engineering_bundle(
+            result,
+            pre_app=pre_app,
+            chem=chem,
+            recommendation_reasons=recommendation_reasons,
+            recommendation_warnings=recommendation_warnings,
+            recommendation_limitations=recommendation_limitations,
+        )
 
     def format_explanation(self, result: SystemCalculationResult) -> str:
         """Текстовый отчёт Explanation Engine."""

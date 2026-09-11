@@ -81,7 +81,6 @@ def _result(
 def test_explain_complete_layer_ok_status():
     mat = _mat()
     layer = _layer(mat, dft=120.0, losses=15.0)
-    # approximate cost
     res = _result([layer], cost=12.5)
     report = explain_system_calculation(res)
     codes = {i.code for i in report.items}
@@ -90,10 +89,9 @@ def test_explain_complete_layer_ok_status():
     assert "LAYER_LOSSES_APPLIED" in codes
     assert "COST_KNOWN" in codes
     assert "PRECISION_NOTE" in codes
-    # no UNKNOWN for density/sv
     assert "LAYER_DENSITY_MISSING" not in codes
     assert "LAYER_SV_MISSING" not in codes
-    assert report.overall_status == UNKNOWN_DATA  # default ctx surface/normative UNKNOWN
+    assert report.overall_status == UNKNOWN_DATA
 
 
 def test_explain_missing_sv_and_density():
@@ -190,3 +188,86 @@ def test_service_explain_calculation():
     assert len(report.items) >= 3
     text = svc.format_explanation(res)
     assert "LAYER_LOSSES_APPLIED" in text or "losses" in text.lower()
+
+
+def test_explain_pre_application_ready():
+    from app.domain.pre_application import PreApplicationCheckResult
+
+    mat = _mat()
+    layer = _layer(mat)
+    res = _result([layer], cost=1.0)
+    pre = PreApplicationCheckResult()
+    pre.add("AMB_OK", "info", "Условия в норме")
+    from app.domain.explanation import explain_engineering_bundle
+
+    report = explain_engineering_bundle(res, pre_app=pre)
+    codes = {i.code for i in report.items}
+    assert any(c.startswith("PREAPP_") for c in codes)
+
+
+def test_explain_chemical_empty_unknown():
+    from app.domain.chemical_resistance import ChemicalResistanceCheckResult
+    from app.domain.explanation import explain_engineering_bundle
+
+    mat = _mat()
+    layer = _layer(mat)
+    res = _result([layer])
+    chem = ChemicalResistanceCheckResult()
+    report = explain_engineering_bundle(res, chem=chem)
+    assert any(i.code == "CHEM_EMPTY" for i in report.items)
+    assert any(i.level == UNKNOWN_DATA and i.code == "CHEM_EMPTY" for i in report.items)
+
+
+def test_explain_chemical_resistant_and_unknown():
+    from app.domain.chemical_resistance import (
+        ChemicalResistanceCheckResult,
+        RESISTANT,
+        UNKNOWN as CHEM_UNKNOWN,
+    )
+    from app.domain.explanation import explain_engineering_bundle
+
+    mat = _mat()
+    layer = _layer(mat)
+    res = _result([layer])
+    chem = ChemicalResistanceCheckResult()
+    chem.set_outcome("CoatA", "acid", RESISTANT)
+    chem.set_outcome("CoatA", "solvent", CHEM_UNKNOWN)
+    report = explain_engineering_bundle(res, chem=chem)
+    statuses = {(i.code, i.level) for i in report.items if i.code.startswith("CHEM_")}
+    assert ("CHEM_RESISTANT", OK) in statuses
+    assert ("CHEM_UNKNOWN", UNKNOWN_DATA) in statuses
+
+
+def test_explain_recommendation_signals():
+    from app.domain.explanation import explain_engineering_bundle
+
+    mat = _mat()
+    layer = _layer(mat)
+    res = _result([layer])
+    report = explain_engineering_bundle(
+        res,
+        recommendation_reasons=["Соответствует C4"],
+        recommendation_warnings=["Нет подтверждённого TDS DFT"],
+        recommendation_limitations=["Стоимость UNKNOWN"],
+    )
+    codes = {i.code for i in report.items}
+    assert "REC_REASON_0" in codes
+    assert "REC_WARN_0" in codes
+    assert "REC_LIMIT_0" in codes
+
+
+def test_service_explain_engineering_bundle():
+    from app.domain.chemical_resistance import ChemicalResistanceCheckResult
+
+    svc = CalculationService()
+    mat = _mat()
+    layer = _layer(mat, losses=5.0)
+    res = _result([layer], cost=3.0)
+    chem = ChemicalResistanceCheckResult()
+    report = svc.explain_engineering_bundle(
+        res,
+        chem=chem,
+        recommendation_reasons=["ok score"],
+    )
+    assert any(i.code == "CHEM_EMPTY" for i in report.items)
+    assert any(i.code == "REC_REASON_0" for i in report.items)
