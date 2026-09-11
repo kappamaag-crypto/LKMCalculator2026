@@ -45,7 +45,7 @@
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. UI/E2E acceptance remains. |
 | 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Catalog of promoted TDS-backed agents and UI remain. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
-| 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests. UI/E2E remain. |
+| 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests; добавлен ExplanationDialog и headless dialog smoke-test. UI теперь имеет инженерный пункт «Пояснение расчёта» в отдельном диалоге; остаётся фактический pytest-run и E2E acceptance. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
 | 29 | ЧАСТИЧНО | Catalogue → draft → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules. |
@@ -71,9 +71,11 @@
 - `chemical_resistance.py` — source-backed chemical resistance only.
 - `chemical_resistance_rules.py` — promote gate; empty registry by default.
 - `explanation.py` — Explanation Engine (source-traceable report for SystemCalculationResult).
+- `explanation_dialog.py` — read-only Qt dialog for ExplanationReport; no engineering logic in UI.
 - DFT inspection evaluate + limits_from_calculation_result (§32 partial).
 - LayerResult losses provenance + ResolvedLosses (§26/§28).
 - `test_calculation_view_smoke.py` — headless CalculationView workflow coverage for direct calculation and saved-system restore; test execution remains pending because this connector-only session has no runnable repository checkout.
+- `test_explanation_dialog_smoke.py` — headless ExplanationDialog rendering coverage; test execution remains pending for the same reason.
 
 ## TDS verification boundary — §12/§14/§25
 
@@ -103,7 +105,7 @@ Still open:
 ## §23 — Pre-Application Check
 
 Done:
-- `domain/pre_application.py` — pure checklist: ambient, surface condition, per-material technology limits;
+- `domain/pre_application.py` — pure checklist: ambient, surface, per-material technology limits;
 - status READY / BLOCKED / INCOMPLETE; missing data = UNKNOWN (no default 3 °C dew-point margin);
 - `CalculationService.run_pre_application_check` service entry;
 - unit tests `test_pre_application.py` (8 cases).
@@ -136,11 +138,14 @@ Done:
 - `explain_engineering_bundle` + `explain_pre_application` / `explain_chemical_resistance` / `explain_recommendation_signals` (optional fold; empty chem → UNKNOWN);
 - `CalculationService.explain_calculation` / `explain_engineering_bundle` / `format_explanation`;
 - LayerResult.losses_source / losses_profile_name / losses_note; ResolvedLosses in calculator;
-- tests `test_explanation.py` (17 cases, including EXPLICIT/PROFILE/DEFAULT provenance).
+- tests `test_explanation.py` (17 cases, including EXPLICIT/PROFILE/DEFAULT provenance);
+- `ui/dialogs/explanation_dialog.py` — read-only source-traceable report dialog;
+- `tests/test_explanation_dialog_smoke.py` — headless rendering assertions.
 
 Still open:
-- UI surface for explanation report;
-- E2E acceptance.
+- фактический pytest-run (отложен согласно текущему правилу плана);
+- полный E2E acceptance;
+- проверка доступа к Explanation UI из рабочего процесса расчёта остаётся отдельной acceptance-задачей, если потребуется не только инженерное меню.
 
 ## §32 — Inspection / DFT workflow
 
