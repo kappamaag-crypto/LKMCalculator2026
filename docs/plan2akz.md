@@ -40,16 +40,16 @@
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI реализованы; runtime/UI acceptance ещё не выполнен. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist есть; evidence пока `PENDING`. |
 | 19 | ЧАСТИЧНО | Legacy parity matrix есть; строки пока `PENDING`. |
-| 20 | ЧАСТИЧНО | KB индексирует source identity/SHA-256 и searchable content. `Системы 1.xls`, `Системы 2.XLSX`, `Системы 3.xlsx`, `Системы 4.xlsx` индексируются; staging importer, Review UI и отдельная вкладка `Каталог систем` добавлены. Остаются фактическое сопоставление всех строк, draft editing и UI acceptance. |
+| 20 | ЧАСТИЧНО | KB индексирует source identity/SHA-256 и searchable content. `Системы 1.xls`, `Системы 2.XLSX`, `Системы 3.xlsx`, `Системы 4.xlsx` индексируются; staging importer, Review UI и отдельная вкладка `Каталог систем` добавлены. Draft editor с ручным выбором материала добавлен; остаются controlled creation, UI acceptance и фактическое сопоставление всех строк. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix есть. Таблицы «Системы 1–4» могут давать варианты систем, но не заменяют TDS/норматив. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` интегрирован в calculation/systems/recommendation workflow. `WARNING`/`UNKNOWN` не являются автоматическим запретом. Остаются UI acceptance и реальные TDS-backed conditions. |
 | 23 | НЕ ВЫПОЛНЕНО | Pre-Application Check: климат, RH, dew point, температуры, recoat, 2K pot life/induction, application, DFT, thinner и ограничения производителя. |
 | 24 | НЕ ВЫПОЛНЕНО | Химическая стойкость и среда эксплуатации только через явные source-backed rules. |
 | 25 | НЕ ВЫПОЛНЕНО | Полная normative traceability: документ, версия, пункт, правило, дата актуальности. |
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine для объяснения ranking/filter/ограничений и отсутствующих данных. |
-| 27 | ЧАСТИЧНО | Material Data Quality. Staging показывает candidate materials, duplicate normalization, provenance и статус совпадения с БД. System Template builder и отдельный persistence boundary добавлены; controlled creation неполных карточек и ручное подтверждение остаются. |
+| 27 | ЧАСТИЧНО | Material Data Quality. Staging показывает candidate materials, duplicate normalization, provenance и статус совпадения с БД. System Template builder, отдельный persistence boundary и draft editor с ручным выбором существующего Material добавлены; controlled creation неполных карточек остаётся. |
 | 28 | НЕ ВЫПОЛНЕНО | Управляемый `LossProfile`: способ нанесения, геометрия, условия, диапазон, источник. |
-| 29 | ЧАСТИЧНО | `Системы 1–4` закреплены как исходный каталог вариантов систем и кандидатов материалов. Staging importer + Review UI + draft System Template model/service + DB persistence schema/repository/service реализованы. UI редактирования/подтверждения и подключение к Calculation Scenarios остаются. |
+| 29 | ЧАСТИЧНО | `Системы 1–4` закреплены как исходный каталог вариантов систем и кандидатов материалов. Staging importer + Review UI + draft System Template model/service + DB persistence schema/repository/service + UI editor с явным CONFIRM реализованы. Подключение CONFIRM→persistence и Calculation Scenarios остаётся. |
 | 30 | НЕ ВЫПОЛНЕНО | Engineering Decision Log, связанный со snapshot расчёта. |
 | 31 | НЕ ВЫПОЛНЕНО | Calculation Scenarios на едином `CalculationService`; варианты из каталога `Системы 1–4` могут стать входом сценариев. |
 | 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow: зоны, проектный/фактический DFT, acceptance, repair/recoat, фото/акты. |
@@ -128,43 +128,24 @@ Commit: `c960d9ea6e52f74f46b10a91193c31adbcb6f83b`
 
 `SystemCatalogReviewView` подключён отдельной вкладкой `Каталог систем` и пунктом меню `Инженерное → Каталог систем 1–4…`. При изменении Material DB review view обновляет свои сопоставления.
 
+### `system_template_editor_view.py`
+Commit: `845be44fdbbd6417112cb89e9804b758894e1a3d`
+
+Добавлен отдельный UI редактора `SystemTemplateDraft`: редактирование имени/описания, просмотр слоёв и DFT, ручной выбор существующего Material, отображение source provenance и `TDS verified`, блокировка `CONFIRM` до прохождения `SystemTemplateService.can_confirm()`. Редактор только эмитит подтверждённый draft; запись в БД должна выполняться отдельной persistence boundary.
+
 ## §20/§27/§29 — следующий шаг
 
 1. Подтвердить фактическую структуру каждой таблицы/листа локальным чтением; не считать первую строку заголовком без подтверждения.
 2. Для каждого кандидата показывать существующую карточку БД при однозначном совпадении.
 3. Для отсутствующего материала — controlled creation неполной карточки только после ручного подтверждения; неизвестные поля не заполнять.
 4. Для неоднозначного совпадения требовать ручного выбора.
-5. Сделать UI редактирования draft: имя системы, слои, материал, DFT и provenance.
-6. Подтверждение draft должно быть отдельным явным действием пользователя.
+5. UI редактирования draft реализован: имя системы, слои, материал, DFT и provenance.
+6. Подтверждение draft является отдельным явным действием пользователя.
 7. Передавать подтверждённый draft в `SystemTemplatePersistenceService`; persistence уже защищён от UNKNOWN material/provenance/TDS.
 8. После сохранения Template подключить его к Calculation Scenarios; не создавать второй расчётный движок.
-9. TDS-поля заполнять только из проверенных документов; `SPKEFFA` читать только в режиме источника и не изменять.
 
-## §12/§14 — TDS boundary
+## TDS verification boundary — §12/§14/§25
 
-TDS из `kappamaag-crypto/SPKEFFA` является внешним read-only источником. Репозиторий `SPKEFFA` не изменять.
+`SPKEFFA` (`kappamaag-crypto/SPKEFFA`) является read-only источником TDS. PDF/страницы каталога могут быть извлечены для подготовки evidence, но извлечённый текст сам по себе не считается verified normative/technology rule.
 
-Для нормативных/технологических правил: идентичность документа; SHA-256 PDF; явный source identity и locator; только подтверждённые значения = `KNOWN`; отсутствующие параметры = `UNKNOWN`; extracted PDF text сам по себе не становится нормативным правилом.
-
-На текущем этапе `SPKEFFA` проверяется только как источник соответствующих TDS/страниц и их связки; это не является доказательством технологической применимости. Фактические SHA-256 бинарных PDF и ручное подтверждение rule-by-rule ещё не внесены, поэтому §14 остаётся `НЕ ВЫПОЛНЕНО`.
-
-## §22 — критическое ограничение
-
-Не закрывать §22 до пользовательского acceptance. `FORBIDDEN` может блокировать только при подтверждённой source-backed записи. `WARNING` и `UNKNOWN` требуют инженерной проверки.
-
-## §17 — критическое ограничение
-
-Не закрывать §17 до runtime/UI acceptance. Инспекция не должна изменять исходный расчёт; фактические измерения хранятся отдельно.
-
-## §18/§19 — acceptance
-
-Checklist/parity matrix не являются доказательством прохождения. Evidence заполняется после локального общего прогона и пользовательского acceptance.
-
-## Порядок продолжения
-1. GitHub Actions не запускать.
-2. Тесты пока не запускать.
-3. Продолжить §20/§27/§29: review сопоставления → UI draft editing → ручной выбор Material → explicit CONFIRM → persistence → Calculation Scenarios.
-4. Параллельно подготовить §14 на основании проверенных TDS из `SPKEFFA`, без изменений в `SPKEFFA`.
-5. После source-backed правил развивать §23/§24/§25/§26.
-6. Не закрывать частичные пункты без acceptance-доказательства.
-7. Каждый существенный code stage фиксировать отдельным commit, затем отдельным docs/plan commit.
+Для `KNOWN` требуется отдельная запись документа и правила с явным source identity, применимостью и SHA-256. Git blob SHA-1 не заменяет SHA-256 бинарного PDF. Пока фактические SHA-256 бинарных TDS и rule-by-rule verification не введены, соответствующие технологические ограничения остаются `UNKNOWN`.
