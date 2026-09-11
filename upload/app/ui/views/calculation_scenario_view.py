@@ -56,7 +56,7 @@ class CalculationScenarioView(QWidget):
     def _send_to_comparison(self):
         parent=self.window();cmp=getattr(parent,"cmp_view",None)
         if cmp is None or not self._results:QMessageBox.warning(self,"Сравнение","Экран сравнения недоступен");return
-        cmp._on_clear()
+        cmp.clear()
         for result in self._results:cmp.add_from_calculation(result)
         tabs=getattr(parent,"tabs",None)
         if tabs is not None:tabs.setCurrentWidget(cmp)
