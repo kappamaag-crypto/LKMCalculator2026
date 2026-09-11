@@ -40,16 +40,16 @@
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI реализованы; runtime/UI acceptance ещё не выполнен. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist есть; evidence пока `PENDING`. |
 | 19 | ЧАСТИЧНО | Legacy parity matrix есть; строки пока `PENDING`. |
-| 20 | ЧАСТИЧНО | KB индексирует source identity/SHA-256 и searchable content. `Системы 1.xls`, `Системы 2.XLSX`, `Системы 3.xlsx`, `Системы 4.xlsx` индексируются; staging importer и Review UI добавлены. БД напрямую не изменяется. Остаются фактическое сопоставление всех строк, UI acceptance и интеграция подтверждённых данных в templates. |
+| 20 | ЧАСТИЧНО | KB индексирует source identity/SHA-256 и searchable content. `Системы 1.xls`, `Системы 2.XLSX`, `Системы 3.xlsx`, `Системы 4.xlsx` индексируются; staging importer, Review UI и отдельная вкладка `Каталог систем` добавлены. Остаются фактическое сопоставление всех строк, draft editing и UI acceptance. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix есть. Таблицы «Системы 1–4» могут давать варианты систем, но не заменяют TDS/норматив. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` интегрирован в calculation/systems/recommendation workflow. `WARNING`/`UNKNOWN` не являются автоматическим запретом. Остаются UI acceptance и реальные TDS-backed conditions. |
 | 23 | НЕ ВЫПОЛНЕНО | Pre-Application Check: климат, RH, dew point, температуры, recoat, 2K pot life/induction, application, DFT, thinner и ограничения производителя. |
 | 24 | НЕ ВЫПОЛНЕНО | Химическая стойкость и среда эксплуатации только через явные source-backed rules. |
 | 25 | НЕ ВЫПОЛНЕНО | Полная normative traceability: документ, версия, пункт, правило, дата актуальности. |
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine для объяснения ranking/filter/ограничений и отсутствующих данных. |
-| 27 | ЧАСТИЧНО | Material Data Quality. Staging показывает candidate materials, duplicate normalization, provenance и статус совпадения с БД. System Template builder добавлен; controlled creation карточек и ручное подтверждение остаются. |
+| 27 | ЧАСТИЧНО | Material Data Quality. Staging показывает candidate materials, duplicate normalization, provenance и статус совпадения с БД. System Template builder и отдельный persistence boundary добавлены; controlled creation неполных карточек и ручное подтверждение остаются. |
 | 28 | НЕ ВЫПОЛНЕНО | Управляемый `LossProfile`: способ нанесения, геометрия, условия, диапазон, источник. |
-| 29 | ЧАСТИЧНО | `Системы 1–4` закреплены как исходный каталог вариантов систем и кандидатов материалов. Staging importer + Review UI + draft System Template model/service реализованы; сохранение подтверждённых templates остаётся. |
+| 29 | ЧАСТИЧНО | `Системы 1–4` закреплены как исходный каталог вариантов систем и кандидатов материалов. Staging importer + Review UI + draft System Template model/service + DB persistence schema/repository/service реализованы. UI редактирования/подтверждения и подключение к Calculation Scenarios остаются. |
 | 30 | НЕ ВЫПОЛНЕНО | Engineering Decision Log, связанный со snapshot расчёта. |
 | 31 | НЕ ВЫПОЛНЕНО | Calculation Scenarios на едином `CalculationService`; варианты из каталога `Системы 1–4` могут стать входом сценариев. |
 | 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow: зоны, проектный/фактический DFT, acceptance, repair/recoat, фото/акты. |
@@ -98,6 +98,36 @@ Commit: `5d610e30669d7842598b74ced9049ce433827af9`
 
 Добавлен `SystemTemplateService`: построение draft из `SystemRowCandidate`, однозначное сопоставление с Material DB, `material_id=None` при отсутствии/неоднозначности, сохранение source provenance и проверка `can_confirm()`. TDS applicability не считается подтверждённой автоматически.
 
+### `system_template_models.py`
+Commit: `127486c04e6a4a06d92d429c943a188ea7fb1eb1`
+
+Добавлены отдельные ORM-таблицы `system_templates` и `system_template_layers`. Хранят статус, material_id, DFT и source provenance; слой требует существующий Material, поэтому неизвестные/неподтверждённые материалы не попадают в confirmed persistence.
+
+### `system_template_repository.py`
+Commit: `b180e757c688eee8ce7e2f9ff083bc524c218108`
+
+Добавлен repository boundary: `add_confirmed()`, поиск по source provenance, чтение и преобразование обратно в draft. Persistence не создаёт Material и не делает автоматический upsert каталога.
+
+### `007_system_templates.py`
+Commit: `75b394567d64bbc33f1f8871e503c5f79c46c6b6`
+
+Добавлена Alembic-схема для confirmed System Templates и слоёв с FK на `materials` и уникальностью source provenance.
+
+### `engine.py`
+Commit: `cb2d6cc7afe2e6a45ee780be4dd7888eea8dbcb5`
+
+ORM System Template регистрируется до `Base.metadata.create_all()`, поэтому новая схема видима обычному SQLite runtime.
+
+### `system_template_persistence_service.py`
+Commit: `da6d542c2a3c1557401ccfcf699b2bdcb42a9e56`
+
+Явная граница `save_confirmed()`: принимает только `CONFIRMED`, требует `tds_verified=KNOWN`, полной provenance и однозначных material_id; при этом не создаёт и не изменяет Material.
+
+### `main_window.py`
+Commit: `c960d9ea6e52f74f46b10a91193c31adbcb6f83b`
+
+`SystemCatalogReviewView` подключён отдельной вкладкой `Каталог систем` и пунктом меню `Инженерное → Каталог систем 1–4…`. При изменении Material DB review view обновляет свои сопоставления.
+
 ## §20/§27/§29 — следующий шаг
 
 1. Подтвердить фактическую структуру каждой таблицы/листа локальным чтением; не считать первую строку заголовком без подтверждения.
@@ -106,7 +136,7 @@ Commit: `5d610e30669d7842598b74ced9049ce433827af9`
 4. Для неоднозначного совпадения требовать ручного выбора.
 5. Сделать UI редактирования draft: имя системы, слои, материал, DFT и provenance.
 6. Подтверждение draft должно быть отдельным явным действием пользователя.
-7. Persistence System Template выполнять отдельным шагом и только после review.
+7. Передавать подтверждённый draft в `SystemTemplatePersistenceService`; persistence уже защищён от UNKNOWN material/provenance/TDS.
 8. После сохранения Template подключить его к Calculation Scenarios; не создавать второй расчётный движок.
 9. TDS-поля заполнять только из проверенных документов; `SPKEFFA` читать только в режиме источника и не изменять.
 
@@ -115,6 +145,8 @@ Commit: `5d610e30669d7842598b74ced9049ce433827af9`
 TDS из `kappamaag-crypto/SPKEFFA` является внешним read-only источником. Репозиторий `SPKEFFA` не изменять.
 
 Для нормативных/технологических правил: идентичность документа; SHA-256 PDF; явный source identity и locator; только подтверждённые значения = `KNOWN`; отсутствующие параметры = `UNKNOWN`; extracted PDF text сам по себе не становится нормативным правилом.
+
+На текущем этапе `SPKEFFA` проверяется только как источник соответствующих TDS/страниц и их связки; это не является доказательством технологической применимости. Фактические SHA-256 бинарных PDF и ручное подтверждение rule-by-rule ещё не внесены, поэтому §14 остаётся `НЕ ВЫПОЛНЕНО`.
 
 ## §22 — критическое ограничение
 
@@ -131,7 +163,7 @@ Checklist/parity matrix не являются доказательством п�
 ## Порядок продолжения
 1. GitHub Actions не запускать.
 2. Тесты пока не запускать.
-3. Продолжить §20/§27/§29: review сопоставления → controlled creation → UI draft → persistence System Templates.
+3. Продолжить §20/§27/§29: review сопоставления → UI draft editing → ручной выбор Material → explicit CONFIRM → persistence → Calculation Scenarios.
 4. Параллельно подготовить §14 на основании проверенных TDS из `SPKEFFA`, без изменений в `SPKEFFA`.
 5. После source-backed правил развивать §23/§24/§25/§26.
 6. Не закрывать частичные пункты без acceptance-доказательства.
