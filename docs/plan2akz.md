@@ -45,7 +45,7 @@
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. UI/E2E acceptance remains. |
 | 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Catalog of promoted TDS-backed agents and UI remain. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
-| 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
+| 26 | ЧАСТИЧНО | Domain ExplanationReport + explain_system_calculation + CalculationService.explain_calculation/format_explanation; 9 unit tests. UI/E2E and richer coverage remain. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
 | 29 | ЧАСТИЧНО | Catalogue → draft → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules. |
@@ -70,6 +70,7 @@
 - `pre_application.py` — Pre-Application Check READY/BLOCKED/INCOMPLETE.
 - `chemical_resistance.py` — source-backed chemical resistance only.
 - `chemical_resistance_rules.py` — promote gate; empty registry by default.
+- `explanation.py` — Explanation Engine (source-traceable report for SystemCalculationResult).
 
 ## TDS verification boundary — §12/§14/§25
 
@@ -122,6 +123,21 @@ Still open:
 - populate KNOWN rules only after verified TDS/НД excerpts;
 - recommendation filter / UI exposure;
 - concentration–temperature matrix per product family.
+
+## §26 — Explanation Engine
+
+Done:
+- `domain/explanation.py` — ExplanationItem / ExplanationReport; explain_system_calculation;
+- explains DFT/WFT basis (SV only), losses resolved value + zero/default note (§28), engineering context normative/surface status, cost UNKNOWN vs known, incomplete material;
+- no invented values; intermediate no-round note;
+- `CalculationService.explain_calculation` / `format_explanation`;
+- tests `test_explanation.py` (9 cases).
+
+Still open:
+- UI surface for explanation report;
+- deeper layer/loss-profile provenance in LayerResult;
+- integration with recommendation reasons and pre-app/chem results;
+- E2E acceptance.
 
 ## §28 / §30 — закрыты ранее
 
