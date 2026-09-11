@@ -120,3 +120,18 @@ def check_target_dft_with_known_tds(
                 "target_dft",
             )
     return result
+
+
+def enrich_filter_result_with_known_tds(result) -> None:
+    for layer in result.system.layers:
+        material = layer.material
+        if material is None:
+            continue
+        tds = check_target_dft_with_known_tds(material, layer.target_dft)
+        for issue in tds.issues:
+            prefix = f"Слой {layer.layer_number}: "
+            if issue.level == "error" and issue.code.startswith("TECH_TDS_"):
+                result.passed = False
+                result.reasons_fail.append(prefix + issue.message)
+            elif issue.code.startswith("TECH_TDS_"):
+                result.notes.append(prefix + issue.message)
