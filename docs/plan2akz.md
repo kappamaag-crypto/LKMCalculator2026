@@ -41,7 +41,7 @@
 | 19 | НЕ ВЫПОЛНЕНО | Legacy parity matrix. |
 | 20 | ЧАСТИЧНО | `book_index.py` индексирует source identity/integrity файлов `books/`; `book_content_index.py` извлекает searchable content из PDF и UTF-8 text-like файлов в source-linked chunks с path/SHA-256/locator; `BookSearchService` имеет DB-backed persistence/search; `BookSearchView` подключён отдельной вкладкой и меню, показывает source/locator/SHA-256, а выбранный источник можно передать в инженерный контекст как `UNKNOWN` source identity без создания нормативного значения. Остаются acceptance/visual smoke и более глубокая интеграция KB с инженерными решениями. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix есть; applicability к реальной chemistry/TDS остаётся. |
-| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` подключён к `CalculationService.format_summary()`, поэтому обычный `CalculationView` получает source-backed результат проверки соседних слоёв. Проверка не блокирует расчёт и `UNKNOWN` не превращается в запрет. Остаётся прямое workflow-подключение `SystemsView`, UI regression и TDS-backed conditions. |
+| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` подключён к `CalculationService.format_summary()`, поэтому обычный `CalculationView` получает source-backed результат проверки соседних слоёв. `SystemsView` теперь также выполняет проверку прямо в редакторе: после загрузки/добавления/удаления/перестановки слоёв обновляется отдельный блок «Совместимость соседних слоёв» со сводным статусом и сообщениями переходов. Проверка использует только source-backed матрицу; `UNKNOWN` остаётся неизвестным, TDS cure/recoat conditions не выводятся. Остаются UI regression/acceptance и TDS-backed conditions. |
 | 23 | НЕ ВЫПОЛНЕНО | — |
 | 24 | НЕ ВЫПОЛНЕНО | — |
 | 25 | НЕ ВЫПОЛНЕНО | — |
@@ -79,12 +79,15 @@ Code commits: `b47743a679edd147848d6aab3f4b5088f10365cd`, `3929540e50bc2f69c40d8
 ### §22 — Calculation workflow integration
 Code commit: `2ea726933b859c8e00dd17069be437cb6251a302` — `CalculationService` получил `LayerCompatibilityEngine`; `compatibility_report()` и source-backed блок совместимости добавлены в `format_summary()`.
 
+### §22 — Systems workflow integration
+Code commit: `d4db7ee7c87478a280de79412fc86dd176ddb8a7` — `SystemsView` получил прямую source-backed проверку соседних слоёв. Редактор показывает сводный статус и детализацию переходов, автоматически обновляя её при изменении состава/порядка слоёв. `UNKNOWN` не превращается в запрет; TDS-условия не интерпретируются.
+
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы.
 
 Минимум для закрытия:
 1. интеграция проверки в `CalculationView` — выполнена через `CalculationService.format_summary()`;
-2. интеграция проверки в `SystemsView`/редактор системы — остаётся;
+2. интеграция проверки в `SystemsView`/редактор системы — выполнена в code commit `d4db7ee7c87478a280de79412fc86dd176ddb8a7`;
 3. UI regression на положительный, отрицательный и `UNKNOWN` сценарии — остаётся;
 4. условия `previous_is_cured`, `recoat_elapsed_h`, `surface_prepared` только если они подтверждены TDS/источником — остаётся в §14;
 5. `UNKNOWN` должен оставаться неизвестным и требовать проверки источника, а не автоматически становиться запретом — выполнено на уровне compatibility workflow.
@@ -98,5 +101,5 @@ Code commit: `2ea726933b859c8e00dd17069be437cb6251a302` — `CalculationService`
 6. §12/§13: добавлять только фактически проверенные sidecar-манифесты с SHA-256 исходного PDF и без придуманных значений, затем подключить фактический registry к инженерному workflow.
 7. После фактического набора verified rules перейти к §14 TDS-backed technological validation.
 8. §20: DB-backed KB и source handoff созданы. Следующий шаг — acceptance/visual smoke и более глубокая интеграция source-linked материалов в инженерные решения без автоматической генерации нормативных правил.
-9. §22 вести отдельно: следующий шаг — SystemsView и UI regression; формально не закрывать до полного workflow integration.
+9. §22 вести отдельно: SystemsView integration выполнена, но UI regression/acceptance и TDS-backed conditions остаются; формально не закрывать до их выполнения.
 10. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
