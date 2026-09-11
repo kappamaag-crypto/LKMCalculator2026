@@ -16,6 +16,9 @@ from app.domain.comparison import ComparisonEngine
 from app.domain.engineering_context import EngineeringContext
 from app.domain.layer_compatibility import LayerCompatibilityEngine
 from app.domain.validation import ValidationResult
+from app.domain.technology import TechnologyCheckResult
+from app.services.tds_technology_bridge import check_target_dft_with_known_tds
+from app.services.tds_normative_bridge import engineering_context_from_known_tds, tds_trace_for_material
 
 
 class CalculationService:
@@ -102,6 +105,49 @@ class CalculationService:
         not inferred here.
         """
         return self.compatibility.check_result(result)
+
+    def check_system_tds_dft(self, system, materials_by_id=None):
+        out = []
+        for layer in system.layers or ():
+            material = getattr(layer, "material", None)
+            if material is None and materials_by_id is not None:
+                mid = getattr(layer, "material_id", None)
+                if mid is not None:
+                    material = materials_by_id.get(mid)
+            if material is None:
+                continue
+            out.append((layer.layer_number, check_target_dft_with_known_tds(material, getattr(layer, "target_dft", None))))
+        return out
+
+    def build_tds_engineering_context(self, system, materials_by_id=None, base=None):
+        names = []
+        for layer in system.layers or ():
+            material = getattr(layer, "material", None)
+            if material is None and materials_by_id is not None:
+                mid = getattr(layer, "material_id", None)
+                if mid is not None:
+                    material = materials_by_id.get(mid)
+            if material is not None:
+                names.append(material.material_name or material.display_name())
+            else:
+                name = getattr(layer, "material_name", None)
+                if name:
+                    names.append(name)
+        return engineering_context_from_known_tds(names, base=base)
+
+    def tds_trace_for_system(self, system, materials_by_id=None):
+        traces = []
+        for layer in system.layers or ():
+            material = getattr(layer, "material", None)
+            if material is None and materials_by_id is not None:
+                mid = getattr(layer, "material_id", None)
+                if mid is not None:
+                    material = materials_by_id.get(mid)
+            name = (material.material_name or material.display_name()) if material else (getattr(layer, "material_name", "") or "")
+            trace = tds_trace_for_material(name)
+            trace["layer_number"] = layer.layer_number
+            traces.append(trace)
+        return traces
 
     def format_summary(self, result: SystemCalculationResult) -> str:
         """Краткая текстовая сводка расчёта, включая расход разбавителя и совместимость."""
