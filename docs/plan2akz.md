@@ -24,7 +24,7 @@
 | 3 | ВЫПОЛНЕНО | `AdHocMaterialDialog`: нормализация, duplicate reuse, persistence; regression `42bb7fb`. |
 | 4 | ЧАСТИЧНО | ComparisonEngine/View, 2K/многослойность и headless UI smoke `2ad50af`; остаются визуальный smoke и финальная source-backed проверка wording. |
 | 5 | ЧАСТИЧНО | Инженерный Excel и regression missing-price `a1e1a0a`; остаются визуальный/печать/PDF-конверсионный smoke. |
-| 6 | ЧАСТИЧНО | PDF строится из `SystemCalculationResult`; multilayer/comparison/2K/unknown-price покрыты; cross-export regression `e3ef08d`; остаются визуальный/печать smoke. |
+| 6 | ЧАСТИЧНО | PDF строится из `SystemCalculationResult`; multilayer/comparison/2K/unknown-price покрыты; cross-export regression `e3ef08`; остаются визуальный/печать smoke. |
 | 7 | ВЫПОЛНЕНО | Precision/unit invariants + независимые golden cases 2/3/4/5 layers; исторически был успешный CI. |
 | 8 | ВЫПОЛНЕНО | 2K учитывается как один смешанный материалный слой; TDS technology rules вынесены в §14. |
 | 9 | ЧАСТИЧНО | `PackagingPlanner` считает коммерческую потребность по фасовке: целые упаковки, резерв и опциональную стоимость. Складские остатки, складской учёт, резерв склада и закупочные заказы не входят. |
@@ -36,7 +36,7 @@
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. Начинать после появления проверяемого source-backed rule pipeline. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; `RecommendationEngine` дополнительно прогоняет разрешённые системы через `LayerCompatibilityEngine` и переносит source-backed warnings/limitations. `UNKNOWN` и отсутствие подтверждённого правила не изменяют ranking; environment/technology/весовые настройки и полноценная compatibility scoring остаются. |
-| 17 | НЕ ВЫПОЛНЕНО | Inspection workflow. |
+| 17 | ЧАСТИЧНО | Добавлены typed `InspectionRecord`, измерения и дефекты, `InspectionService` для создания/валидации/сводки/экспорта записи и regression cases. Приёмочный статус по умолчанию `UNKNOWN`; нормативные критерии не выводятся автоматически. UI и runtime acceptance ещё не выполнены. |
 | 18 | НЕ ВЫПОЛНЕНО | Release/regression/smoke/DB backup/docs acceptance. |
 | 19 | НЕ ВЫПОЛНЕНО | Legacy parity matrix. |
 | 20 | ЧАСТИЧНО | `book_index.py` индексирует source identity/integrity файлов `books/`; `book_content_index.py` извлекает searchable content из PDF и UTF-8 text-like файлов в source-linked chunks с path/SHA-256/locator; `BookSearchService` имеет DB-backed persistence/search; `BookSearchView` подключён отдельной вкладкой и меню, показывает source/locator/SHA-256, а выбранный источник можно передать в инженерный контекст как `UNKNOWN` source identity без создания нормативного значения. Остаются acceptance/visual smoke и более глубокая интеграция KB с инженерными решениями. |
@@ -88,6 +88,9 @@ Code commit: `99c1643d0a823963e730df730ff73864860ec2f5` — `RecommendationEngin
 ### §22 — Compatibility status semantics
 Code commits: `1817249358e613bd753a431c617f7a35f24dd881`, `063ef315cd37d6bbcf1bad45d3e15bcf72db519b` — `LayerCompatibilityReport` разделяет `WARNING`, `UNKNOWN` и явно `FORBIDDEN`; `blocking_transitions` сохранён как обратимо-совместимый alias только для `FORBIDDEN`. Recommendation workflow больше не трактует WARNING/UNKNOWN как blockers.
 
+### §17 — Inspection workflow foundation
+Code commits: `8408933facba7f93d05f4ae745cb9b4de78f70d2` — typed `InspectionRecord`, `InspectionMeasurement`, `InspectionDefect` с безопасным `UNKNOWN` acceptance status; `9a6667d29861b122e6160990dab889eaf8c95eed` — `InspectionService` для создания/валидации/сводки/serialization; `eab29520a26b406839bdcff8cba39a3626d827a0` — regression cases для `UNKNOWN` и invalid status.
+
 ## §22 — Критическое ограничение
 Не закрывать §22 до фактического пользовательского acceptance.
 
@@ -98,6 +101,16 @@ Code commits: `1817249358e613bd753a431c617f7a35f24dd881`, `063ef315cd37d6bbcf1ba
 4. условия `previous_is_cured`, `recoat_elapsed_h`, `surface_prepared` только если они подтверждены TDS/источником — остаётся в §14;
 5. `UNKNOWN` должен оставаться неизвестным и требовать проверки источника, а не автоматически становиться запретом — выполнено на уровне compatibility workflow;
 6. явно `FORBIDDEN` может считаться blocker только при наличии подтверждённой source-backed записи — реализовано в domain semantics.
+
+## §17 — Критическое ограничение
+Не закрывать §17 до runtime/UI acceptance.
+
+Минимум для закрытия:
+1. domain-модель инспекции с измерениями, дефектами, фото-ссылками и source identity — выполнено;
+2. сервис создания/валидации/сериализации — выполнено;
+3. UI workflow с созданием записи и просмотром сводки — остаётся;
+4. regression/smoke с `UNKNOWN`, измерением и дефектом — тест добавлен, но пока не запускался;
+5. нормативные пределы и приёмочные решения не должны генерироваться без подтверждённого источника/решения инспектора — выполнено на уровне domain/service.
 
 ## Порядок продолжения
 1. GitHub Actions не запускать.
@@ -110,4 +123,5 @@ Code commits: `1817249358e613bd753a431c617f7a35f24dd881`, `063ef315cd37d6bbcf1ba
 8. §20 продолжать с acceptance/visual smoke и source-linked handoff в инженерные решения; extracted text не превращать автоматически в норматив.
 9. §21 не расширять generic chemistry assumptions; applicability подтверждать TDS/источником.
 10. §22: выполнить UI regression/acceptance позже; не считать WARNING/UNKNOWN запретом и не добавлять TDS-условия без источника.
-11. Затем переходить к §17 → §18 → §19 и оставшимся §23–§32, сохраняя отдельные code/docs commits.
+11. §17: продолжить UI-интеграцией inspection workflow, затем acceptance.
+12. После §17 переходить к §18 → §19 и оставшимся §23–§32, сохраняя отдельные code/docs commits.
