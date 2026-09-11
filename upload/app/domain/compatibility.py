@@ -15,11 +15,10 @@ technical documentation provides a confirmed compatibility family.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Optional
 
-from .compatibility import CompatibilityRule, check_materials
 from .enums import BinderType, CompatibilityStatus
-from .models import LayerDefinition, Material, SystemCalculationResult
+from .models import Material
 
 SOURCE_URL = "https://www.lkm-prof.ru/razdel/sovmestim.php"
 SOURCE_SNAPSHOT = "books/совместимость_лкм.png"
