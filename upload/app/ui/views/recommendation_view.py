@@ -10,8 +10,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
+from app.domain.chemical_resistance import ChemicalAgent
 from app.domain.models import ObjectData, CoatingSystem, RecommendationResult
 from app.domain.enums import CorrosionCategory, DurabilityLevel, SurfaceType, EnvironmentType
+from app.services.chemical_resistance_rules import list_known_chemical_resistance_rules
 from app.services.recommendation_service import RecommendationService
 
 
@@ -77,6 +79,23 @@ class RecommendationView(QWidget):
         form.addRow("T мин:", self.spin_tmin)
         form.addRow("T макс:", self.spin_tmax)
 
+        chem = QGroupBox("Химическая среда — опциональный hard-filter")
+        chem_form = QFormLayout(chem)
+        self.ed_chemical_agent = QLineEdit()
+        self.ed_chemical_agent.setPlaceholderText("ID агента из KNOWN-правил")
+        self.ed_chemical_concentration = QLineEdit()
+        self.ed_chemical_concentration.setPlaceholderText("не задано")
+        self.ed_chemical_temperature = QLineEdit()
+        self.ed_chemical_temperature.setPlaceholderText("не задано")
+        chem_form.addRow("Агент ID:", self.ed_chemical_agent)
+        chem_form.addRow("Концентрация, %:", self.ed_chemical_concentration)
+        chem_form.addRow("Температура, °C:", self.ed_chemical_temperature)
+        chem_note = QLabel("Если агент задан, UNKNOWN химстойкость не считается пригодной. Без KNOWN source-backed правила кандидат исключается.")
+        chem_note.setWordWrap(True)
+        chem_note.setProperty("subheading", True)
+        chem_form.addRow(chem_note)
+        form.addRow(chem)
+
         btn_find = QPushButton("Подобрать системы")
         btn_find.clicked.connect(self._on_recommend)
         form.addRow(btn_find)
@@ -108,6 +127,16 @@ class RecommendationView(QWidget):
     def set_systems(self, systems: list[CoatingSystem]) -> None:
         self._systems = list(systems)
 
+    @staticmethod
+    def _optional_float(widget: QLineEdit, label: str) -> float | None:
+        text = widget.text().strip().replace(",", ".")
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError as exc:
+            raise ValueError(f"Поле «{label}» должно быть числом или пустым.") from exc
+
     def _on_recommend(self) -> None:
         if not self._systems:
             QMessageBox.information(
@@ -115,6 +144,13 @@ class RecommendationView(QWidget):
                 "Каталог систем пуст.\nДобавьте системы во вкладке «Системы» или загрузите демо."
             )
             return
+        try:
+            concentration = self._optional_float(self.ed_chemical_concentration, "Концентрация")
+            chemical_temperature = self._optional_float(self.ed_chemical_temperature, "Температура химической среды")
+        except ValueError as exc:
+            QMessageBox.warning(self, "Некорректные данные", str(exc))
+            return
+
         obj = ObjectData(
             object_name=self.ed_object.text().strip(),
             corrosion_category=self.cmb_corrosion.currentData(),
@@ -124,7 +160,19 @@ class RecommendationView(QWidget):
             temperature_min=self.spin_tmin.value(),
             temperature_max=self.spin_tmax.value(),
         )
-        result = self.service.recommend(obj, self._systems, top_n=10, calculate_costs=False)
+        agent_id = self.ed_chemical_agent.text().strip()
+        chemical_agents = None
+        if agent_id:
+            chemical_agents = [ChemicalAgent(agent_id, concentration_percent=concentration, temperature_c=chemical_temperature)]
+        result = self.service.recommend(
+            obj,
+            self._systems,
+            top_n=10,
+            calculate_costs=False,
+            chemical_agents=chemical_agents,
+            chemical_rules=list_known_chemical_resistance_rules(),
+            require_known_chemical=True,
+        )
         self._last_result = result
         self._show_result(result)
 
