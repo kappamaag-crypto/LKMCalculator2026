@@ -66,17 +66,27 @@ class RecommendationEngine:
             breakdown = score_system(filter_result=fr, obj=obj, calc_result=calc, all_costs=costs, weights=self.weights, compatibility_ok=True)
             compatibility_report = self._compatibility_for_system(fr.system, calc)
             if compatibility_report is not None:
+                # Only explicitly forbidden source-backed transitions are
+                # blockers. WARNING and UNKNOWN remain engineering review
+                # signals and must not silently alter the recommendation score.
                 breakdown.warnings.extend(
-                    transition.message for transition in compatibility_report.blocking_transitions
+                    transition.message for transition in compatibility_report.warning_transitions
                 )
-                if compatibility_report.status.value == "нет подтвержденных данных":
+                breakdown.warnings.extend(
+                    transition.message for transition in compatibility_report.forbidden_transitions
+                )
+                if compatibility_report.unknown_transitions:
                     breakdown.limitations.append(
-                        "Совместимость одного или нескольких соседних слоёв не подтверждена source-backed матрицей."
+                        f"Совместимость UNKNOWN: не подтверждено переходов — {len(compatibility_report.unknown_transitions)}."
                     )
-                elif compatibility_report.status.value == "предупреждение":
-                    breakdown.warnings.append(
-                        "Есть переходы со специальным условием совместимости; проверить первичный источник/TDS."
+                if compatibility_report.forbidden_transitions:
+                    breakdown.limitations.append(
+                        f"Источник содержит явно запрещённых переходов: {len(compatibility_report.forbidden_transitions)}."
                     )
+            else:
+                breakdown.limitations.append(
+                    "Совместимость слоёв не проверена: материалы системы не разрешены."
+                )
             scored.append((fr, breakdown, calc))
         scored.sort(key=lambda x: x[1].total, reverse=True)
 
