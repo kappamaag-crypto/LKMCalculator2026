@@ -49,7 +49,7 @@
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile: domain model + integration into SystemCalculator/LayerInput; explicit losses_percent priority over profile; LossProfile.none(); no hidden engineering defaults; regression tests in test_loss_profile.py. Commits: eac21b6 (model), d93f48e (integration), 3e3873f (tests). |
 | 29 | ЧАСТИЧНО | Catalogue → draft → editor → explicit CONFIRM → persistence boundary реализовано; persistence блокирует UNKNOWN TDS. Scenario UI подключён, а источник альтернатив ограничен подтверждёнными и TDS-verified templates. Persistence/acceptance остаются. |
-| 30 | НЕ ВЫПОЛНЕНО | Engineering Decision Log. |
+| 30 | ВЫПОЛНЕНО | Engineering Decision Log создан: `docs/engineering_decision_log_v3.md`. Зафиксированы границы domain/service, единый calculation result для PDF/Excel, семантика UNKNOWN, read-only SPKEFFA, catalogue vs TDS proof, CONFIRM gate, controlled LossProfile, TDS promotion gate и запрет GitHub Actions. Commit: 9005c30. |
 | 31 | ЧАСТИЧНО | `CalculationScenario` + `CalculationScenarioService` + UI подключены к существующему `CalculationService`; Comparison/Excel workflow используется без второго расчётного движка. Добавлен read-only bridge confirmed + `tds_verified=KNOWN` templates → scenario alternatives. Acceptance остаётся. |
 | 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow. |
 
@@ -87,6 +87,7 @@
 - `loss_profile.py` — `eac21b6df1b7989961740ec3a36f3a6dd3a0f36c`: controlled LossProfile domain model (name/percent/source, resolve, none()).
 - `calculator.py` — `d93f48e3ff999c802457d1e842f23848c37edbcb`: LossProfile integrated into SystemCalculator/LayerInput; explicit losses_percent priority; legacy default_losses preserved as 0.0 without hidden engineering values.
 - `test_loss_profile.py` — `3e3873fc9445d87694433be93701e5ed772fd27c`: regression coverage for profile usage, explicit override, none(), invalid rejection, legacy compatibility.
+- `engineering_decision_log_v3.md` — `9005c30b453ed2f23ef40f585adddebe5ae13818`: Engineering Decision Log for v3; factual architectural and engineering decisions recorded without promoting UNKNOWN data to KNOWN.
 
 ## §20/§27/§29/§31 — следующий шаг
 
@@ -112,3 +113,7 @@
 3. legacy `default_losses` (по умолчанию 0.0 — не скрытое инженерное значение).
 
 `LossProfile.none()` — явный нулевой профиль (`source=SYSTEM`). Некорректный percent отклоняется. Существующий API `LayerCalculator.calculate(..., losses_percent=0.0)` сохранён.
+
+## §30 — Engineering Decision Log (закрыто)
+
+`docs/engineering_decision_log_v3.md` фиксирует фактически принятые архитектурные решения и границы доверия к данным. Отдельная запись не повышает статус TDS rules: `UNKNOWN` остаётся `UNKNOWN` до выполнения §14/§25.
