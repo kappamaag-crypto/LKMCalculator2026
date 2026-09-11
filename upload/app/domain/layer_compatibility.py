@@ -90,12 +90,40 @@ class LayerCompatibilityReport:
         return self.status is CompatibilityStatus.ALLOWED
 
     @property
-    def blocking_transitions(self) -> tuple[LayerTransitionResult, ...]:
+    def warning_transitions(self) -> tuple[LayerTransitionResult, ...]:
+        """Transitions with a source-backed special condition/warning."""
         return tuple(
             transition
             for transition in self.transitions
-            if transition.status is not CompatibilityStatus.ALLOWED
+            if transition.status is CompatibilityStatus.WARNING
         )
+
+    @property
+    def unknown_transitions(self) -> tuple[LayerTransitionResult, ...]:
+        """Transitions for which the source matrix has no confirmed rule."""
+        return tuple(
+            transition
+            for transition in self.transitions
+            if transition.status is CompatibilityStatus.UNKNOWN
+        )
+
+    @property
+    def forbidden_transitions(self) -> tuple[LayerTransitionResult, ...]:
+        """Transitions explicitly marked forbidden by the source matrix."""
+        return tuple(
+            transition
+            for transition in self.transitions
+            if transition.status is CompatibilityStatus.FORBIDDEN
+        )
+
+    @property
+    def blocking_transitions(self) -> tuple[LayerTransitionResult, ...]:
+        """Backward-compatible alias for explicitly forbidden transitions.
+
+        WARNING and UNKNOWN are not blockers: they require engineering review
+        rather than being converted into an automatic prohibition.
+        """
+        return self.forbidden_transitions
 
 
 class LayerCompatibilityEngine:
