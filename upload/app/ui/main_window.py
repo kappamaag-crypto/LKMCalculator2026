@@ -12,6 +12,7 @@ from app.domain.enums import MaterialType,BinderType,DurabilityLevel
 from app.domain.engineering_context import EngineeringContext
 from app.services.calculation_service import CalculationService
 from app.services.calculation_scenario_service import CalculationScenarioService
+from app.services.confirmed_system_template_service import ConfirmedSystemTemplateService
 from app.services.recommendation_service import RecommendationService
 from app.ui.styles import APP_STYLE
 from app.ui.views.calculation_view import CalculationView
@@ -63,7 +64,7 @@ def _demo_systems():
     mats={m.id:m for m in _demo_materials()};return [CoatingSystem(id=1,system_name="Blank Universal + Finish (C3–C4 Medium)",manufacturer="Blank",layers=[LayerDefinition(material_id=1,material=mats[1],layer_number=1,target_dft=150),LayerDefinition(material_id=2,material=mats[2],layer_number=2,target_dft=80)],number_of_layers=2)]
 class MainWindow(QMainWindow):
     def __init__(self):
-        super().__init__();self.setWindowTitle(f"{__app_name__} v{__version__}");self.setMinimumSize(1100,700);self.resize(1280,800);self.setStyleSheet(APP_STYLE);self.settings=AppSettings.load();self.calc_service=CalculationService();self.scenario_service=CalculationScenarioService(self.calc_service);self.rec_service=RecommendationService();self._materials=_load_materials_from_db(_demo_materials());self._systems=_load_systems_from_db(self._materials,_demo_systems());self._engineering_context=EngineeringContext();self._build_ui();self._load_demo_data();self.statusBar().showMessage("Готово. Материалы и системы загружены из базы данных.")
+        super().__init__();self.setWindowTitle(f"{__app_name__} v{__version__}");self.setMinimumSize(1100,700);self.resize(1280,800);self.setStyleSheet(APP_STYLE);self.settings=AppSettings.load();self.calc_service=CalculationService();self.scenario_service=CalculationScenarioService(self.calc_service);self.template_service=ConfirmedSystemTemplateService();self.rec_service=RecommendationService();self._materials=_load_materials_from_db(_demo_materials());self._systems=_load_systems_from_db(self._materials,_demo_systems());self._engineering_context=EngineeringContext();self._build_ui();self._load_demo_data();self.statusBar().showMessage("Готово. Материалы и системы загружены из базы данных.")
     def _build_ui(self):
         self.tabs=QTabWidget();self.setCentralWidget(self.tabs);self.calc_view=CalculationView(self.calc_service);self.calc_view.set_settings(self.settings);self.calc_view.set_engineering_context(self._engineering_context);self.scenario_view=CalculationScenarioView(self.scenario_service);self.scenario_view.set_engineering_context(self._engineering_context);self.rec_view=RecommendationView(self.rec_service);self.cmp_view=ComparisonView(self.calc_service);self.two_component_view=TwoComponentView();self.materials_view=MaterialsView(self._materials);self.history_view=HistoryView();self.systems_view=SystemsView(self._materials);self.settings_view=SettingsView(self.settings);self.book_search_view=BookSearchView(Path(__file__).resolve().parents[3]/"books");self.inspection_view=InspectionView();self.catalog_review_view=SystemCatalogReviewView(Path(__file__).resolve().parents[3]/"books",self._materials)
         self.tabs.addTab(self.calc_view,"Расчёт");self.tabs.addTab(self.scenario_view,"Сценарий");self.tabs.addTab(self.rec_view,"Рекомендации");self.tabs.addTab(self.cmp_view,"Сравнение");self.tabs.addTab(self.two_component_view,"2К-информация");self.tabs.addTab(self.materials_view,"База материалов");self.tabs.addTab(self.systems_view,"Системы");self.tabs.addTab(self.catalog_review_view,"Каталог систем");self.tabs.addTab(self.history_view,"История");self.tabs.addTab(self.book_search_view,"Инженерная БД");self.tabs.addTab(self.inspection_view,"Инспекция");self.tabs.addTab(self.settings_view,"Настройки")
@@ -78,8 +79,11 @@ class MainWindow(QMainWindow):
         model=context.normative_model
         if model is None:self.statusBar().showMessage("Инженерный контекст обновлён: нормативная модель не выбрана; отсутствующие правила остаются UNKNOWN.",10000)
         else:self.statusBar().showMessage(f"Инженерный контекст обновлён: модель {model.model_id} v{model.version}; правила без источника остаются UNKNOWN.",10000)
-    def _load_demo_data(self):self.calc_view.set_materials(self._materials);self.calc_view.set_systems(self._systems);self.scenario_view.set_systems(self._systems);self.rec_view.set_systems(self._systems)
-    def _refresh_system_catalog(self):self._systems=_load_systems_from_db(self._materials,_demo_systems());self.calc_view.set_systems(self._systems);self.scenario_view.set_systems(self._systems);self.rec_view.set_systems(self._systems)
+    def _load_scenario_templates(self):return self.template_service.load_systems(self._materials)
+    def _load_demo_data(self):
+        self.calc_view.set_materials(self._materials);self.calc_view.set_systems(self._systems);self.scenario_view.set_systems(self._load_scenario_templates());self.rec_view.set_systems(self._systems)
+    def _refresh_system_catalog(self):
+        self._systems=_load_systems_from_db(self._materials,_demo_systems());self.calc_view.set_systems(self._systems);self.scenario_view.set_systems(self._load_scenario_templates());self.rec_view.set_systems(self._systems)
     def _on_systems_changed(self):self._refresh_system_catalog();self.statusBar().showMessage(f"Каталог систем обновлён: {len(self._systems)}",5000)
     def _on_settings_changed(self,settings):
         self.settings=settings;self.calc_view.set_settings(settings);self.statusBar().showMessage("Настройки применены к расчёту и экспорту",7000)
