@@ -118,12 +118,21 @@ class LayerCompatibilityReport:
 
     @property
     def blocking_transitions(self) -> tuple[LayerTransitionResult, ...]:
-        """Backward-compatible alias for explicitly forbidden transitions.
+        """Transitions that prevent an unconditional compatibility pass.
 
-        WARNING and UNKNOWN are not blockers: they require engineering review
-        rather than being converted into an automatic prohibition.
+        UNKNOWN is included because a missing source entry cannot be promoted
+        to compatibility. It is a review blocker, not an invented prohibition:
+        the caller must resolve the evidence before declaring the system
+        compatible. WARNING remains non-blocking and preserves its source note.
         """
-        return self.forbidden_transitions
+        return tuple(
+            transition
+            for transition in self.transitions
+            if transition.status in {
+                CompatibilityStatus.UNKNOWN,
+                CompatibilityStatus.FORBIDDEN,
+            }
+        )
 
 
 class LayerCompatibilityEngine:
@@ -186,6 +195,14 @@ class LayerCompatibilityEngine:
         """Check an already calculated system without recalculating it."""
         layers = [LayerDefinition(material=layer.material) for layer in result.layers]
         return self.check_layers(layers, contexts=contexts)
+
+    def report(
+        self,
+        result: SystemCalculationResult,
+        contexts: Sequence[LayerCompatibilityContext] | None = None,
+    ) -> LayerCompatibilityReport:
+        """CompatibilityService-facing alias for an already calculated result."""
+        return self.check_result(result, contexts=contexts)
 
     def check_material_sequence(
         self,
