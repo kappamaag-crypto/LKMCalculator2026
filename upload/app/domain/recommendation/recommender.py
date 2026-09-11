@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Optional, Sequence, Callable
 
 from app.domain.models import CoatingSystem, ObjectData, Material, RecommendationItem, RecommendationResult, SystemCalculationResult
 from app.domain.calculator import SystemCalculator
+from app.domain.layer_compatibility import LayerCompatibilityEngine
 from app.domain.recommendation.rules import filter_systems, FilterResult
 from app.domain.recommendation.scorer import score_system, ScoreWeights, ScoreBreakdown
 
@@ -21,10 +21,11 @@ class RecommendationEngine:
         "требованиями и применимыми нормативными документами."
     )
 
-    def __init__(self, calculator: Optional[SystemCalculator] = None, weights: Optional[ScoreWeights] = None, materials_provider: Optional[Callable[[], dict[int, Material]]] = None):
+    def __init__(self, calculator: Optional[SystemCalculator] = None, weights: Optional[ScoreWeights] = None, materials_provider: Optional[Callable[[], dict[int, Material]]] = None, compatibility_engine: Optional[LayerCompatibilityEngine] = None):
         self.calculator = calculator or SystemCalculator()
         self.weights = weights or ScoreWeights()
         self.materials_provider = materials_provider
+        self.compatibility = compatibility_engine or LayerCompatibilityEngine()
 
     def recommend(self, obj: ObjectData, systems: Sequence[CoatingSystem], calculate_costs: bool = True, top_n: int = 10, require_corrosion: bool = True, require_durability: bool = True) -> RecommendationResult:
         if not systems:
@@ -52,8 +53,6 @@ class RecommendationEngine:
                     calc_result, validation = self.calculator.calculate_from_system(obj, fr.system, materials_by_id, skip_validation=True)
                     if not validation.has_errors and calc_result.layers:
                         calc_map[id(fr.system)] = calc_result
-                        # Неизвестная стоимость не является нулевой стоимостью и
-                        # не должна попадать в min/max нормализацию рейтинга.
                         if calc_result.total_cost_per_m2 is not None:
                             costs.append(calc_result.total_cost_per_m2)
                     else:
@@ -65,6 +64,19 @@ class RecommendationEngine:
         for fr in passed:
             calc = calc_map.get(id(fr.system))
             breakdown = score_system(filter_result=fr, obj=obj, calc_result=calc, all_costs=costs, weights=self.weights, compatibility_ok=True)
+            compatibility_report = self._compatibility_for_system(fr.system, calc)
+            if compatibility_report is not None:
+                breakdown.warnings.extend(
+                    transition.message for transition in compatibility_report.blocking_transitions
+                )
+                if compatibility_report.status.value == "нет подтвержденных данных":
+                    breakdown.limitations.append(
+                        "Совместимость одного или нескольких соседних слоёв не подтверждена source-backed матрицей."
+                    )
+                elif compatibility_report.status.value == "предупреждение":
+                    breakdown.warnings.append(
+                        "Есть переходы со специальным условием совместимости; проверить первичный источник/TDS."
+                    )
             scored.append((fr, breakdown, calc))
         scored.sort(key=lambda x: x[1].total, reverse=True)
 
@@ -73,6 +85,20 @@ class RecommendationEngine:
             items.append(RecommendationItem(system=fr.system, score=breakdown.total, rank=rank, status=getattr(breakdown, "status", "Подходит"), reasons=breakdown.reasons, warnings=breakdown.warnings, limitations=breakdown.limitations))
 
         return RecommendationResult(object_data=obj, items=items, insufficient_data=False, message=f"Найдено подходящих систем: {len(passed)} из {len(systems)}", disclaimer=self.DISCLAIMER)
+
+    def _compatibility_for_system(self, system: CoatingSystem, calc: Optional[SystemCalculationResult]):
+        """Return compatibility only when layer materials are resolved.
+
+        Recommendation ranking is not silently changed by an UNKNOWN result.
+        Source-backed warnings are surfaced as explanation/limitation instead.
+        """
+        if calc is not None and calc.layers:
+            return self.compatibility.check_result(calc)
+        layers = getattr(system, "layers", None) or ()
+        materials = [getattr(layer, "material", None) for layer in layers]
+        if len(materials) < 2 or any(material is None for material in materials):
+            return None
+        return self.compatibility.check_material_sequence(materials)
 
     def format_report(self, result: RecommendationResult) -> str:
         lines = [
