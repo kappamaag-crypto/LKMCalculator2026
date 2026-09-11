@@ -146,22 +146,6 @@ Still open:
 ## §24 — Chemical resistance (source-backed only)
 
 Done:
-- `domain/chemical_resistance.py` — pure checklist: ambient, surface, per-material technology limits;
-- status READY / BLOCKED / INCOMPLETE; missing data = UNKNOWN (no default 3 °C dew-point margin);
-- `CalculationService.run_pre_application_check` service entry;
-- unit tests `test_pre_application.py` (8 cases);
-- `ui/dialogs/pre_application_dialog.py` — read-only checklist dialog bound to the latest `SystemCalculationResult`, with explicit re-check;
-- `MainWindow` menu entry `Инженерное → Pre-Application Check…`;
-- `tests/test_pre_application_dialog_smoke.py` — headless rendering/UNKNOWN smoke.
-
-Still open:
-- фактический pytest-run (отложен согласно текущему правилу плана);
-- full E2E with confirmed templates, verified TDS sources and inspection workflow;
-- broader acceptance evidence before marking §23 `ВЫПОЛНЕНО`.
-
-## §24 — Chemical resistance (source-backed only)
-
-Done:
 - `domain/chemical_resistance.py` — ChemicalAgent, ChemicalResistanceRule, check_chemical_resistance;
 - outcome RESISTANT / NOT_RESISTANT only when status=KNOWN + NormativeSource; else UNKNOWN;
 - no inference from binder type / corrosion category;
