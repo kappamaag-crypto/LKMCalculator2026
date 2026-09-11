@@ -40,12 +40,38 @@ def _system_header(key: str) -> bool:
     return any(x in key for x in ("система", "марка", "обозначение", "system"))
 
 def _read(source: BookSource, root: Path) -> tuple[SystemRowCandidate, ...]:
+    result: list[SystemRowCandidate] = []
+    suffix = source.suffix
+    if suffix == ".xls":
+        try:
+            import xlrd
+        except ImportError as exc:
+            raise RuntimeError("Legacy XLS import requires xlrd") from exc
+        book = xlrd.open_workbook(root / source.relative_path, on_demand=True)
+        sheets = ((sheet.name, sheet.nrows, sheet.ncols, lambda r, s=sheet: s.row_values(r)) for sheet in book.sheets())
+        for sheet_name, nrows, ncols, row_reader in sheets:
+            if not nrows:
+                continue
+            first = row_reader(0)
+            headers = tuple(_norm(v) for v in first)
+            keys = tuple(_key(v) for v in first)
+            material_cols = tuple(i for i, k in enumerate(keys) if _material_header(k))
+            system_cols = tuple(i for i, k in enumerate(keys) if _system_header(k))
+            for row_no in range(1, nrows):
+                cells = tuple(_norm(v) for v in row_reader(row_no))
+                pairs = tuple((headers[i] or f"column_{i + 1}", cells[i]) for i in range(min(ncols, len(cells))) if cells[i])
+                if not pairs or not (system_cols or material_cols):
+                    continue
+                mats = tuple(MaterialCandidate(cells[i], source.relative_path, sheet_name, row_no + 1, source.sha256) for i in material_cols if i < len(cells) and cells[i])
+                result.append(SystemRowCandidate(source.relative_path, sheet_name, row_no + 1, pairs, mats, source.sha256))
+        book.release_resources()
+        return tuple(result)
+
     try:
         from openpyxl import load_workbook
     except ImportError as exc:
         raise RuntimeError("Spreadsheet import requires openpyxl") from exc
     wb = load_workbook(root / source.relative_path, read_only=True, data_only=False)
-    result: list[SystemRowCandidate] = []
     try:
         for ws in wb.worksheets:
             rows = ws.iter_rows(values_only=True)
@@ -57,8 +83,6 @@ def _read(source: BookSource, root: Path) -> tuple[SystemRowCandidate, ...]:
             keys = tuple(_key(v) for v in first)
             material_cols = tuple(i for i, k in enumerate(keys) if _material_header(k))
             system_cols = tuple(i for i, k in enumerate(keys) if _system_header(k))
-            if not any(headers):
-                continue
             for row_no, row in enumerate(rows, 2):
                 cells = tuple(_norm(v) for v in row)
                 pairs = tuple((headers[i] or f"column_{i + 1}", cells[i]) for i in range(min(len(headers), len(cells))) if cells[i])
@@ -71,9 +95,9 @@ def _read(source: BookSource, root: Path) -> tuple[SystemRowCandidate, ...]:
     return tuple(result)
 
 def discover_system_catalogues(books_root: Path) -> tuple[SystemRowCandidate, ...]:
-    """Discover XLSX-family ``Системы 1–4`` rows without database writes."""
+    """Discover ``Системы 1–4`` rows without database writes."""
     sources = index_books(books_root)
-    selected = tuple(s for s in sources if s.suffix in {".xlsx", ".xlsm", ".xltx", ".xltm"} and Path(s.relative_path).stem.casefold().startswith("системы"))
+    selected = tuple(s for s in sources if s.suffix in {".xls", ".xlsx", ".xlsm", ".xltx", ".xltm"} and Path(s.relative_path).stem.casefold().startswith("системы"))
     result: list[SystemRowCandidate] = []
     for source in selected:
         result.extend(_read(source, books_root))
