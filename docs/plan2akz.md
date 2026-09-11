@@ -36,7 +36,7 @@
 | 14 | ЧАСТИЧНО | All 10 SPKEFFA catalog docs have KNOWN rules + full service/UI wiring (template, calc, recommend default, History). Broader E2E acceptance remains. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; полная scoring остаётся. |
-| 17 | ЧАСТИЧНО | Inspection domain/service/UI; acceptance позже. |
+| 17 | ЧАСТИЧНО | Inspection domain/service/UI; добавлен DFT UI workflow; acceptance позже. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
 | 19 | ЧАСТИЧНО | Legacy parity matrix; строки PENDING. |
 | 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + controlled incomplete Material. Остаются полное сопоставление и UI acceptance. |
@@ -45,13 +45,13 @@
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. UI/E2E acceptance remains. |
 | 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Catalog of promoted TDS-backed agents and UI remain. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
-| 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests; ExplanationDialog + headless dialog smoke-test; MainWindow now exposes «Пояснение расчёта…» under «Инженерное» and opens it from the last completed calculation. Остаются фактический pytest-run и E2E acceptance. |
+| 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests; ExplanationDialog + headless dialog smoke-test; MainWindow exposes «Пояснение расчёта…». Остаются фактический pytest-run и E2E acceptance. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
 | 29 | ЧАСТИЧНО | Catalogue → draft → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules. |
 | 30 | ВЫПОЛНЕНО | Engineering Decision Log. |
 | 31 | ЧАСТИЧНО | Scenario service/UI + confirmed-template bridge; acceptance remains. |
-| 32 | ЧАСТИЧНО | Domain DFT evaluate + bind into InspectionRecord (dft_points/overall/summary; acceptance not auto-set) + service create_record_with_dft*; 15 tests. UI/E2E remain. |
+| 32 | ЧАСТИЧНО | Domain DFT evaluate + bind into InspectionRecord + service + 15 tests; добавлен UI для ввода DFT-точек, проверки против последнего расчёта и формирования записи с DFT. Остаются фактический pytest-run, полный E2E, multi-layer acceptance policy. |
 
 ## Каталог `Системы 1–4`
 
@@ -73,10 +73,12 @@
 - `explanation.py` — Explanation Engine (source-traceable report for SystemCalculationResult).
 - `explanation_dialog.py` — read-only Qt dialog for ExplanationReport; no engineering logic in UI.
 - `main_window.py` — «Инженерное → Пояснение расчёта…» открывает ExplanationDialog для последнего завершённого расчёта; без расчёта переводит пользователя на экран «Расчёт».
+- `inspection_view.py` — DFT point input, evaluation against latest SystemCalculationResult, and DFT-bound inspection record creation.
 - DFT inspection evaluate + limits_from_calculation_result (§32 partial).
 - LayerResult losses provenance + ResolvedLosses (§26/§28).
 - `test_calculation_view_smoke.py` — headless CalculationView workflow coverage for direct calculation and saved-system restore; test execution remains pending because this connector-only session has no runnable repository checkout.
 - `test_explanation_dialog_smoke.py` — headless ExplanationDialog rendering coverage; test execution remains pending for the same reason.
+- `test_inspection_view_smoke.py` — headless DFT InspectionView evaluation against a calculation result; test execution remains pending for the same reason.
 
 ## TDS verification boundary — §12/§14/§25
 
@@ -156,11 +158,13 @@ Done:
 - `limits_from_calculation_result` from SystemCalculationResult + optional material.recommended_dft_*;
 - InspectionRecord binds `dft_points` / `dft_overall_status` / `dft_summary` via `with_dft_report` (acceptance_status never auto-set from DFT);
 - `InspectionService.evaluate_dft` / `evaluate_dft_against_calculation` / `bind_dft_report` / `create_record_with_dft*`;
-- tests `test_inspection_workflow.py` (15 cases).
+- tests `test_inspection_workflow.py` (15 cases);
+- `ui/views/inspection_view.py` — DFT layer/point/measurement/instrument input; evaluation against the latest completed calculation; creation of an InspectionRecord with the DFT report bound without changing acceptance status;
+- `tests/test_inspection_view_smoke.py` — headless UI workflow smoke.
 
 Still open:
-- UI surface for DFT points and report;
-- full E2E with confirmed templates / standards source;
+- фактический pytest-run (отложен согласно текущему правилу плана);
+- полный E2E с подтверждённым шаблоном/источником НД;
 - multi-layer acceptance aggregation policy beyond current overall status.
 
 ## §28 / §30 — закрыты ранее
