@@ -43,7 +43,7 @@
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | CompatibilityEngine интегрирован; реальные TDS-backed conditions и UI acceptance остаются. |
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. UI/E2E acceptance remains. |
-| 24 | НЕ ВЫПОЛНЕНО | Химическая стойкость только через source-backed rules. |
+| 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Catalog of promoted TDS-backed agents and UI remain. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
@@ -61,14 +61,15 @@
 
 ## Реализованные code stages
 
-- `tds_manifest.py` — `80e75053fc237e4b0c622304f1f502d57050016b`: TDS document/rule verification boundary.
-- `spk_effa_tds_catalog.py` — `cc3fb0f57cff584363bb943ae35ed4085dd8019f`: measured binary SHA-256 catalog for 10 SPKEFFA TDS PDFs.
-- `tds_rule_promotion.py` — `4a2b23f23255c65de148f840efbe4261731fa375`: explicit promote_tds_rule gate; parse_dft_range_um.
+- `tds_manifest.py` — TDS document/rule verification boundary.
+- `spk_effa_tds_catalog.py` — measured binary SHA-256 catalog for 10 SPKEFFA TDS PDFs.
+- `tds_rule_promotion.py` — explicit promote_tds_rule gate; parse_dft_range_um.
 - `tds_known_rules.py` — Tank LP + EFFA 01B + prior Blank rules; longest-hint resolve.
 - `tds_technology_bridge.py` — DFT checks + enrich_filter_result_with_known_tds.
 - `tds_normative_bridge.py` — KNOWN TDS → NormativeModel / EngineeringContext.
-- `loss_profile` / calculator / scenario / system template stages — see prior plan entries.
 - `pre_application.py` — Pre-Application Check READY/BLOCKED/INCOMPLETE.
+- `chemical_resistance.py` — source-backed chemical resistance only.
+- `chemical_resistance_rules.py` — promote gate; empty registry by default.
 
 ## TDS verification boundary — §12/§14/§25
 
@@ -81,7 +82,7 @@ Document KNOWN requires path + binary SHA-256. Rule KNOWN requires explicit prom
 Done:
 - binary SHA-256 document catalog (10 SPKEFFA PDFs);
 - promote gate;
-- KNOWN rules for all catalog documents including **Blank Tank LP** and **EFFA 01B** (verified PDF text + SHA-256);
+- KNOWN rules for all catalog documents including **Blank Tank LP** and **EFFA 01B**;
 - longest-hint material→document resolution;
 - TDS DFT technology bridge;
 - template `tds_verified` evaluation + editor status;
@@ -106,6 +107,21 @@ Done:
 Still open:
 - UI surface for Pre-Application checklist;
 - full E2E with confirmed templates and inspection workflow (§32).
+
+## §24 — Chemical resistance (source-backed only)
+
+Done:
+- `domain/chemical_resistance.py` — ChemicalAgent, ChemicalResistanceRule, check_chemical_resistance;
+- outcome RESISTANT / NOT_RESISTANT only when status=KNOWN + NormativeSource; else UNKNOWN;
+- no inference from binder type / corrosion category;
+- `services/chemical_resistance_rules.py` — promote gate + empty registry by default;
+- `CalculationService.check_chemical_resistance`;
+- tests `test_chemical_resistance.py` (9 cases).
+
+Still open:
+- populate KNOWN rules only after verified TDS/НД excerpts;
+- recommendation filter / UI exposure;
+- concentration–temperature matrix per product family.
 
 ## §28 / §30 — закрыты ранее
 

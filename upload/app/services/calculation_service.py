@@ -21,6 +21,12 @@ from app.domain.pre_application import PreApplicationCheckResult, check_pre_appl
 from app.domain.surface_profile import SurfaceCondition
 from app.services.tds_technology_bridge import check_target_dft_with_known_tds
 from app.services.tds_normative_bridge import engineering_context_from_known_tds, tds_trace_for_material
+from app.domain.chemical_resistance import (
+    ChemicalAgent,
+    ChemicalResistanceCheckResult,
+    check_chemical_resistance,
+)
+from app.services.chemical_resistance_rules import list_known_chemical_resistance_rules
 
 
 class CalculationService:
@@ -143,6 +149,28 @@ class CalculationService:
             trace["layer_number"] = layer.layer_number
             traces.append(trace)
         return traces
+
+    def check_chemical_resistance(
+        self,
+        material_names: Sequence[str],
+        agents: Sequence[ChemicalAgent],
+        *,
+        require_known: bool = False,
+        extra_rules: Sequence | None = None,
+    ) -> ChemicalResistanceCheckResult:
+        """Chemical resistance only via source-backed KNOWN rules (registry + optional extra).
+
+        Empty registry ⇒ UNKNOWN for every pair; never invents resistance.
+        """
+        rules = list(list_known_chemical_resistance_rules())
+        if extra_rules:
+            rules.extend(extra_rules)
+        return check_chemical_resistance(
+            material_names,
+            agents,
+            rules,
+            require_known=require_known,
+        )
 
     def run_pre_application_check(
         self,
