@@ -42,7 +42,7 @@
 | 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + controlled incomplete Material. Остаются полное сопоставление и UI acceptance. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | CompatibilityEngine интегрирован; реальные TDS-backed conditions и UI acceptance остаются. |
-| 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. UI/E2E acceptance remains. |
+| 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. Добавлен read-only UI диалог из последнего расчёта с повторной проверкой и headless smoke. Остаются фактический pytest-run и полный E2E с подтверждёнными шаблонами/источниками НД и inspection workflow (§32). |
 | 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Catalog of promoted TDS-backed agents and UI remain. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
 | 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests; ExplanationDialog + headless dialog smoke-test; MainWindow exposes «Пояснение расчёта…». Остаются фактический pytest-run и E2E acceptance. |
@@ -72,12 +72,15 @@
 - `chemical_resistance_rules.py` — promote gate; empty registry by default.
 - `explanation.py` — Explanation Engine (source-traceable report for SystemCalculationResult).
 - `explanation_dialog.py` — read-only Qt dialog for ExplanationReport; no engineering logic in UI.
+- `pre_application_dialog.py` — read-only Qt surface for Pre-Application status/checklist; reruns the existing service against the latest calculation result.
+- `main_window.py` — «Инженерное → Pre-Application Check…» opens the checklist for the last completed calculation; no calculation => returns user to «Расчёт».
 - `main_window.py` — «Инженерное → Пояснение расчёта…» открывает ExplanationDialog для последнего завершённого расчёта; без расчёта переводит пользователя на экран «Расчёт».
 - `inspection_view.py` — DFT point input, evaluation against latest SystemCalculationResult, and DFT-bound inspection record creation.
 - DFT inspection evaluate + limits_from_calculation_result (§32 partial).
 - LayerResult losses provenance + ResolvedLosses (§26/§28).
 - `test_calculation_view_smoke.py` — headless CalculationView workflow coverage for direct calculation and saved-system restore; test execution remains pending because this connector-only session has no runnable repository checkout.
 - `test_explanation_dialog_smoke.py` — headless ExplanationDialog rendering coverage; test execution remains pending for the same reason.
+- `test_pre_application_dialog_smoke.py` — headless Pre-Application dialog rendering/UNKNOWN preservation coverage; test execution remains pending for the same reason.
 - `test_inspection_view_smoke.py` — headless DFT InspectionView evaluation against a calculation result; test execution remains pending for the same reason.
 
 ## TDS verification boundary — §12/§14/§25
@@ -89,7 +92,7 @@ Document KNOWN requires path + binary SHA-256. Rule KNOWN requires explicit prom
 ## §14/§25 — progress
 
 Done:
-- binary SHA-256 document catalog (10 SPKEFFA PDFs);
+- binary SHA-256 document catalog (10 SPKEFFA TDS PDFs);
 - promote gate;
 - KNOWN rules for all catalog documents including **Blank Tank LP** and **EFFA 01B**;
 - longest-hint material→document resolution;
@@ -111,11 +114,15 @@ Done:
 - `domain/pre_application.py` — pure checklist: ambient, surface, per-material technology limits;
 - status READY / BLOCKED / INCOMPLETE; missing data = UNKNOWN (no default 3 °C dew-point margin);
 - `CalculationService.run_pre_application_check` service entry;
-- unit tests `test_pre_application.py` (8 cases).
+- unit tests `test_pre_application.py` (8 cases);
+- `ui/dialogs/pre_application_dialog.py` — read-only checklist dialog bound to the latest `SystemCalculationResult`, with explicit re-check;
+- `MainWindow` menu entry `Инженерное → Pre-Application Check…`;
+- `tests/test_pre_application_dialog_smoke.py` — headless rendering/UNKNOWN smoke.
 
 Still open:
-- UI surface for Pre-Application checklist;
-- full E2E with confirmed templates and inspection workflow (§32).
+- фактический pytest-run (отложен согласно текущему правилу плана);
+- full E2E with confirmed templates, verified TDS sources and inspection workflow;
+- broader acceptance evidence before marking §23 `ВЫПОЛНЕНО`.
 
 ## §24 — Chemical resistance (source-backed only)
 
