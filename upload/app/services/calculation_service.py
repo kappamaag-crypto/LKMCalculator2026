@@ -27,6 +27,7 @@ from app.domain.chemical_resistance import (
     check_chemical_resistance,
 )
 from app.services.chemical_resistance_rules import list_known_chemical_resistance_rules
+from app.domain.explanation import ExplanationReport, explain_system_calculation, format_explanation_text
 
 
 class CalculationService:
@@ -99,7 +100,7 @@ class CalculationService:
     def compare_systems(
         self,
         obj: ObjectData,
-        systems: Sequence,
+        systems: Sequence[CoatingSystem],
         materials_by_id=None,
     ) -> ComparisonResult:
         return self.comparison.compare(obj, systems, materials_by_id=materials_by_id)
@@ -108,46 +109,42 @@ class CalculationService:
         return self.compatibility.report(result)
 
     def check_system_tds_dft(self, system, materials_by_id=None):
-        out = []
-        for layer in system.layers or ():
-            material = getattr(layer, "material", None)
-            if material is None and materials_by_id is not None:
-                mid = getattr(layer, "material_id", None)
-                if mid is not None:
-                    material = materials_by_id.get(mid)
-            if material is None:
+        """Check target DFT of each layer against known TDS rules when available."""
+        from app.services.tds_known_rules import resolve_material_document
+
+        materials_by_id = materials_by_id or {}
+        findings = []
+        for layer in system.layers:
+            mat = None
+            if layer.material is not None:
+                mat = layer.material
+            elif layer.material_id is not None:
+                mat = materials_by_id.get(layer.material_id)
+            if mat is None:
                 continue
-            out.append((layer.layer_number, check_target_dft_with_known_tds(material, getattr(layer, "target_dft", None))))
-        return out
+            findings.append(
+                check_target_dft_with_known_tds(
+                    mat,
+                    layer.target_dft or layer.dft_min or layer.dft_max,
+                )
+            )
+        return findings
 
     def build_tds_engineering_context(self, system, materials_by_id=None, base=None):
-        names = []
-        for layer in system.layers or ():
-            material = getattr(layer, "material", None)
-            if material is None and materials_by_id is not None:
-                mid = getattr(layer, "material_id", None)
-                if mid is not None:
-                    material = materials_by_id.get(mid)
-            if material is not None:
-                names.append(material.material_name or material.display_name())
-            else:
-                name = getattr(layer, "material_name", None)
-                if name:
-                    names.append(name)
-        return engineering_context_from_known_tds(names, base=base)
+        return engineering_context_from_known_tds(
+            system, materials_by_id=materials_by_id, base=base
+        )
 
     def tds_trace_for_system(self, system, materials_by_id=None):
+        materials_by_id = materials_by_id or {}
         traces = []
-        for layer in system.layers or ():
-            material = getattr(layer, "material", None)
-            if material is None and materials_by_id is not None:
-                mid = getattr(layer, "material_id", None)
-                if mid is not None:
-                    material = materials_by_id.get(mid)
-            name = (material.material_name or material.display_name()) if material else (getattr(layer, "material_name", "") or "")
-            trace = tds_trace_for_material(name)
-            trace["layer_number"] = layer.layer_number
-            traces.append(trace)
+        for layer in system.layers:
+            mat = layer.material
+            if mat is None and layer.material_id is not None:
+                mat = materials_by_id.get(layer.material_id)
+            if mat is None:
+                continue
+            traces.append(tds_trace_for_material(mat))
         return traces
 
     def check_chemical_resistance(
@@ -195,6 +192,17 @@ class CalculationService:
             surface_condition=surface,
             actual_dfts=actual_dfts,
         )
+
+    def explain_calculation(self, result: SystemCalculationResult) -> ExplanationReport:
+        """Explanation Engine: source-traceable объяснение SystemCalculationResult.
+
+        Domain-only logic; no invented values. Missing data → UNKNOWN_DATA.
+        """
+        return explain_system_calculation(result)
+
+    def format_explanation(self, result: SystemCalculationResult) -> str:
+        """Текстовый отчёт Explanation Engine."""
+        return format_explanation_text(explain_system_calculation(result))
 
     def format_summary(self, result: SystemCalculationResult) -> str:
         """Краткая текстовая сводка расчёта, включая расход разбавителя и совместимость."""
