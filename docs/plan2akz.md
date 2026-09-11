@@ -41,7 +41,7 @@
 | 19 | ЧАСТИЧНО | Legacy parity matrix; строки PENDING. |
 | 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + controlled incomplete Material. Остаются полное сопоставление и UI acceptance. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
-| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | CompatibilityEngine интегрирован; реальные TDS-backed conditions и UI acceptance остаются. |
+| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` использует точную матрицу из `books/совместимость_лкм.png` (Таблица 1) с опубликованным источником LKM-Prof; пустая ячейка = UNKNOWN, 1 = WARNING/проверка адгезии, 2 = WARNING/требуется шероховатость. Матрица уже участвует в `CalculationService` summary/UI. Остаются реальные material-specific TDS-backed conditions и полноценный UI/E2E acceptance. |
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. Добавлен read-only UI диалог из последнего расчёта с повторной проверкой и headless smoke. Остаются фактический pytest-run и полный E2E с подтверждёнными шаблонами/источниками НД и inspection workflow (§32). |
 | 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Добавлен opt-in hard-filter химстойкости в RecommendationService и тесты; UI диалог/меню уже есть; RecommendationView теперь передаёт явную химсреду в hard-filter. Остаются каталог KNOWN TDS-backed agents и concentration–temperature matrix. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
@@ -80,6 +80,8 @@
 - `recommendation_view.py` — optional chemical-agent/concentration/temperature inputs wired to the source-backed recommendation filter; ScoreBreakdown rendered in recommendation details.
 - `recommender.py` — RecommendationItem retains ScoreBreakdown; text report exposes factor-level scoring.
 - `inspection_view.py` — DFT point input, evaluation against latest SystemCalculationResult, and DFT-bound inspection record creation.
+- `compatibility.py` — source-backed LKM-Prof Table 1 matrix snapshot from `books/совместимость_лкм.png`; blank cells remain UNKNOWN.
+- `calculation_service.py` — calculation summary now reports the source-backed compatibility status and each adjacent layer transition with source URL.
 - DFT inspection evaluate + limits_from_calculation_result (§32 partial).
 - LayerResult losses provenance + ResolvedLosses (§26/§28).
 - `test_calculation_view_smoke.py` — headless CalculationView workflow coverage for direct calculation and saved-system restore; test execution remains pending because this connector-only session has no runnable repository checkout.
@@ -89,6 +91,8 @@
 - `test_chemical_resistance_dialog_smoke.py` — headless ChemicalResistanceDialog UNKNOWN-preservation smoke; test execution remains pending for the same reason.
 - `test_recommendation_chemical_filter.py` — opt-in recommendation hard-filter coverage for UNKNOWN/RESISTANT/NOT_RESISTANT and explicit concentration limits; test execution remains pending for the same reason.
 - `test_recommendation_view_smoke.py` — headless RecommendationView chemical-filter input smoke and ScoreBreakdown rendering assertions; test execution remains pending for the same reason.
+- `test_compatibility_source_matrix.py` — regression lock for all 18×17 source cells and source identity; test execution remains pending for the same reason.
+- `test_calculation_summary_compatibility.py` — calculation-summary compatibility reporting smoke; test execution remains pending for the same reason.
 
 ## TDS verification boundary — §12/§14/§25
 
