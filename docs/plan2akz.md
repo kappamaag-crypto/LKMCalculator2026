@@ -39,7 +39,7 @@
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI; добавлен DFT UI workflow; acceptance позже. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
 | 19 | ЧАСТИЧНО | Legacy parity matrix; строки PENDING. |
-| 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + controlled incomplete Material. Добавлены source-preserving SystemBookImporter (SHA-256 + row cells) и явный SystemBookMapper (только назначенные колонки → DRAFT SystemTemplateDraft, tds_verified=UNKNOWN). Сырые книги имеют side-by-side layout слоёв — полное сопоставление и UI acceptance остаются. |
+| 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + controlled incomplete Material. SystemBookImporter + SystemBookMapper + SystemBookSideBySideMapper (reviewed SYSTEMS2_AKZ_SIDE_BY_SIDE → DRAFT, tds_verified=UNKNOWN; non-numeric DFT=None). Остаются layouts остальных листов/книг, UI review acceptance, TDS gate. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` использует точную матрицу из `books/совместимость_лкм.png` (Таблица 1) с опубликованным источником LKM-Prof; пустая ячейка = UNKNOWN, 1 = WARNING/проверка адгезии, 2 = WARNING/требуется шероховатость. Матрица участвует в `CalculationService` summary/UI, source identity зафиксирована в коде и regression-test. Остаются реальные material-specific TDS-backed conditions и полноценный UI/E2E acceptance. |
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. Добавлен read-only UI диалог из последнего расчёта с повторной проверкой и headless smoke. Остаются фактический pytest-run и полный E2E с подтверждёнными шаблонами/источниками НД и inspection workflow (§32). |
@@ -62,7 +62,8 @@
 Staging boundary (v3):
 - `SystemBookImporter` читает только сырые ячейки + identity (path/SHA-256); не угадывает колонки.
 - `SystemBookMapper` принимает **явную** `SystemBookColumnMap` и строит только `DRAFT` `SystemTemplateDraft` с provenance; `tds_verified=UNKNOWN` до review/TDS gate.
-- Сырые листы АКЗ/ОГЗ имеют side-by-side layout слоёв (не один слой = одна строка) — полное reviewed mapping и UI acceptance остаются открытыми.
+- `SystemBookSideBySideMapper` + reviewed `SYSTEMS2_AKZ_SIDE_BY_SIDE`: одна строка данных → один DRAFT с последовательными слоями; «-» = слой пропущен; нечисловая толщина → DFT UNKNOWN; без auto-CONFIRM.
+- Остальные листы/книги (ОГЗ, Системы 1/3/4) и UI review acceptance остаются открытыми.
 
 ## Реализованные code stages
 
@@ -101,6 +102,7 @@ Staging boundary (v3):
 - `system_book_importer.py` — source-preserving reader for books/Системы 1–4 (xls/xlsx); binary SHA-256 + sheet/row/cells; no column semantics inferred.
 - `system_book_mapping.py` — explicit SystemBookColumnMap → DRAFT SystemTemplateDraft (provenance + tds_verified=UNKNOWN); invalid layer/number rejected.
 - `test_system_book_mapping.py` / prior importer tests — unit coverage for provenance and UNKNOWN DFT preservation.
+- `SystemBookSideBySideMapper` + `SYSTEMS2_AKZ_SIDE_BY_SIDE` — reviewed side-by-side expand for Системы 2 / АКЗ; 5 unit tests + real-sheet smoke (14 DRAFT rows).
 
 ## TDS verification boundary — §12/§14/§25
 
