@@ -205,6 +205,7 @@ class SystemTemplateEditorView(QWidget):
             layers=tuple(layers), notes=self._draft.notes, status="REVIEW",
             metadata=dict(self._draft.metadata),
         )
+        draft = SystemTemplateService.with_tds_verification(draft, self._materials)
         draft.validate()
         return draft
 
@@ -213,8 +214,18 @@ class SystemTemplateEditorView(QWidget):
             draft = self._current_draft()
             if draft is None:
                 raise ValueError("Нет draft")
+            self._draft = SystemTemplateDraft(
+                name=draft.name, manufacturer=draft.manufacturer, description=draft.description,
+                substrate=draft.substrate, source_path=draft.source_path, source_sheet=draft.source_sheet,
+                source_row=draft.source_row, source_sha256=draft.source_sha256, layers=draft.layers,
+                notes=draft.notes, status=draft.status, metadata=dict(draft.metadata),
+            )
+            self._show_provenance(self._draft)
             ok, reasons = SystemTemplateService.can_confirm(draft)
-            self.status.setText("ГОТОВ К CONFIRM" if ok else "Review: " + "; ".join(reasons))
+            tds = draft.metadata.get("tds_verified", "UNKNOWN")
+            self.status.setText(
+                f"TDS={tds}; " + ("ГОТОВ К CONFIRM" if ok else "Review: " + "; ".join(reasons))
+            )
             self.btn_confirm.setEnabled(ok)
         except Exception as exc:
             self.status.setText(f"Review: {exc}")
