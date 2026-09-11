@@ -45,7 +45,7 @@
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. UI/E2E acceptance remains. |
 | 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Catalog of promoted TDS-backed agents and UI remain. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
-| 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests; добавлен ExplanationDialog и headless dialog smoke-test. UI теперь имеет инженерный пункт «Пояснение расчёта» в отдельном диалоге; остаётся фактический pytest-run и E2E acceptance. |
+| 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests; ExplanationDialog + headless dialog smoke-test; MainWindow now exposes «Пояснение расчёта…» under «Инженерное» and opens it from the last completed calculation. Остаются фактический pytest-run и E2E acceptance. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
 | 29 | ЧАСТИЧНО | Catalogue → draft → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules. |
@@ -72,6 +72,7 @@
 - `chemical_resistance_rules.py` — promote gate; empty registry by default.
 - `explanation.py` — Explanation Engine (source-traceable report for SystemCalculationResult).
 - `explanation_dialog.py` — read-only Qt dialog for ExplanationReport; no engineering logic in UI.
+- `main_window.py` — «Инженерное → Пояснение расчёта…» открывает ExplanationDialog для последнего завершённого расчёта; без расчёта переводит пользователя на экран «Расчёт».
 - DFT inspection evaluate + limits_from_calculation_result (§32 partial).
 - LayerResult losses provenance + ResolvedLosses (§26/§28).
 - `test_calculation_view_smoke.py` — headless CalculationView workflow coverage for direct calculation and saved-system restore; test execution remains pending because this connector-only session has no runnable repository checkout.
@@ -140,12 +141,12 @@ Done:
 - LayerResult.losses_source / losses_profile_name / losses_note; ResolvedLosses in calculator;
 - tests `test_explanation.py` (17 cases, including EXPLICIT/PROFILE/DEFAULT provenance);
 - `ui/dialogs/explanation_dialog.py` — read-only source-traceable report dialog;
-- `tests/test_explanation_dialog_smoke.py` — headless rendering assertions.
+- `tests/test_explanation_dialog_smoke.py` — headless rendering assertions;
+- `ui/main_window.py` — menu `Инженерное → Пояснение расчёта…` invokes `CalculationService.explain_calculation` for the last completed calculation and presents `ExplanationDialog`; when no result exists, the user is sent to the calculation tab.
 
 Still open:
 - фактический pytest-run (отложен согласно текущему правилу плана);
-- полный E2E acceptance;
-- проверка доступа к Explanation UI из рабочего процесса расчёта остаётся отдельной acceptance-задачей, если потребуется не только инженерное меню.
+- полный E2E acceptance.
 
 ## §32 — Inspection / DFT workflow
 
