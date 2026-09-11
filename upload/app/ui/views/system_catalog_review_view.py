@@ -1,7 +1,7 @@
 """Review/staging UI for the tabular ``Системы 1–4`` catalogue.
 
-The view is deliberately review-first: spreadsheet rows are never written to the
-material/system database. Spreadsheet data is catalogue evidence only, not TDS.
+Spreadsheet rows remain evidence only. Material creation and System Template
+confirmation are explicit user actions and never happen implicitly on import.
 """
 from __future__ import annotations
 
@@ -11,19 +11,25 @@ import re
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget,
     QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QGroupBox,
-    QTextEdit,
+    QTextEdit, QInputDialog,
 )
 
 from app.domain.models import Material
+from app.domain.enums import MaterialType, BinderType
 from app.services.system_catalog_importer import (
     discover_system_catalogues,
     unique_material_candidates,
     SystemRowCandidate,
 )
+from app.services.system_template_service import SystemTemplateService
+from app.services.system_template_persistence_service import SystemTemplatePersistenceService
+from app.ui.views.system_template_editor_view import SystemTemplateEditorView
+from app.infrastructure.database.engine import get_session_factory
+from app.infrastructure.database.repositories import MaterialRepository
 
 
 class SystemCatalogReviewView(QWidget):
-    """Read-only staging/review of system catalogue rows and material matches."""
+    """Review catalogue rows, create incomplete materials explicitly, edit drafts."""
 
     def __init__(self, books_root: Path, materials: list[Material], parent=None):
         super().__init__(parent)
@@ -51,9 +57,9 @@ class SystemCatalogReviewView(QWidget):
         root.addLayout(top)
 
         note = QLabel(
-            "Режим Review/Staging: данные Excel только сопоставляются с БД. "
-            "Автоматического сохранения материалов или систем нет. Значения, "
-            "которых нет в источнике, не заполняются и остаются UNKNOWN."
+            "Review/Staging: Excel не является TDS/нормативом. Автоматических "
+            "INSERT/UPDATE нет. Создание неполной карточки, выбор материала и "
+            "подтверждение System Template выполняются только отдельными действиями."
         )
         note.setWordWrap(True)
         root.addWidget(note)
@@ -73,6 +79,16 @@ class SystemCatalogReviewView(QWidget):
         self.rows_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         self.rows_table.itemSelectionChanged.connect(self._show_row_details)
         rows_layout.addWidget(self.rows_table)
+
+        actions = QHBoxLayout()
+        self.btn_open_editor = QPushButton("Открыть как System Template")
+        self.btn_open_editor.clicked.connect(self._open_selected_draft)
+        self.btn_create_material = QPushButton("Создать неполный Material")
+        self.btn_create_material.clicked.connect(self._create_incomplete_material)
+        actions.addWidget(self.btn_open_editor)
+        actions.addWidget(self.btn_create_material)
+        actions.addStretch()
+        rows_layout.addLayout(actions)
         root.addWidget(rows_box, 1)
 
         materials_box = QGroupBox("Кандидаты материалов")
@@ -96,8 +112,13 @@ class SystemCatalogReviewView(QWidget):
         details_layout.addWidget(self.details)
         root.addWidget(details_box)
 
+        self.editor = SystemTemplateEditorView(self._materials, self)
+        self.editor.template_confirmed.connect(self._persist_confirmed_template)
+
     def set_materials(self, materials: list[Material]) -> None:
         self._materials = list(materials)
+        if hasattr(self, "editor"):
+            self.editor.set_materials(self._materials)
         if hasattr(self, "rows_table"):
             self._populate_material_candidates()
 
@@ -128,14 +149,12 @@ class SystemCatalogReviewView(QWidget):
         for row in self._rows:
             table_row = self.rows_table.rowCount()
             self.rows_table.insertRow(table_row)
-            system_text = self._system_text(row)
-            materials_text = "; ".join(c.name for c in row.material_candidates) or "—"
             values = [
                 row.source_path,
                 row.sheet,
                 str(row.row_number),
-                system_text,
-                materials_text,
+                self._system_text(row),
+                "; ".join(c.name for c in row.material_candidates) or "—",
                 row.source_sha256,
             ]
             for col, value in enumerate(values):
@@ -180,11 +199,93 @@ class SystemCatalogReviewView(QWidget):
                 pairs.append(f"{key}: {value}")
         return "; ".join(pairs) or "UNKNOWN"
 
-    def _show_row_details(self) -> None:
+    def _selected_row(self) -> SystemRowCandidate | None:
         index = self.rows_table.currentRow()
-        if index < 0 or index >= len(self._rows):
+        return self._rows[index] if 0 <= index < len(self._rows) else None
+
+    def _open_selected_draft(self) -> None:
+        row = self._selected_row()
+        if row is None:
+            QMessageBox.information(self, "Каталог систем", "Выберите строку каталога.")
             return
-        row = self._rows[index]
+        try:
+            draft = SystemTemplateService.build_draft(row, self._materials)
+            self.editor.load_draft(draft)
+            layout = self.layout()
+            if layout.indexOf(self.editor) < 0:
+                layout.addWidget(self.editor, 2)
+            self.editor.show()
+            self.editor.raise_()
+        except Exception as exc:
+            QMessageBox.warning(self, "System Template", f"Не удалось построить draft:\n{exc}")
+
+    def _create_incomplete_material(self) -> None:
+        row = self._selected_row()
+        if row is None or not row.material_candidates:
+            QMessageBox.information(self, "Material", "Выберите строку с кандидатом материала.")
+            return
+        names = [c.name for c in row.material_candidates]
+        name, ok = QInputDialog.getItem(self, "Неполный Material", "Кандидат:", names, 0, False)
+        if not ok or not name.strip():
+            return
+
+        matches = [m for m in self._materials if self._norm(m.material_name) == self._norm(name)]
+        if matches:
+            QMessageBox.information(self, "Material", "Материал с таким названием уже есть в текущей БД.")
+            return
+
+        candidate = next(c for c in row.material_candidates if c.name == name)
+        provenance = (
+            f"Catalogue source: {candidate.source_path}; sheet={candidate.sheet}; "
+            f"row={candidate.row_number}; SHA-256={candidate.source_sha256}"
+        )
+        material = Material(
+            manufacturer="",
+            brand="",
+            material_name=name.strip(),
+            material_type=MaterialType.OTHER,
+            binder_type=BinderType.UNKNOWN,
+            is_incomplete=True,
+            notes=f"Создано вручную из staging-кандидата. {provenance}",
+        )
+        answer = QMessageBox.question(
+            self,
+            "Подтвердить создание",
+            f"Создать неполную карточку Material «{name.strip()}»?\n"
+            "Неизвестные технические, коммерческие и TDS-поля останутся пустыми/UNKNOWN.",
+        )
+        if answer != QMessageBox.Yes:
+            return
+        try:
+            with get_session_factory()() as session:
+                saved = MaterialRepository(session).add(material)
+                session.commit()
+            self._materials.append(saved)
+            self.set_materials(self._materials)
+            self._populate_rows()
+            self._show_row_details()
+            QMessageBox.information(self, "Material", f"Неполная карточка создана: ID {saved.id}.")
+        except Exception as exc:
+            QMessageBox.warning(self, "Material", f"Не удалось создать карточку:\n{exc}")
+
+    def _persist_confirmed_template(self, draft) -> None:
+        try:
+            template_id = SystemTemplatePersistenceService().save_confirmed(draft)
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                "System Template",
+                f"Подтверждённый draft не сохранён:\n{exc}\n\n"
+                "Для persistence требуется подтверждённая TDS applicability (KNOWN).",
+            )
+            return
+        QMessageBox.information(self, "System Template", f"Система сохранена. Template ID: {template_id}")
+        self.details.setPlainText(f"System Template сохранён: ID {template_id}")
+
+    def _show_row_details(self) -> None:
+        row = self._selected_row()
+        if row is None:
+            return
         lines = [
             f"Источник: {row.source_path}",
             f"Лист: {row.sheet}",
