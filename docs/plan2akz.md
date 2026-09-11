@@ -35,13 +35,13 @@
 | 13 | ЧАСТИЧНО | `SurfacePreparation`, `SurfaceProfile`, `SurfaceCondition` + serializer и History snapshot v7 реализованы. `CalculationView` хранит/восстанавливает typed surface context; legacy fallback сохранён. В UI есть редактор подготовки/профиля и источников. Без источника assessment остаётся `UNKNOWN`. Acceptance отложен. |
 | 14 | НЕ ВЫПОЛНЕНО | Полная TDS-backed technological validation. Начинать после появления проверяемого source-backed rule pipeline. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
-| 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; теперь `RecommendationEngine` дополнительно прогоняет прошедшие системы через `LayerCompatibilityEngine` и переносит source-backed переходы в warnings/limitations. Ранжирование не меняется из-за `UNKNOWN`; environment/technology/весовые настройки и полноценная compatibility scoring остаются. |
+| 16 | ЧАСТИЧНО | Legacy recommendation hard-filter/score; `RecommendationEngine` дополнительно прогоняет разрешённые системы через `LayerCompatibilityEngine` и переносит source-backed warnings/limitations. `UNKNOWN` и отсутствие подтверждённого правила не изменяют ranking; environment/technology/весовые настройки и полноценная compatibility scoring остаются. |
 | 17 | НЕ ВЫПОЛНЕНО | Inspection workflow. |
 | 18 | НЕ ВЫПОЛНЕНО | Release/regression/smoke/DB backup/docs acceptance. |
 | 19 | НЕ ВЫПОЛНЕНО | Legacy parity matrix. |
 | 20 | ЧАСТИЧНО | `book_index.py` индексирует source identity/integrity файлов `books/`; `book_content_index.py` извлекает searchable content из PDF и UTF-8 text-like файлов в source-linked chunks с path/SHA-256/locator; `BookSearchService` имеет DB-backed persistence/search; `BookSearchView` подключён отдельной вкладкой и меню, показывает source/locator/SHA-256, а выбранный источник можно передать в инженерный контекст как `UNKNOWN` source identity без создания нормативного значения. Остаются acceptance/visual smoke и более глубокая интеграция KB с инженерными решениями. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix есть; applicability к реальной chemistry/TDS остаётся. |
-| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` подключён к `CalculationService.format_summary()` и напрямую к `SystemsView`: редактор показывает source-backed статус и переходы, обновляя их при изменении слоёв. Дополнительно `RecommendationEngine` теперь учитывает результат compatibility как объяснение/предупреждение без изменения ranking при `UNKNOWN`. Остаются UI regression/acceptance и TDS-backed conditions. |
+| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` подключён к `CalculationService.format_summary()` и напрямую к `SystemsView`: редактор показывает source-backed статус и переходы, обновляя их при изменении слоёв. `RecommendationEngine` также переносит compatibility warnings/limitations без изменения ranking. Семантика уточнена: только явно запрещённый source-backed переход является blocker; `WARNING` и `UNKNOWN` требуют инженерной проверки и не превращаются в автоматический запрет. Остаются UI regression/acceptance и TDS-backed conditions. |
 | 23 | НЕ ВЫПОЛНЕНО | — |
 | 24 | НЕ ВЫПОЛНЕНО | — |
 | 25 | НЕ ВЫПОЛНЕНО | — |
@@ -85,15 +85,19 @@ Code commit: `d4db7ee7c87478a280de79412fc86dd176ddb8a7` — `SystemsView` пол
 ### §16/§22 — Recommendation compatibility explanation
 Code commit: `99c1643d0a823963e730df730ff73864860ec2f5` — `RecommendationEngine` получает `LayerCompatibilityEngine`, проверяет resolved layers прошедших hard-filter систем и переносит source-backed compatibility warnings/limitations в `RecommendationItem`; `UNKNOWN` не меняет ranking.
 
+### §22 — Compatibility status semantics
+Code commits: `1817249358e613bd753a431c617f7a35f24dd881`, `063ef315cd37d6bbcf1bad45d3e15bcf72db519b` — `LayerCompatibilityReport` разделяет `WARNING`, `UNKNOWN` и явно `FORBIDDEN`; `blocking_transitions` сохранён как обратимо-совместимый alias только для `FORBIDDEN`. Recommendation workflow больше не трактует WARNING/UNKNOWN как blockers.
+
 ## §22 — Критическое ограничение
-Не закрывать §22 до фактического подключения `LayerCompatibilityEngine` к пользовательскому workflow расчёта/системы.
+Не закрывать §22 до фактического пользовательского acceptance.
 
 Минимум для закрытия:
 1. интеграция проверки в `CalculationView` — выполнена через `CalculationService.format_summary()`;
 2. интеграция проверки в `SystemsView`/редактор системы — выполнена в code commit `d4db7ee7c87478a280de79412fc86dd176ddb8a7`;
 3. UI regression на положительный, отрицательный и `UNKNOWN` сценарии — остаётся;
 4. условия `previous_is_cured`, `recoat_elapsed_h`, `surface_prepared` только если они подтверждены TDS/источником — остаётся в §14;
-5. `UNKNOWN` должен оставаться неизвестным и требовать проверки источника, а не автоматически становиться запретом — выполнено на уровне compatibility workflow.
+5. `UNKNOWN` должен оставаться неизвестным и требовать проверки источника, а не автоматически становиться запретом — выполнено на уровне compatibility workflow;
+6. явно `FORBIDDEN` может считаться blocker только при наличии подтверждённой source-backed записи — реализовано в domain semantics.
 
 ## Порядок продолжения
 1. GitHub Actions не запускать.
@@ -101,8 +105,9 @@ Code commit: `99c1643d0a823963e730df730ff73864860ec2f5` — `RecommendationEngin
 3. §10 не считать закрытым без acceptance-доказательства.
 4. §9 не расширять складской моделью: коммерческая фасовка остаётся без складского учёта.
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
-6. §12/§13: добавлять только фактически проверенные sidecar-манифесты с SHA-256 исходного PDF и без придуманных значений, затем подключить фактический registry к инженерному workflow.
-7. После фактического набора verified rules перейти к §14 TDS-backed technological validation.
-8. §20: DB-backed KB и source handoff созданы. Следующий шаг — acceptance/visual smoke и более глубокая интеграция source-linked материалов в инженерные решения без автоматической генерации нормативных правил.
-9. §22 вести отдельно: SystemsView integration и recommendation explanation выполнены, но UI regression/acceptance и TDS-backed conditions остаются; формально не закрывать до их выполнения.
-10. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
+6. §12/§13: добавлять только фактически проверенные sidecar-манифесты с SHA-256 исходного PDF и без придуманных значений, затем подключать только подтверждённые правила.
+7. §14 начинать только после появления проверяемого source-backed TDS rule pipeline.
+8. §20 продолжать с acceptance/visual smoke и source-linked handoff в инженерные решения; extracted text не превращать автоматически в норматив.
+9. §21 не расширять generic chemistry assumptions; applicability подтверждать TDS/источником.
+10. §22: выполнить UI regression/acceptance позже; не считать WARNING/UNKNOWN запретом и не добавлять TDS-условия без источника.
+11. Затем переходить к §17 → §18 → §19 и оставшимся §23–§32, сохраняя отдельные code/docs commits.
