@@ -56,6 +56,7 @@ def init_db(engine=None) -> None:
     if engine is None:
         engine = get_engine()
     from app.infrastructure.database import models  # noqa: F401
+    from app.infrastructure.database import system_template_models  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
     database = engine.url.database
