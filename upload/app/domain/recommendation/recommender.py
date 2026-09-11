@@ -66,9 +66,6 @@ class RecommendationEngine:
             breakdown = score_system(filter_result=fr, obj=obj, calc_result=calc, all_costs=costs, weights=self.weights, compatibility_ok=True)
             compatibility_report = self._compatibility_for_system(fr.system, calc)
             if compatibility_report is not None:
-                # Only explicitly forbidden source-backed transitions are
-                # blockers. WARNING and UNKNOWN remain engineering review
-                # signals and must not silently alter the recommendation score.
                 breakdown.warnings.extend(
                     transition.message for transition in compatibility_report.warning_transitions
                 )
@@ -92,7 +89,7 @@ class RecommendationEngine:
 
         items: list[RecommendationItem] = []
         for rank, (fr, breakdown, calc) in enumerate(scored[:top_n], start=1):
-            items.append(RecommendationItem(system=fr.system, score=breakdown.total, rank=rank, status=getattr(breakdown, "status", "Подходит"), reasons=breakdown.reasons, warnings=breakdown.warnings, limitations=breakdown.limitations))
+            items.append(RecommendationItem(system=fr.system, score=breakdown.total, breakdown=breakdown, rank=rank, status=getattr(breakdown, "status", "Подходит"), reasons=breakdown.reasons, warnings=breakdown.warnings, limitations=breakdown.limitations))
 
         return RecommendationResult(object_data=obj, items=items, insufficient_data=False, message=f"Найдено подходящих систем: {len(passed)} из {len(systems)}", disclaimer=self.DISCLAIMER)
 
