@@ -4,148 +4,90 @@
 
 ## Правила
 1. Не ломать существующий расчёт.
-2. Инженерная логика находится в domain/service, а не в UI.
+2. Инженерная логика — domain/service, не UI.
 3. Excel не является вторым расчётным движком.
-4. PDF и Excel получают данные из одного `CalculationResult` / `SystemCalculationResult`.
+4. PDF и Excel получают данные из одного результата расчёта.
 5. Инженерные и коммерческие/закупочные данные не смешивать без явного назначения.
-6. Существенный этап должен иметь regression/smoke-проверку.
-7. Каждый существенный этап — отдельный code commit.
-8. После code commit — отдельный docs/plan commit.
-9. `ВЫПОЛНЕНО` ставится только при реализации и проверочном доказательстве.
-10. Отсутствующие/непроверенные данные = `UNKNOWN`; запреты и разрешения не выдумывать.
-11. GitHub Actions не запускать. Тесты пока не запускать; общий прогон выполнить позже.
-12. Репозиторий `kappamaag-crypto/SPKEFFA` используется только как внешний read-only источник TDS. Его не изменять.
+6. Существенный этап требует regression/smoke-проверки до закрытия.
+7. Существенный этап — отдельный code commit; после него — отдельный docs/plan commit.
+8. `ВЫПОЛНЕНО` только при реализации и проверочном доказательстве.
+9. Отсутствующие/непроверенные данные = `UNKNOWN`.
+10. GitHub Actions не запускать. Тесты пока не запускать; общий прогон позже по отдельной команде.
+11. `kappamaag-crypto/SPKEFFA` — только read-only источник TDS; его не изменять.
 
 ## Матрица статуса
 
-| § | Статус | Фактическое состояние / следующий шаг |
+| § | Статус | Состояние / следующий шаг |
 |---|---|---|
 | 1 | ВЫПОЛНЕНО | Базовое ядро расчёта сохранено. |
-| 2 | ЧАСТИЧНО | Динамический редактор есть; остаются совместимость workflow и визуальный smoke. |
-| 3 | ВЫПОЛНЕНО | `AdHocMaterialDialog`: нормализация, duplicate reuse, persistence; regression `42bb7fb`. |
-| 4 | ЧАСТИЧНО | ComparisonEngine/View, 2K и многослойность реализованы; остаются визуальный smoke и source-backed wording check. |
-| 5 | ЧАСТИЧНО | Инженерный Excel и missing-price regression есть; остаётся визуальная/печатаемая проверка. |
-| 6 | ЧАСТИЧНО | PDF строится из `SystemCalculationResult`; multilayer/2K/unknown-price и cross-export regression есть; остаётся визуальный/печать smoke. |
-| 7 | ВЫПОЛНЕНО | Precision/unit invariants и golden cases 2/3/4/5 layers. |
-| 8 | ВЫПОЛНЕНО | 2K считается одним смешанным материалным слоем; TDS technology rules вынесены в §14. |
-| 9 | ЧАСТИЧНО | `PackagingPlanner`: целые упаковки, резерв, опциональная стоимость; складского учёта нет и не добавлять. |
-| 10 | ЧАСТИЧНО | Alembic + SQLite-safe backup/restore; acceptance ещё не выполнен. |
-| 11 | ЧАСТИЧНО | Immutable material snapshots v5, verified reads, integrity hashing; runtime acceptance ещё не выполнен. |
-| 11.1 | ЧАСТИЧНО | Durable notification outbox + opt-in worker/trigger + idempotency + env-only SMTP; runtime/SMTP acceptance ещё не выполнен. |
-| 12 | ЧАСТИЧНО | Engineering context, source identity, History v7 и verified sidecar loader с SHA-256 реализованы; фактический verified rules/manifest ещё не добавлен. |
-| 13 | ЧАСТИЧНО | `SurfacePreparation/Profile/Condition`, serializer, History и UI реализованы; без источника остаётся `UNKNOWN`. Acceptance ещё не выполнен. |
-| 14 | НЕ ВЫПОЛНЕНО | TDS-backed technological validation. Начать с проверенного rule pipeline и TDS из `SPKEFFA` read-only. |
+| 2 | ЧАСТИЧНО | Динамический редактор есть; остаются workflow/UI smoke. |
+| 3 | ВЫПОЛНЕНО | AdHocMaterialDialog, normalisation, duplicate reuse, persistence. |
+| 4 | ЧАСТИЧНО | Comparison/2K/multilayer есть; остаются smoke и source-backed wording. |
+| 5 | ЧАСТИЧНО | Engineering Excel есть; остаётся визуальная/печатаемая проверка. |
+| 6 | ЧАСТИЧНО | PDF из SystemCalculationResult; остаётся visual/print smoke. |
+| 7 | ВЫПОЛНЕНО | Precision/unit invariants и golden multilayer cases. |
+| 8 | ВЫПОЛНЕНО | 2K — один смешанный материалный слой; TDS rules вынесены в §14. |
+| 9 | ЧАСТИЧНО | PackagingPlanner; склада нет и не добавлять. |
+| 10 | ЧАСТИЧНО | Alembic + SQLite backup/restore; acceptance позже. |
+| 11 | ЧАСТИЧНО | Material snapshots/verified reads/integrity hashing; runtime acceptance позже. |
+| 11.1 | ЧАСТИЧНО | Durable notification outbox; runtime/SMTP acceptance позже. |
+| 12 | ЧАСТИЧНО | Engineering context/source identity/History/verified loader; реальные rules ещё не подтверждены. |
+| 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI; acceptance позже. |
+| 14 | НЕ ВЫПОЛНЕНО | TDS-backed technological validation из SPKEFFA read-only. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
-| 16 | ЧАСТИЧНО | Legacy ranking сохранён; compatibility warnings/limitations передаются в recommendations. Полная environment/technology/weight scoring остаётся. |
-| 17 | ЧАСТИЧНО | Inspection domain/service/UI реализованы; runtime/UI acceptance ещё не выполнен. |
-| 18 | ЧАСТИЧНО | Release acceptance checklist есть; evidence пока `PENDING`. |
-| 19 | ЧАСТИЧНО | Legacy parity matrix есть; строки пока `PENDING`. |
-| 20 | ЧАСТИЧНО | KB индексирует source identity/SHA-256 и searchable content. `Системы 1.xls`, `Системы 2.XLSX`, `Системы 3.xlsx`, `Системы 4.xlsx` индексируются; staging importer, Review UI и отдельная вкладка `Каталог систем` добавлены. Draft editor с ручным выбором материала добавлен; остаются controlled creation, UI acceptance и фактическое сопоставление всех строк. |
-| 21 | ЧАСТИЧНО | Source-backed compatibility matrix есть. Таблицы «Системы 1–4» могут давать варианты систем, но не заменяют TDS/норматив. |
-| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` интегрирован в calculation/systems/recommendation workflow. `WARNING`/`UNKNOWN` не являются автоматическим запретом. Остаются UI acceptance и реальные TDS-backed conditions. |
-| 23 | НЕ ВЫПОЛНЕНО | Pre-Application Check: климат, RH, dew point, температуры, recoat, 2K pot life/induction, application, DFT, thinner и ограничения производителя. |
-| 24 | НЕ ВЫПОЛНЕНО | Химическая стойкость и среда эксплуатации только через явные source-backed rules. |
-| 25 | НЕ ВЫПОЛНЕНО | Полная normative traceability: документ, версия, пункт, правило, дата актуальности. |
-| 26 | НЕ ВЫПОЛНЕНО | Explanation Engine для объяснения ranking/filter/ограничений и отсутствующих данных. |
-| 27 | ЧАСТИЧНО | Material Data Quality. Staging показывает candidate materials, duplicate normalization, provenance и статус совпадения с БД. System Template builder, отдельный persistence boundary и draft editor с ручным выбором существующего Material добавлены; controlled creation неполных карточек остаётся. |
-| 28 | НЕ ВЫПОЛНЕНО | Управляемый `LossProfile`: способ нанесения, геометрия, условия, диапазон, источник. |
-| 29 | ЧАСТИЧНО | `Системы 1–4` закреплены как исходный каталог вариантов систем и кандидатов материалов. Staging importer + Review UI + draft System Template model/service + DB persistence schema/repository/service + UI editor с явным CONFIRM реализованы. Подключение CONFIRM→persistence и Calculation Scenarios остаётся. |
-| 30 | НЕ ВЫПОЛНЕНО | Engineering Decision Log, связанный со snapshot расчёта. |
-| 31 | НЕ ВЫПОЛНЕНО | Calculation Scenarios на едином `CalculationService`; варианты из каталога `Системы 1–4` могут стать входом сценариев. |
-| 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow: зоны, проектный/фактический DFT, acceptance, repair/recoat, фото/акты. |
+| 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; полная scoring остаётся. |
+| 17 | ЧАСТИЧНО | Inspection domain/service/UI; acceptance позже. |
+| 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
+| 19 | ЧАСТИЧНО | Legacy parity matrix; строки PENDING. |
+| 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + controlled incomplete Material. Остаются полное сопоставление и UI acceptance. |
+| 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
+| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | CompatibilityEngine интегрирован; реальные TDS-backed conditions и UI acceptance остаются. |
+| 23 | НЕ ВЫПОЛНЕНО | Pre-Application Check. |
+| 24 | НЕ ВЫПОЛНЕНО | Химическая стойкость только через source-backed rules. |
+| 25 | НЕ ВЫПОЛНЕНО | Полная normative traceability. |
+| 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
+| 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
+| 28 | НЕ ВЫПОЛНЕНО | Управляемый LossProfile. |
+| 29 | ЧАСТИЧНО | Catalogue → draft → editor → explicit CONFIRM → persistence boundary реализовано; persistence блокирует UNKNOWN TDS. Calculation Scenarios остаются. |
+| 30 | НЕ ВЫПОЛНЕНО | Engineering Decision Log. |
+| 31 | НЕ ВЫПОЛНЕНО | Calculation Scenarios на едином CalculationService. |
+| 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow. |
 
-## Табличный каталог систем и материалов
+## Каталог `Системы 1–4`
 
-Файлы в `books/`:
-- `Системы 1.xls`
-- `Системы 2.XLSX`
-- `Системы 3.xlsx`
-- `Системы 4.xlsx`
+Файлы в `books/`: `Системы 1.xls`, `Системы 2.XLSX`, `Системы 3.xlsx`, `Системы 4.xlsx`.
 
-Назначение: исходные варианты систем покрытия, названия/идентификаторы материалов и будущие входы System Templates / Calculation Scenarios.
+Каталог является исходным набором вариантов систем и кандидатов материалов, но не TDS/нормативом. Сохраняются file/sheet/row/SHA-256; неизвестное/неоднозначное = `UNKNOWN`; автоматического доказательства применимости нет.
 
-Ограничения: таблицы не являются TDS/нормативом; не подтверждают автоматически пригодность; неизвестное/неоднозначное = `UNKNOWN`; импорт и review выполняются до записи; сохраняются файл/лист/строка/SHA-256; дубликаты нормализуются; TDS остаётся отдельным уровнем верификации.
+## Реализованные code stages
 
-## Реализованные code stages — KB/catalogue ingestion
-
-### `book_content_index.py`
-Commit: `047839b0df403f8ae552394110408b15d219a8c6`
-
-Индексация XLS/XLSX-family с locator `sheet:<лист>!row:<номер>`. Legacy `.xls` читается через отдельный reader-путь.
-
-### `system_catalog_importer.py`
-Commit: `d7fa8f5af2b160da8153fe0bf6d93cbfcb527aae`
-
-Review-first staging importer с `SystemRowCandidate` / `MaterialCandidate`, provenance file/sheet/row/SHA-256, распознаванием явных заголовков и duplicate normalization. Записи в Material/System DB нет.
-
-### Зависимость для legacy XLS
-Commit: `ff1142c35d09c8b10d3aa708a06cb5576de38563`
-
-Добавлен `xlrd>=2.0.1`; `openpyxl` остаётся reader для XLSX-family.
-
-### `system_catalog_review_view.py`
-Commit: `43257fbbbff67fb206b164c5b64baaa0ee347748`
-
-Добавлен Review/Staging UI: строки источника, file/sheet/row/SHA-256, поля строки, кандидаты материалов, совпадения с БД, состояния `НЕ НАЙДЕНО`/`НЕОДНОЗНАЧНО`, детали строки. Автоматических INSERT/UPDATE нет.
-
-### `system_template.py`
-Commit: `d01b0244d46a84e321517a00fe88ed22c3d22187`
-
-Добавлен immutable draft-модель `SystemTemplateDraft` и `TemplateLayer`. Поддержаны статусы `DRAFT`/`REVIEW`/`CONFIRMED`, последовательные слои, DFT-поля, provenance, признаки `has_unknown_materials` и `provenance_complete`. Модель не выполняет persistence.
-
-### `system_template_service.py`
-Commit: `5d610e30669d7842598b74ced9049ce433827af9`
-
-Добавлен `SystemTemplateService`: построение draft из `SystemRowCandidate`, однозначное сопоставление с Material DB, `material_id=None` при отсутствии/неоднозначности, сохранение source provenance и проверка `can_confirm()`. TDS applicability не считается подтверждённой автоматически.
-
-### `system_template_models.py`
-Commit: `127486c04e6a4a06d92d429c943a188ea7fb1eb1`
-
-Добавлены отдельные ORM-таблицы `system_templates` и `system_template_layers`. Хранят статус, material_id, DFT и source provenance; слой требует существующий Material, поэтому неизвестные/неподтверждённые материалы не попадают в confirmed persistence.
-
-### `system_template_repository.py`
-Commit: `b180e757c688eee8ce7e2f9ff083bc524c218108`
-
-Добавлен repository boundary: `add_confirmed()`, поиск по source provenance, чтение и преобразование обратно в draft. Persistence не создаёт Material и не делает автоматический upsert каталога.
-
-### `007_system_templates.py`
-Commit: `75b394567d64bbc33f1f8871e503c5f79c46c6b6`
-
-Добавлена Alembic-схема для confirmed System Templates и слоёв с FK на `materials` и уникальностью source provenance.
-
-### `engine.py`
-Commit: `cb2d6cc7afe2e6a45ee780be4dd7888eea8dbcb5`
-
-ORM System Template регистрируется до `Base.metadata.create_all()`, поэтому новая схема видима обычному SQLite runtime.
-
-### `system_template_persistence_service.py`
-Commit: `da6d542c2a3c1557401ccfcf699b2bdcb42a9e56`
-
-Явная граница `save_confirmed()`: принимает только `CONFIRMED`, требует `tds_verified=KNOWN`, полной provenance и однозначных material_id; при этом не создаёт и не изменяет Material.
-
-### `main_window.py`
-Commit: `c960d9ea6e52f74f46b10a91193c31adbcb6f83b`
-
-`SystemCatalogReviewView` подключён отдельной вкладкой `Каталог систем` и пунктом меню `Инженерное → Каталог систем 1–4…`. При изменении Material DB review view обновляет свои сопоставления.
-
-### `system_template_editor_view.py`
-Commit: `845be44fdbbd6417112cb89e9804b758894e1a3d`
-
-Добавлен отдельный UI редактора `SystemTemplateDraft`: редактирование имени/описания, просмотр слоёв и DFT, ручной выбор существующего Material, отображение source provenance и `TDS verified`, блокировка `CONFIRM` до прохождения `SystemTemplateService.can_confirm()`. Редактор только эмитит подтверждённый draft; запись в БД должна выполняться отдельной persistence boundary.
+- `book_content_index.py` — `047839b0df403f8ae552394110408b15d219a8c6`: индекс XLS/XLSX и locator `sheet:<лист>!row:<номер>`.
+- `system_catalog_importer.py` — `d7fa8f5af2b160da8153fe0bf6d93cbfcb527aae`: review-first staging, candidates, provenance, duplicate normalization.
+- `xlrd` — `ff1142c35d09c8b10d3aa708a06cb5576de38563`: legacy XLS reader dependency.
+- `system_catalog_review_view.py` — `43257fbbbff67fb206b164c5b64baaa0ee347748`: базовый Review/Staging UI.
+- `system_template.py` — `d01b0244d46a84e321517a00fe88ed22c3d22187`: immutable draft model/statuses/DFT/provenance.
+- `system_template_service.py` — `5d610e30669d7842598b74ced9049ce433827af9`: draft builder, DB matching, `can_confirm`.
+- `system_template_models.py` — `127486c04e6a4a06d92d429c943a188ea7fb1eb1`: ORM tables.
+- `system_template_repository.py` — `b180e757c688eee8ce7e2f9ff083bc524c218108`: persistence repository boundary.
+- `007_system_templates.py` — `75b394567d64bbc33f1f8871e503c5f79c46c6b6`: Alembic schema.
+- `engine.py` — `cb2d6cc7afe2e6a45ee780be4dd7888eea8dbcb5`: ORM registration.
+- `system_template_persistence_service.py` — `da6d542c2a3c1557401ccfcf699b2bdcb42a9e56`: explicit CONFIRMED persistence; requires `tds_verified=KNOWN`.
+- `main_window.py` — `c960d9ea6e52f74f46b10a91193c31adbcb6f83b`: catalogue tab/menu and material refresh.
+- `system_template_editor_view.py` — `845be44fdbbd6417112cb89e9804b758894e1a3d`: draft editor, manual Material selection, explicit CONFIRM gate.
+- `system_catalog_review_view.py` — `8b68ce1de37c39608d73a4d2a1699d275aaf4ebb`: selected row → draft/editor, controlled incomplete Material creation, CONFIRM → persistence wiring.
+- `tds_manifest.py` — `80e75053fc237e4b0c622304f1f502d57050016b`: explicit TDS document/rule verification boundary; extracted PDF text is not promoted automatically.
 
 ## §20/§27/§29 — следующий шаг
 
-1. Подтвердить фактическую структуру каждой таблицы/листа локальным чтением; не считать первую строку заголовком без подтверждения.
-2. Для каждого кандидата показывать существующую карточку БД при однозначном совпадении.
-3. Для отсутствующего материала — controlled creation неполной карточки только после ручного подтверждения; неизвестные поля не заполнять.
-4. Для неоднозначного совпадения требовать ручного выбора.
-5. UI редактирования draft реализован: имя системы, слои, материал, DFT и provenance.
-6. Подтверждение draft является отдельным явным действием пользователя.
-7. Передавать подтверждённый draft в `SystemTemplatePersistenceService`; persistence уже защищён от UNKNOWN material/provenance/TDS.
-8. После сохранения Template подключить его к Calculation Scenarios; не создавать второй расчётный движок.
+1. Проверить фактическую структуру каждого листа/строки; не угадывать заголовки.
+2. Сохранить/показать однозначные DB matches.
+3. Для отсутствующего материала использовать только явное создание incomplete Material; неизвестные поля не заполнять.
+4. Для неоднозначного match — ручной выбор.
+5. Редактор draft реализован.
+6. CONFIRM — отдельное действие.
+7. CONFIRM → persistence wiring реализован, но `tds_verified=KNOWN` обязателен.
+8. Следующий крупный этап — Calculation Scenarios на существующем CalculationService.
 
 ## TDS verification boundary — §12/§14/§25
 
-`SPKEFFA` (`kappamaag-crypto/SPKEFFA`) является read-only источником TDS. PDF/страницы каталога могут быть извлечены для подготовки evidence, но извлечённый текст сам по себе не считается verified normative/technology rule.
-
-Для `KNOWN` требуется отдельная запись документа и правила с явным source identity, применимостью и SHA-256. Git blob SHA-1 не заменяет SHA-256 бинарного PDF. Пока фактические SHA-256 бинарных TDS и rule-by-rule verification не введены, соответствующие технологические ограничения остаются `UNKNOWN`.
+`kappamaag-crypto/SPKEFFA` используется только read-only. Git blob SHA-1 не является SHA-256 бинарного PDF. Для `KNOWN` нужны реальный SHA-256 PDF, явный source identity, locator и applicability правила. Пока бинарные SHA-256 и rule-by-rule verification не внесены, технологические ограничения остаются `UNKNOWN`.
