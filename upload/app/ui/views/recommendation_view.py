@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
+    QWidget, QVBoxLayout, QFormLayout, QGroupBox,
     QLabel, QLineEdit, QDoubleSpinBox, QComboBox, QPushButton,
     QListWidget, QListWidgetItem, QTextEdit, QMessageBox, QSplitter,
 )
@@ -112,7 +112,7 @@ class RecommendationView(QWidget):
         right_layout.addWidget(self.list_results)
         self.txt_details = QTextEdit()
         self.txt_details.setReadOnly(True)
-        self.txt_details.setMaximumHeight(200)
+        self.txt_details.setMaximumHeight(260)
         right_layout.addWidget(self.txt_details)
         self.lbl_disclaimer = QLabel()
         self.lbl_disclaimer.setWordWrap(True)
@@ -201,6 +201,19 @@ class RecommendationView(QWidget):
         if self.list_results.count() > 0:
             self.list_results.setCurrentRow(0)
 
+    @staticmethod
+    def _breakdown_lines(item) -> list[str]:
+        breakdown = item.breakdown
+        if breakdown is None:
+            return ["Оценка по факторам: недоступна."]
+        return [
+            f"  • Коррозионная категория: {breakdown.corrosion:.1f}/100",
+            f"  • Долговечность: {breakdown.durability:.1f}/100",
+            f"  • Технологичность: {breakdown.technology:.1f}/100",
+            f"  • Стоимость: {breakdown.cost:.1f}/100",
+            f"  • Итоговый Score: {breakdown.total:.1f}/100",
+        ]
+
     def _on_select(self, row: int) -> None:
         if row < 0 or not self._last_result or row >= len(self._last_result.items):
             return
@@ -208,6 +221,9 @@ class RecommendationView(QWidget):
         lines = [
             f"Система: {item.system.system_name}",
             f"Оценка: {item.score:.0f}/100  (место {item.rank})",
+            "",
+            "Разбивка оценки:",
+            *self._breakdown_lines(item),
             "",
             "Причины рекомендации:",
         ]
