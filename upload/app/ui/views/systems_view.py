@@ -4,14 +4,16 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel,
     QLineEdit, QComboBox, QPushButton, QMessageBox, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView,
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QTextEdit,
 )
 from PySide6.QtCore import Signal
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.domain.models import Material
-from app.domain.enums import MaterialType
+from app.domain.enums import MaterialType, CompatibilityStatus
+from app.domain.layer_compatibility import LayerCompatibilityEngine
+from app.domain.models import LayerDefinition
 from app.infrastructure.database.engine import get_session_factory
 from app.infrastructure.database.models import CoatingSystemORM, CoatingSystemLayerORM
 from app.infrastructure.database.repositories import CoatingSystemRepository
@@ -26,6 +28,7 @@ class SystemsView(QWidget):
         self._systems = []
         self._current_id = None
         self._calculation_result = None
+        self._compatibility = LayerCompatibilityEngine()
         self._build_ui()
         self.set_materials(materials)
         self.reload()
@@ -110,8 +113,27 @@ class SystemsView(QWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.itemChanged.connect(self._renumber)
+        self.table.itemChanged.connect(self._refresh_compatibility)
         lv.addWidget(self.table)
         root.addWidget(layerbox, 1)
+
+        compatibility_box = QGroupBox("Совместимость соседних слоёв")
+        compatibility_layout = QVBoxLayout(compatibility_box)
+        self.lbl_compatibility_status = QLabel("UNKNOWN — добавьте минимум два слоя")
+        self.lbl_compatibility_status.setWordWrap(True)
+        compatibility_layout.addWidget(self.lbl_compatibility_status)
+        self.txt_compatibility = QTextEdit()
+        self.txt_compatibility.setReadOnly(True)
+        self.txt_compatibility.setMinimumHeight(80)
+        compatibility_layout.addWidget(self.txt_compatibility)
+        note = QLabel(
+            "Проверка использует только source-backed матрицу совместимости. "
+            "UNKNOWN не является запретом; условия отверждения/окна перекрытия "
+            "по TDS здесь не выводятся."
+        )
+        note.setWordWrap(True)
+        compatibility_layout.addWidget(note)
+        root.addWidget(compatibility_box)
 
         bottom = QHBoxLayout()
         self.btn_save = QPushButton("Сохранить систему")
@@ -169,6 +191,7 @@ class SystemsView(QWidget):
         self.table.blockSignals(False)
         if self.table.rowCount():
             self.table.selectRow(0)
+        self._refresh_compatibility()
         self.status_message(f"Создан черновик копии системы: {self.table.rowCount()} слоёв. Проверьте и сохраните его.")
 
     def _from_calculation(self):
@@ -202,6 +225,7 @@ class SystemsView(QWidget):
             )
         self.table.blockSignals(False)
         self.table.selectRow(0)
+        self._refresh_compatibility()
         self.status_message(f"Создан черновик системы из расчёта: {len(result.layers)} слоёв. Проверьте и сохраните его.")
 
     def status_message(self, text):
@@ -249,6 +273,7 @@ class SystemsView(QWidget):
         self.ed_standards.clear()
         self.ed_certificate.clear()
         self.table.setRowCount(0)
+        self._refresh_compatibility()
 
     def _load_selected(self, index):
         sid = self.list_systems.itemData(index)
@@ -281,6 +306,7 @@ class SystemsView(QWidget):
                 layer.thinner_percent,
             )
         self.table.blockSignals(False)
+        self._refresh_compatibility()
 
     def _append_row(self, num, material, dmin, target, dmax, thinner):
         row = self.table.rowCount()
@@ -314,12 +340,14 @@ class SystemsView(QWidget):
             0,
         )
         self.table.selectRow(self.table.rowCount() - 1)
+        self._refresh_compatibility()
 
     def _delete_layer(self):
         row = self.table.currentRow()
         if row >= 0:
             self.table.removeRow(row)
             self._renumber()
+            self._refresh_compatibility()
 
     def _move_layer(self, direction: int):
         row = self.table.currentRow()
@@ -340,6 +368,7 @@ class SystemsView(QWidget):
             self.table.selectRow(target)
         finally:
             self.table.blockSignals(False)
+        self._refresh_compatibility()
 
     def _renumber(self, *args):
         self.table.blockSignals(True)
@@ -350,6 +379,29 @@ class SystemsView(QWidget):
                 self.table.setItem(row, 0, item)
             item.setText(str(row + 1))
         self.table.blockSignals(False)
+
+    def _materials_from_table(self):
+        materials = []
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 1)
+            materials.append(item.data(32) if item is not None else None)
+        return materials
+
+    def _refresh_compatibility(self, *args):
+        materials = self._materials_from_table()
+        report = self._compatibility.check_material_sequence(materials)
+        self.lbl_compatibility_status.setText(f"Статус: {report.status.value}")
+        if not report.transitions:
+            self.txt_compatibility.setPlainText(
+                "Недостаточно слоёв для проверки. Для проверки соседних переходов нужны минимум два слоя."
+            )
+            return
+        self.txt_compatibility.setPlainText(
+            "\n".join(
+                f"{index}. {transition.message}"
+                for index, transition in enumerate(report.transitions, start=1)
+            )
+        )
 
     @staticmethod
     def _float(table, row, col):
