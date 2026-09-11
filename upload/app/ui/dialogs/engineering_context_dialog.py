@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.domain.engineering_context import EngineeringContext
-from app.domain.normative import NormativeModel, NormativeSource, UNKNOWN
+from app.domain.normative import NormativeModel, NormativeRule, NormativeSource, UNKNOWN
 from app.domain.surface_profile import SurfaceCondition, SurfacePreparation, SurfaceProfile
 from app.services.engineering_source_registry import EngineeringSourceRegistry, EngineeringSource
 
@@ -188,14 +188,14 @@ class EngineeringContextDialog(QDialog):
         )
 
     def set_normative_source(self, source: NormativeSource) -> None:
-        """Set source identity only; no normative rule is created."""
+        """Set source identity as an explicit UNKNOWN rule source."""
         self.norm_document_id.setText(source.document_id)
         self.norm_title.setText(source.title)
         self.norm_revision.setText(source.revision)
         self.norm_issuer.setText(source.issuer)
         self.norm_uri.setText(source.source_uri)
-        self.norm_model_id.clear()
-        self.norm_version.clear()
+        self.norm_model_id.setText(f"source:{source.document_id}")
+        self.norm_version.setText("UNVERIFIED")
         self.norm_description.setText("Источник из справочной инженерной БД; правила требуют отдельной верификации.")
         self.norm_status.setCurrentIndex(0)
 
@@ -259,11 +259,20 @@ class EngineeringContextDialog(QDialog):
         if model_id or version:
             if not model_id or not version:
                 raise ValueError("Для нормативной модели укажите ID модели и версию.")
+            rules = {}
+            if norm_source is not None and version == "UNVERIFIED":
+                rules["source_identity"] = NormativeRule(
+                    rule_id="source_identity",
+                    value=None,
+                    status=UNKNOWN,
+                    source=norm_source,
+                    notes="Источник выбран из справочной БД; нормативное значение не подтверждено.",
+                )
             model = NormativeModel(
                 model_id=model_id,
                 version=version,
                 description=self.norm_description.text().strip(),
-                rules={},
+                rules=rules,
             )
 
         prep_source = self._source_from_widgets(self.prep_document_id, self.prep_title, self.prep_revision, self.prep_issuer, self.prep_uri)
