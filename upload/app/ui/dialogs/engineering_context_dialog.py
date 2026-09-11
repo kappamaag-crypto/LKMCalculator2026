@@ -187,6 +187,18 @@ class EngineeringContextDialog(QDialog):
             source_uri=uri.text().strip(),
         )
 
+    def set_normative_source(self, source: NormativeSource) -> None:
+        """Set source identity only; no normative rule is created."""
+        self.norm_document_id.setText(source.document_id)
+        self.norm_title.setText(source.title)
+        self.norm_revision.setText(source.revision)
+        self.norm_issuer.setText(source.issuer)
+        self.norm_uri.setText(source.source_uri)
+        self.norm_model_id.clear()
+        self.norm_version.clear()
+        self.norm_description.setText("Источник из справочной инженерной БД; правила требуют отдельной верификации.")
+        self.norm_status.setCurrentIndex(0)
+
     def _on_norm_source_selected(self, index: int) -> None:
         item = self.norm_source_combo.itemData(index)
         if not isinstance(item, EngineeringSource):
@@ -244,7 +256,7 @@ class EngineeringContextDialog(QDialog):
         model_id = self.norm_model_id.text().strip()
         version = self.norm_version.text().strip()
         model = None
-        if model_id or version or norm_source:
+        if model_id or version:
             if not model_id or not version:
                 raise ValueError("Для нормативной модели укажите ID модели и версию.")
             model = NormativeModel(
