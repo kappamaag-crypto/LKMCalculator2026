@@ -45,7 +45,7 @@
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. UI/E2E acceptance remains. |
 | 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Catalog of promoted TDS-backed agents and UI remain. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
-| 26 | ЧАСТИЧНО | Domain ExplanationReport + explain_system_calculation + explain_engineering_bundle (pre-app/chem/recommendation signals) + service entry; 14 unit tests. UI/E2E remain. |
+| 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests. UI/E2E remain. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
 | 29 | ЧАСТИЧНО | Catalogue → draft → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules. |
@@ -72,6 +72,7 @@
 - `chemical_resistance_rules.py` — promote gate; empty registry by default.
 - `explanation.py` — Explanation Engine (source-traceable report for SystemCalculationResult).
 - DFT inspection evaluate + limits_from_calculation_result (§32 partial).
+- LayerResult losses provenance + ResolvedLosses (§26/§28).
 
 ## TDS verification boundary — §12/§14/§25
 
@@ -133,11 +134,11 @@ Done:
 - no invented values; intermediate no-round note;
 - `explain_engineering_bundle` + `explain_pre_application` / `explain_chemical_resistance` / `explain_recommendation_signals` (optional fold; empty chem → UNKNOWN);
 - `CalculationService.explain_calculation` / `explain_engineering_bundle` / `format_explanation`;
-- tests `test_explanation.py` (14 cases).
+- LayerResult.losses_source / losses_profile_name / losses_note; ResolvedLosses in calculator;
+- tests `test_explanation.py` (17 cases, including EXPLICIT/PROFILE/DEFAULT provenance).
 
 Still open:
 - UI surface for explanation report;
-- deeper layer/loss-profile provenance in LayerResult;
 - E2E acceptance.
 
 ## §32 — Inspection / DFT workflow
