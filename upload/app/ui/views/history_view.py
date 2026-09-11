@@ -68,8 +68,8 @@ class HistoryView(QWidget):
         root.addLayout(btn_row)
 
         splitter = QSplitter(Qt.Vertical)
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(["ID", "Дата", "№", "Объект", "Система", "DFT, мкм", "Стоимость, руб"])
+        self.table = QTableWidget(0, 8)
+        self.table.setHorizontalHeaderLabels(["ID", "Дата", "№", "Объект", "Система", "DFT, мкм", "Стоимость, руб", "TDS"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.verticalHeader().setVisible(False)
@@ -95,10 +95,16 @@ class HistoryView(QWidget):
                 self.table.setRowCount(len(rows))
                 for r, calc in enumerate(rows):
                     date_str = calc.created_at.strftime("%d.%m.%Y %H:%M") if calc.created_at else "—"
+                    tds_status = "—"
+                    try:
+                        tds_status = HistoryService(session).get_calculation_tds_verified(calc.id)
+                    except Exception:
+                        tds_status = "—"
                     values = [
                         str(calc.id), date_str, calc.calculation_number or "—",
                         calc.object_name or "—", calc.system_name or "—",
                         self._money(calc.total_dft, 0), self._money(calc.total_cost, 0),
+                        tds_status,
                     ]
                     for c, v in enumerate(values):
                         item = QTableWidgetItem(v)
@@ -144,6 +150,21 @@ class HistoryView(QWidget):
                     )
                 if calc.notes:
                     lines.append(f"\nЗаметки: {calc.notes}")
+                try:
+                    svc = HistoryService(session)
+                    tds_status = svc.get_calculation_tds_verified(calc_id)
+                    traces = svc.get_calculation_tds_traces(calc_id)
+                    lines.append("")
+                    lines.append(f"TDS verified: {tds_status}")
+                    for tr in traces:
+                        lines.append(
+                            f"  слой {tr.get('layer_number', '?')}: "
+                            f"{tr.get('material_name') or '—'} → {tr.get('tds_verified', 'UNKNOWN')}"
+                            + (f" [{tr.get('document_id')}]" if tr.get('document_id') else "")
+                            + (f" DFT={tr.get('dft_value')}" if tr.get('dft_value') else "")
+                        )
+                except Exception as tds_exc:
+                    lines.append(f"\nTDS: недоступно ({tds_exc})")
                 self.txt_detail.setPlainText("\n".join(lines))
         except Exception as e:
             self.txt_detail.setPlainText(str(e))
