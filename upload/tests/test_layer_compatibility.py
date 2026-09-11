@@ -1,6 +1,7 @@
 from app.domain.enums import BinderType, CompatibilityStatus, MaterialType
 from app.domain.layer_compatibility import LayerCompatibilityContext, LayerCompatibilityEngine
 from app.domain.models import CoatingSystem, LayerDefinition, LayerResult, Material, ObjectData, SystemCalculationResult
+from app.services.calculation_service import CalculationService
 
 
 def material(name: str, binder: BinderType) -> Material:
@@ -94,6 +95,23 @@ def test_engine_checks_system_calculation_result_without_recalculation():
     assert report.transitions[0].previous_material is layers[0].material
     assert report.transitions[0].applied_material is layers[1].material
     assert report.status is CompatibilityStatus.WARNING
+
+
+def test_calculation_service_exposes_compatibility_report_for_existing_result():
+    layers = [
+        LayerResult(material=material("Epoxy primer", BinderType.EPOXY), target_dft=100.0),
+        LayerResult(material=material("PU finish", BinderType.POLYURETHANE), target_dft=80.0),
+    ]
+    result = SystemCalculationResult(
+        system=CoatingSystem(number_of_layers=2),
+        object_data=ObjectData(area_m2=100.0),
+        layers=layers,
+    )
+
+    report = CalculationService().compatibility_report(result)
+
+    assert report.status is CompatibilityStatus.WARNING
+    assert len(report.warning_transitions) == 1
 
 
 def test_engine_requires_one_context_per_transition():
