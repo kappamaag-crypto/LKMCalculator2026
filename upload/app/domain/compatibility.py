@@ -1,7 +1,9 @@
-"""Compatibility rules extracted from the public Kraska.Expert matrix.
+"""Source-backed compatibility matrix for coating layers.
 
-The source table is directional: the row is the applied layer and the column is
-its previous coating. A blank cell is *unknown*, not a prohibition.
+The authoritative project snapshot is ``books/совместимость_лкм.png`` and its
+published companion page at LKM-Prof. The source table is directional: the row
+is the applied layer and the column is its previous/priming layer. A blank cell
+is *unknown*, not a prohibition.
 
 This module deliberately does not turn generic coating knowledge into rules.
 Only binder families that can be represented unambiguously by the current
@@ -13,17 +15,16 @@ technical documentation provides a confirmed compatibility family.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
-from .enums import BinderType, CompatibilityStatus
-from .models import Material
+from .compatibility import CompatibilityRule, check_materials
+from .enums import CompatibilityStatus
+from .models import LayerDefinition, Material, SystemCalculationResult
 
-SOURCE_URL = "https://kraska.expert/compatibility-tables.html"
+SOURCE_URL = "https://www.lkm-prof.ru/razdel/sovmestim.php"
+SOURCE_SNAPSHOT = "books/совместимость_лкм.png"
 SOURCE_TABLE = "Таблица 1. Совместимость ЛКМ с грунтовками"
 
-# Matrix taxonomy. ``epoxy`` is intentionally separate from ``alkyd_epoxy``:
-# the source uses the same abbreviation ЭП for both row labels, but they are
-# chemically different rows and must not be collapsed in the model.
 FAMILY_LABELS: dict[str, str] = {
     "ac": "Алкидно-акриловые (АС)",
     "mc": "Алкидно-стирольные (МС)",
@@ -45,8 +46,6 @@ FAMILY_LABELS: dict[str, str] = {
     "epoxy": "Эпоксидные (ЭП)",
 }
 
-# Columns are the previous coating (грунтующий слой). The source table has
-# 17 columns; there is no separate column for the second ЭП row.
 _PREVIOUS_COLUMNS = (
     "ak",
     "ac",
@@ -67,8 +66,9 @@ _PREVIOUS_COLUMNS = (
     "epoxy_ester",
 )
 
-# ``+`` = allowed, ``1`` = adhesion check because of different solvents,
-# ``2`` = roughening required, ``.`` = blank cell in the source table.
+# Exact transcription of the source snapshot. The source uses ``+`` for
+# compatible, ``1`` for adhesion check, ``2`` for roughening, and a blank cell
+# for no confirmed rule. Blanks remain UNKNOWN in the domain.
 _MATRIX_ROWS = {
     "ac": "+ + . . + + . . . + + . + 1 . + .",
     "mc": "+ + . + . + . . + . + . + . . . .",
@@ -76,7 +76,7 @@ _MATRIX_ROWS = {
     "alkyd_epoxy": "+ . . + + + . . . . + . + . + + +",
     "vinyl_chloride": "+ . . . + + + . . . + . + + + + .",
     "glyptal": "+ . . . + + + . . . + . + 1 . + .",
-    "rosin": ". . . . + + + . + . + . + + + + +",
+    "rosin": ". . . . + + + . + . + . + + + + .",
     "rubber": ". . . . + . . . . . . . + . . 2 .",
     "silicone": "+ . . + . . . . . . . . . . . . .",
     "oil": ". . . . + + + . + . + . + . . 2 .",
@@ -131,10 +131,14 @@ def _parse_matrix() -> dict[tuple[str, str], CompatibilityRule]:
 
 RULES: dict[tuple[str, str], CompatibilityRule] = _parse_matrix()
 
+BINDER_TO_FAMILY: dict[object, str] = {}
+
 # These mappings are deliberately narrow. The source table's taxonomy is
 # finer than the current BinderType enum, so a generic ``алкид`` or
 # ``цинк-этилсиликат`` is not silently assigned to a row.
-BINDER_TO_FAMILY: dict[BinderType, str] = {
+from .enums import BinderType
+
+BINDER_TO_FAMILY = {
     BinderType.EPOXY: "epoxy",
     BinderType.POLYURETHANE: "polyurethane",
     BinderType.ACRYLIC: "polyacrylic",
