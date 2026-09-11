@@ -31,9 +31,9 @@
 | 10 | ЧАСТИЧНО | Alembic + SQLite backup/restore; acceptance позже. |
 | 11 | ЧАСТИЧНО | Material snapshots/verified reads/integrity hashing; runtime acceptance позже. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox; runtime/SMTP acceptance позже. |
-| 12 | ЧАСТИЧНО | Engineering context/source identity/History/verified loader; first KNOWN TDS rules exist, full integration remains. |
+| 12 | ЧАСТИЧНО | Engineering context + History TDS traces (v8) + HistoryView TDS UI. Broader runtime acceptance remains. |
 | 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI; acceptance позже. |
-| 14 | ЧАСТИЧНО | Document SHA-256 catalog + explicit promote_tds_rule gate + first KNOWN rules (Blank Universal/Finish DFT, solids, density) + TDS DFT technology bridge. Still open: more materials, full tech stack wiring, UI/template tds_verified. |
+| 14 | ЧАСТИЧНО | All 10 SPKEFFA catalog docs have KNOWN rules + full service/UI wiring (template, calc, recommend default, History). Broader E2E acceptance remains. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; полная scoring остаётся. |
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI; acceptance позже. |
@@ -44,11 +44,11 @@
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | CompatibilityEngine интегрирован; реальные TDS-backed conditions и UI acceptance остаются. |
 | 23 | НЕ ВЫПОЛНЕНО | Pre-Application Check. |
 | 24 | НЕ ВЫПОЛНЕНО | Химическая стойкость только через source-backed rules. |
-| 25 | ЧАСТИЧНО | Document-level SHA-256 + first rule-level KNOWN promotions with locator/value/applicability. Full normative chain into calculation/UI remains. |
+| 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
-| 29 | ЧАСТИЧНО | Catalogue → draft → editor → CONFIRM → persistence; TDS-verified templates gate remains limited by incomplete rule coverage. |
+| 29 | ЧАСТИЧНО | Catalogue → draft → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules. |
 | 30 | ВЫПОЛНЕНО | Engineering Decision Log. |
 | 31 | ЧАСТИЧНО | Scenario service/UI + confirmed-template bridge; acceptance remains. |
 | 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow. |
@@ -64,45 +64,35 @@
 - `tds_manifest.py` — `80e75053fc237e4b0c622304f1f502d57050016b`: TDS document/rule verification boundary.
 - `spk_effa_tds_catalog.py` — `cc3fb0f57cff584363bb943ae35ed4085dd8019f`: measured binary SHA-256 catalog for 10 SPKEFFA TDS PDFs.
 - `tds_rule_promotion.py` — `4a2b23f23255c65de148f840efbe4261731fa375`: explicit promote_tds_rule gate; parse_dft_range_um.
-- `tds_known_rules.py` — `1cddff494657dbe754ad76f9f44e192814ad3df0`: first KNOWN rules for Blank Universal and Blank Finish (DFT/solids/density).
-- `tds_technology_bridge.py` — `ce0083946158de9b45698eafd1192030db89db39`: check_target_dft_against_known_tds without invented limits.
-- `test_spk_effa_tds_catalog.py` — `6b8b426635633a79f28e0408e0c559d9879ecc2c`.
-- `test_tds_rule_promotion.py` — `445b726188000a83ba9526fb63c9c59723e81a93`.
+- `tds_known_rules.py` — Tank LP + EFFA 01B + prior Blank rules; longest-hint resolve.
+- `tds_technology_bridge.py` — DFT checks + enrich_filter_result_with_known_tds.
+- `tds_normative_bridge.py` — KNOWN TDS → NormativeModel / EngineeringContext.
 - `loss_profile` / calculator / scenario / system template stages — see prior plan entries.
 
 ## TDS verification boundary — §12/§14/§25
 
 `kappamaag-crypto/SPKEFFA` — read-only. Git blob SHA-1 ≠ binary PDF SHA-256.
 
-Blank_Universal.pdf:
-- binary SHA-256: `9ab3872b849e523652088a3ba0d8b0788005c0134ac517305a9e2f01621b5887`
-- Git blob SHA-1: `23eb95f2d327249845ca7ddb5d8b8e116fc2dd3a`
-
-Blank_Finish.pdf binary SHA-256: `34465e17e1e1199c94f1391ca2d776dcd377d4d363e0c4513b4e8a40f7a9a235`
-
 Document KNOWN requires path + binary SHA-256. Rule KNOWN requires explicit promote_tds_rule(document, rule, verified_by=...). Extracted text alone does not promote.
-
-First promoted KNOWN rules:
-- BLANK_UNIVERSAL_DFT_RANGE = 80-250 мкм
-- BLANK_UNIVERSAL_SOLIDS_BY_VOLUME = 73 ± 2%
-- BLANK_UNIVERSAL_DENSITY = 1,4 кг/л
-- BLANK_FINISH_DFT_RANGE = 50-90 мкм
-- BLANK_FINISH_SOLIDS_BY_VOLUME = 58±3%
-- BLANK_FINISH_DENSITY = 1,3 г/см³
 
 ## §14/§25 — progress
 
 Done:
-- binary SHA-256 document catalog;
+- binary SHA-256 document catalog (10 SPKEFFA PDFs);
 - promote gate;
-- first KNOWN rules;
-- TDS DFT technology bridge for mapped material names.
+- KNOWN rules for all catalog documents including **Blank Tank LP** and **EFFA 01B** (verified PDF text + SHA-256);
+- longest-hint material→document resolution;
+- TDS DFT technology bridge;
+- template `tds_verified` evaluation + editor status;
+- RecommendationService.recommend(apply_known_tds_dft=True by default);
+- tds_normative_bridge → EngineeringContext;
+- HistoryService snapshot v8 TDS traces + HistoryView TDS column/detail;
+- CalculationService TDS helpers;
+- domain remains free of service imports;
+- **pushed to origin via GitHub connector** (2026-09-11).
 
 Still open:
-- promote remaining SPKEFFA materials;
-- wire bridge into main calculation/UI path;
-- template `tds_verified=KNOWN` acceptance based on known rules;
-- full normative traceability into EngineeringContext/History.
+- broader end-to-end UI/runtime acceptance beyond unit/smoke coverage.
 
 ## §28 / §30 — закрыты ранее
 
