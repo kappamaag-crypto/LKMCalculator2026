@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.domain.calculation_scenario import CalculationScenario
+from app.domain.layer_compatibility import LayerCompatibilityReport
 from app.domain.models import SystemCalculationResult
 from app.services.calculation_service import CalculationService
 
@@ -17,6 +18,7 @@ from app.services.calculation_service import CalculationService
 class ScenarioAlternativeResult:
     system_name: str
     result: SystemCalculationResult
+    compatibility: LayerCompatibilityReport
 
 
 @dataclass(frozen=True)
@@ -66,8 +68,13 @@ class CalculationScenarioService:
                 raise ValueError(
                     f"Система «{system.system_name}» не прошла валидацию: {messages}"
                 )
+            compatibility = self.calculation_service.compatibility_report(result)
             evaluated.append(
-                ScenarioAlternativeResult(system_name=system.system_name, result=result)
+                ScenarioAlternativeResult(
+                    system_name=system.system_name,
+                    result=result,
+                    compatibility=compatibility,
+                )
             )
         return CalculationScenarioResult(
             scenario_name=scenario.name,
