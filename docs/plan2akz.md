@@ -45,7 +45,7 @@
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. UI/E2E acceptance remains. |
 | 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Catalog of promoted TDS-backed agents and UI remain. |
 | 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
-| 26 | ЧАСТИЧНО | Domain ExplanationReport + explain_system_calculation + CalculationService.explain_calculation/format_explanation; 9 unit tests. UI/E2E and richer coverage remain. |
+| 26 | ЧАСТИЧНО | Domain ExplanationReport + explain_system_calculation + explain_engineering_bundle (pre-app/chem/recommendation signals) + service entry; 14 unit tests. UI/E2E remain. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
 | 29 | ЧАСТИЧНО | Catalogue → draft → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules. |
@@ -131,13 +131,13 @@ Done:
 - `domain/explanation.py` — ExplanationItem / ExplanationReport; explain_system_calculation;
 - explains DFT/WFT basis (SV only), losses resolved value + zero/default note (§28), engineering context normative/surface status, cost UNKNOWN vs known, incomplete material;
 - no invented values; intermediate no-round note;
-- `CalculationService.explain_calculation` / `format_explanation`;
-- tests `test_explanation.py` (9 cases).
+- `explain_engineering_bundle` + `explain_pre_application` / `explain_chemical_resistance` / `explain_recommendation_signals` (optional fold; empty chem → UNKNOWN);
+- `CalculationService.explain_calculation` / `explain_engineering_bundle` / `format_explanation`;
+- tests `test_explanation.py` (14 cases).
 
 Still open:
 - UI surface for explanation report;
 - deeper layer/loss-profile provenance in LayerResult;
-- integration with recommendation reasons and pre-app/chem results;
 - E2E acceptance.
 
 ## §32 — Inspection / DFT workflow
