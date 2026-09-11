@@ -1,4 +1,4 @@
-"""Headless smoke for RecommendationView chemical-filter inputs."""
+"""Headless smoke for RecommendationView recommendation details."""
 from __future__ import annotations
 
 import os
@@ -28,5 +28,23 @@ def test_recommendation_view_accepts_optional_chemical_values():
     assert view._last_result is not None
     assert view.list_results.count() == 1
     assert "не найдено" in view.list_results.item(0).text().lower()
+    view.deleteLater()
+    app.processEvents()
+
+
+def test_recommendation_view_displays_score_breakdown():
+    app = QApplication.instance() or QApplication([])
+    view = RecommendationView(RecommendationService())
+    view.set_systems([make_system()])
+    view._on_recommend()
+    assert view._last_result is not None
+    assert view._last_result.items
+    details = view.txt_details.toPlainText()
+    assert "Разбивка оценки:" in details
+    assert "Коррозионная категория:" in details
+    assert "Долговечность:" in details
+    assert "Технологичность:" in details
+    assert "Стоимость:" in details
+    assert "Итоговый Score:" in details
     view.deleteLater()
     app.processEvents()
