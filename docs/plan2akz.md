@@ -20,7 +20,7 @@
 | § | Статус | Состояние / следующий шаг |
 |---|---|---|
 | 1 | ВЫПОЛНЕНО | Базовое ядро расчёта сохранено. |
-| 2 | ЧАСТИЧНО | Динамический редактор есть; остаются workflow/UI smoke. |
+| 2 | ЧАСТИЧНО | Динамический редактор есть; добавлен headless smoke-тест основного workflow (расчёт + загрузка сохранённой системы); остаются фактический pytest-run и полный UI smoke. |
 | 3 | ВЫПОЛНЕНО | AdHocMaterialDialog, normalisation, duplicate reuse, persistence. |
 | 4 | ЧАСТИЧНО | Comparison/2K/multilayer есть; остаются smoke и source-backed wording. |
 | 5 | ЧАСТИЧНО | Engineering Excel есть; остаётся визуальная/печатаемая проверка. |
@@ -73,6 +73,7 @@
 - `explanation.py` — Explanation Engine (source-traceable report for SystemCalculationResult).
 - DFT inspection evaluate + limits_from_calculation_result (§32 partial).
 - LayerResult losses provenance + ResolvedLosses (§26/§28).
+- `test_calculation_view_smoke.py` — headless CalculationView workflow coverage for direct calculation and saved-system restore; test execution remains pending because this connector-only session has no runnable repository checkout.
 
 ## TDS verification boundary — §12/§14/§25
 
