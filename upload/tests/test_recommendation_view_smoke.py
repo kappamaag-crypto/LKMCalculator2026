@@ -6,8 +6,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from app.domain.models import CoatingSystem, LayerDefinition, Material
+from app.domain.models import CoatingSystem, LayerDefinition, Material, RecommendationItem, RecommendationResult
 from app.domain.enums import BinderType, CorrosionCategory, DurabilityLevel, EnvironmentType, MaterialType, SurfaceType
+from app.domain.recommendation.scorer import ScoreBreakdown
 from app.services.recommendation_service import RecommendationService
 from app.ui.views.recommendation_view import RecommendationView
 
@@ -32,19 +33,43 @@ def test_recommendation_view_accepts_optional_chemical_values():
     app.processEvents()
 
 
+class StubRecommendationService:
+    def recommend(self, *args, **kwargs):
+        system = make_system()
+        breakdown = ScoreBreakdown(
+            corrosion=100.0,
+            durability=75.0,
+            technology=100.0,
+            cost=50.0,
+            total=81.25,
+            status="Подходит",
+        )
+        item = RecommendationItem(
+            system=system,
+            score=81.25,
+            breakdown=breakdown,
+            rank=1,
+            status="Подходит",
+        )
+        return RecommendationResult(
+            object_data=kwargs.get("obj") or args[0],
+            items=[item],
+            message="Найдено подходящих систем: 1 из 1",
+            disclaimer="test",
+        )
+
+
 def test_recommendation_view_displays_score_breakdown():
     app = QApplication.instance() or QApplication([])
-    view = RecommendationView(RecommendationService())
+    view = RecommendationView(StubRecommendationService())
     view.set_systems([make_system()])
     view._on_recommend()
-    assert view._last_result is not None
-    assert view._last_result.items
     details = view.txt_details.toPlainText()
     assert "Разбивка оценки:" in details
-    assert "Коррозионная категория:" in details
-    assert "Долговечность:" in details
-    assert "Технологичность:" in details
-    assert "Стоимость:" in details
-    assert "Итоговый Score:" in details
+    assert "Коррозионная категория: 100.0/100" in details
+    assert "Долговечность: 75.0/100" in details
+    assert "Технологичность: 100.0/100" in details
+    assert "Стоимость: 50.0/100" in details
+    assert "Итоговый Score: 81.2/100" in details
     view.deleteLater()
     app.processEvents()
