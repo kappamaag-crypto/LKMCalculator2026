@@ -51,7 +51,7 @@
 | 29 | ЧАСТИЧНО | Catalogue → draft → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules. |
 | 30 | ВЫПОЛНЕНО | Engineering Decision Log. |
 | 31 | ЧАСТИЧНО | Scenario service/UI + confirmed-template bridge; acceptance remains. |
-| 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow. |
+| 32 | ЧАСТИЧНО | Domain DFT evaluate (WITHIN/BELOW/ABOVE/UNKNOWN_LIMITS) + limits_from_calculation_result + InspectionService.evaluate_dft*; 11 tests. UI/E2E and full acceptance remain. |
 
 ## Каталог `Системы 1–4`
 
@@ -71,6 +71,7 @@
 - `chemical_resistance.py` — source-backed chemical resistance only.
 - `chemical_resistance_rules.py` — promote gate; empty registry by default.
 - `explanation.py` — Explanation Engine (source-traceable report for SystemCalculationResult).
+- DFT inspection evaluate + limits_from_calculation_result (§32 partial).
 
 ## TDS verification boundary — §12/§14/§25
 
@@ -138,6 +139,21 @@ Still open:
 - deeper layer/loss-profile provenance in LayerResult;
 - integration with recommendation reasons and pre-app/chem results;
 - E2E acceptance.
+
+## §32 — Inspection / DFT workflow
+
+Done:
+- `domain/inspection.py` — DftLayerLimits, DftMeasurementPoint, DftPointEvaluation, DftInspectionReport;
+- `evaluate_dft_inspection` pure compare; target alone ≠ acceptance band; missing min/max → UNKNOWN_LIMITS (no invented tolerance);
+- `limits_from_calculation_result` from SystemCalculationResult + optional material.recommended_dft_*;
+- `InspectionService.evaluate_dft` / `evaluate_dft_against_calculation` / `format_dft_report`;
+- tests `test_inspection_workflow.py` (11 cases, including legacy UNKNOWN acceptance).
+
+Still open:
+- UI surface for DFT points and report;
+- binding measured DFT into InspectionRecord;
+- full E2E with confirmed templates / standards source;
+- multi-layer acceptance aggregation policy beyond current overall status.
 
 ## §28 / §30 — закрыты ранее
 
