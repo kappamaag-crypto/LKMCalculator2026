@@ -33,7 +33,7 @@
 | 11.1 | ЧАСТИЧНО | Durable notification outbox; runtime/SMTP acceptance позже. |
 | 12 | ЧАСТИЧНО | Engineering context/source identity/History/verified loader; реальные rules ещё не подтверждены. |
 | 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI; acceptance позже. |
-| 14 | НЕ ВЫПОЛНЕНО | TDS-backed technological validation из SPKEFFA read-only. |
+| 14 | ЧАСТИЧНО | SPKEFFA TDS document identity + measured binary SHA-256 catalog + local verify; staged rules for Blank Universal remain UNKNOWN. Rule-by-rule promotion and technology validation engine remain. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; полная scoring остаётся. |
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI; acceptance позже. |
@@ -44,7 +44,7 @@
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | CompatibilityEngine интегрирован; реальные TDS-backed conditions и UI acceptance остаются. |
 | 23 | НЕ ВЫПОЛНЕНО | Pre-Application Check. |
 | 24 | НЕ ВЫПОЛНЕНО | Химическая стойкость только через source-backed rules. |
-| 25 | НЕ ВЫПОЛНЕНО | Полная normative traceability. |
+| 25 | ЧАСТИЧНО | Document-level traceability: SPKEFFA path + binary SHA-256 for 10 TDS PDFs. Rule-level KNOWN promotion and full normative chain remain. |
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile: domain model + integration into SystemCalculator/LayerInput; explicit losses_percent priority over profile; LossProfile.none(); no hidden engineering defaults; regression tests in test_loss_profile.py. Commits: eac21b6 (model), d93f48e (integration), 3e3873f (tests). |
@@ -88,6 +88,8 @@
 - `calculator.py` — `d93f48e3ff999c802457d1e842f23848c37edbcb`: LossProfile integrated into SystemCalculator/LayerInput; explicit losses_percent priority; legacy default_losses preserved as 0.0 without hidden engineering values.
 - `test_loss_profile.py` — `3e3873fc9445d87694433be93701e5ed772fd27c`: regression coverage for profile usage, explicit override, none(), invalid rejection, legacy compatibility.
 - `engineering_decision_log_v3.md` — `9005c30b453ed2f23ef40f585adddebe5ae13818`: Engineering Decision Log for v3; factual architectural and engineering decisions recorded without promoting UNKNOWN data to KNOWN.
+- `spk_effa_tds_catalog.py` — `cc3fb0f57cff584363bb943ae35ed4085dd8019f`: SPKEFFA TDS document catalog with measured binary SHA-256 (not Git blob SHA-1); local verify; staged Blank Universal rules stay UNKNOWN.
+- `test_spk_effa_tds_catalog.py` — `6b8b426635633a79f28e0408e0c559d9879ecc2c`: regression for binary digests, git SHA-1 contrast, local verify, non-promotion of extracted rules.
 
 ## §20/§27/§29/§31 — следующий шаг
 
@@ -99,11 +101,17 @@
 6. CONFIRM — отдельное действие.
 7. CONFIRM → persistence wiring реализован, но `tds_verified=KNOWN` обязателен.
 8. Scenario domain/service/UI реализованы; bridge к confirmed System Templates готов и безопасно отбрасывает UNKNOWN/incomplete templates.
-9. Следующий инженерный блок — реальная TDS verification из `SPKEFFA` (§14/§25), после чего появятся первые допустимые confirmed-template alternatives. Затем — acceptance сценария/сравнения/экспорта.
+9. TDS document identity with binary SHA-256 is in place. Next: explicit human promotion of selected rules to KNOWN (locator+value+applicability), then wire technology validation (§14) and template `tds_verified` acceptance.
 
 ## TDS verification boundary — §12/§14/§25
 
-`kappamaag-crypto/SPKEFFA` используется только read-only. Git blob SHA-1 не является SHA-256 бинарного PDF. Для `KNOWN` нужны реальный SHA-256 PDF, явный source identity, locator и applicability правила. Пока бинарные SHA-256 и rule-by-rule verification не внесены, технологические ограничения остаются `UNKNOWN`.
+`kappamaag-crypto/SPKEFFA` используется только read-only. Git blob SHA-1 **не** является SHA-256 бинарного PDF.
+
+Факт измерения (пример Blank_Universal.pdf):
+- binary SHA-256: `9ab3872b849e523652088a3ba0d8b0788005c0134ac517305a9e2f01621b5887`
+- Git blob SHA-1: `23eb95f2d327249845ca7ddb5d8b8e116fc2dd3a`
+
+Document status may be KNOWN when source path + binary SHA-256 are recorded. Technology rules remain UNKNOWN until explicit promotion with locator, value and applicability. Extracted PDF text alone does not promote rules.
 
 ## §28 — Controlled LossProfile (закрыто)
 
@@ -116,4 +124,11 @@
 
 ## §30 — Engineering Decision Log (закрыто)
 
-`docs/engineering_decision_log_v3.md` фиксирует фактически принятые архитектурные решения и границы доверия к данным. Отдельная запись не повышает статус TDS rules: `UNKNOWN` остаётся `UNKNOWN` до выполнения §14/§25.
+`docs/engineering_decision_log_v3.md` фиксирует фактически принятые архитектурные решения и границы доверия к данным. Отдельная запись не повышает статус TDS rules: `UNKNOWN` остаётся `UNKNOWN` до явного promotion.
+
+## §14/§25 — progress (document identity)
+
+- Catalogued 10 SPKEFFA TDS PDFs with measured binary SHA-256.
+- `verify_spk_effa_local_files` checks local tree against catalog digests and rejects Git blob SHA-1 collision.
+- Staged Blank Universal DFT/solids/density rules exist only as UNKNOWN evidence.
+- Not closed: rule-by-rule KNOWN promotion, technology validation engine, full normative chain into calculation/UI.
