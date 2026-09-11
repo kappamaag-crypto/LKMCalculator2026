@@ -49,6 +49,10 @@ class InspectionRecord:
     notes: str = ""
     conclusion: str = ""
     acceptance_status: str = "UNKNOWN"
+    # §32 DFT binding — observations only; does NOT auto-set acceptance_status
+    dft_points: tuple["DftMeasurementPoint", ...] = ()
+    dft_overall_status: str = "UNKNOWN"  # OK | OUT_OF_RANGE | UNKNOWN from DftInspectionReport
+    dft_summary: str = ""
     created_at: datetime = field(default_factory=datetime.now)
 
     def validate(self) -> None:
@@ -62,10 +66,34 @@ class InspectionRecord:
         for defect in self.defects:
             if defect.count is not None and defect.count < 0:
                 raise ValueError("Количество дефектов не может быть отрицательным")
+        if self.dft_overall_status not in {"OK", "OUT_OF_RANGE", "UNKNOWN"}:
+            raise ValueError("Недопустимый dft_overall_status")
 
     @property
     def has_observations(self) -> bool:
-        return bool(self.measurements or self.defects or self.photo_refs)
+        return bool(
+            self.measurements
+            or self.defects
+            or self.photo_refs
+            or self.dft_points
+        )
+
+    @property
+    def has_dft_binding(self) -> bool:
+        return bool(self.dft_points) or self.dft_overall_status != "UNKNOWN" or bool(self.dft_summary)
+
+    def with_dft_report(self, report: "DftInspectionReport") -> "InspectionRecord":
+        """Return a copy with DFT evaluation bound. Does not change acceptance_status."""
+        from dataclasses import replace
+
+        summary = "\n".join(report.summary_lines())
+        points = tuple(e.point for e in report.evaluations)
+        return replace(
+            self,
+            dft_points=points,
+            dft_overall_status=report.overall_status,
+            dft_summary=summary,
+        )
 
 
 # --- DFT inspection workflow (§32) ---

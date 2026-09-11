@@ -169,3 +169,65 @@ def test_service_evaluate_dft_against_calculation():
 def test_negative_measured_rejected():
     with pytest.raises(ValueError):
         DftMeasurementPoint(0, "P1", measured_dft_um=-1.0)
+
+
+def test_bind_dft_does_not_change_acceptance():
+    points = [DftMeasurementPoint(0, "P1", measured_dft_um=100.0)]
+    limits = [DftLayerLimits(layer_index=0, min_dft_um=80.0, max_dft_um=120.0)]
+    record = InspectionService.create_record_with_dft(
+        "I-DFT-1",
+        points,
+        limits,
+        object_name="Tank",
+    )
+    assert record.acceptance_status == "UNKNOWN"
+    assert record.dft_overall_status == DFT_OVERALL_OK
+    assert record.has_dft_binding
+    assert len(record.dft_points) == 1
+    assert "DFT inspection overall" in record.dft_summary
+    assert "UNKNOWN" in InspectionService.summary(record)
+    assert "DFT:" in InspectionService.summary(record)
+
+
+def test_bind_dft_out_of_range_still_unknown_acceptance():
+    points = [DftMeasurementPoint(0, "P1", measured_dft_um=50.0)]
+    limits = [DftLayerLimits(layer_index=0, min_dft_um=80.0, max_dft_um=120.0)]
+    record = InspectionService.create_record_with_dft("I-DFT-2", points, limits)
+    assert record.dft_overall_status == DFT_OVERALL_OUT_OF_RANGE
+    assert record.acceptance_status == "UNKNOWN"
+
+
+def test_bind_dft_from_calculation():
+    mat = Material(
+        material_name="Coat",
+        density=1.4,
+        solids_by_volume_percent=60.0,
+        recommended_dft_min=80.0,
+        recommended_dft_max=150.0,
+    )
+    layer = LayerResult(material=mat, target_dft=120.0, wft=200.0)
+    result = SystemCalculationResult(
+        system=CoatingSystem(system_name="S"),
+        object_data=ObjectData(),
+        layers=[layer],
+        total_dft=120.0,
+    )
+    points = [DftMeasurementPoint(0, "A1", measured_dft_um=110.0)]
+    record = InspectionService.create_record_with_dft_from_calculation(
+        "I-DFT-3", points, result
+    )
+    assert record.dft_overall_status == DFT_OVERALL_OK
+    assert record.has_observations
+    data = InspectionService.to_dict(record)
+    assert data["dft_overall_status"] == DFT_OVERALL_OK
+    assert len(data["dft_points"]) == 1
+
+
+def test_with_dft_report_on_existing_record():
+    base = InspectionService.create_record("I-DFT-4", acceptance_status="CONDITIONAL")
+    points = [DftMeasurementPoint(0, "P1", measured_dft_um=90.0)]
+    limits = [DftLayerLimits(0, min_dft_um=80.0, max_dft_um=100.0)]
+    report = evaluate_dft_inspection(points, limits)
+    bound = InspectionService.bind_dft_report(base, report)
+    assert bound.acceptance_status == "CONDITIONAL"  # preserved
+    assert bound.dft_overall_status == DFT_OVERALL_OK

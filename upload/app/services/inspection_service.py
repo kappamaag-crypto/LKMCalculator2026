@@ -1,7 +1,7 @@
 """Application service for coating inspection records and DFT workflow."""
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime
 from typing import Optional, Sequence
 
@@ -22,6 +22,7 @@ class InspectionService:
     """Build and validate inspection records without normative inference.
 
     DFT comparison never invents acceptance bands: missing min/max → UNKNOWN_LIMITS.
+    Binding DFT into InspectionRecord does NOT auto-set acceptance_status.
     """
 
     @staticmethod
@@ -41,6 +42,9 @@ class InspectionService:
         notes: str = "",
         conclusion: str = "",
         acceptance_status: str = "UNKNOWN",
+        dft_points: Sequence[DftMeasurementPoint] = (),
+        dft_overall_status: str = "UNKNOWN",
+        dft_summary: str = "",
     ) -> InspectionRecord:
         record = InspectionRecord(
             inspection_id=inspection_id.strip(),
@@ -57,6 +61,9 @@ class InspectionService:
             notes=notes.strip(),
             conclusion=conclusion.strip(),
             acceptance_status=acceptance_status,
+            dft_points=tuple(dft_points),
+            dft_overall_status=dft_overall_status,
+            dft_summary=dft_summary.strip(),
             inspection_date=datetime.now(),
         )
         record.validate()
@@ -67,7 +74,7 @@ class InspectionService:
         record.validate()
         lines = [
             f"Инспекция: {record.inspection_id}",
-            f"Статус: {record.acceptance_status}",
+            f"Статус приёмки: {record.acceptance_status}",
             f"Измерений: {len(record.measurements)}; дефектов: {len(record.defects)}; фото: {len(record.photo_refs)}",
         ]
         if record.object_name:
@@ -76,6 +83,12 @@ class InspectionService:
             lines.append(
                 f"Источник/НД: {record.standard_reference} {record.standard_source}".strip()
             )
+        if record.dft_points or record.dft_overall_status != "UNKNOWN":
+            lines.append(
+                f"DFT: points={len(record.dft_points)}; overall={record.dft_overall_status}"
+            )
+            if record.dft_summary:
+                lines.append(record.dft_summary)
         if record.acceptance_status == "UNKNOWN":
             lines.append("Приёмка не определена: критерий или решение не подтверждены.")
         return "\n".join(lines)
@@ -118,3 +131,44 @@ class InspectionService:
     @staticmethod
     def format_dft_report(report: DftInspectionReport) -> str:
         return "\n".join(report.summary_lines())
+
+    @staticmethod
+    def bind_dft_report(
+        record: InspectionRecord,
+        report: DftInspectionReport,
+    ) -> InspectionRecord:
+        """Bind DFT evaluation into InspectionRecord without changing acceptance_status."""
+        bound = record.with_dft_report(report)
+        bound.validate()
+        return bound
+
+    @staticmethod
+    def create_record_with_dft(
+        inspection_id: str,
+        points: Sequence[DftMeasurementPoint],
+        limits: Sequence[DftLayerLimits],
+        **kwargs,
+    ) -> InspectionRecord:
+        """Create record and bind DFT evaluation in one step.
+
+        acceptance_status stays UNKNOWN unless explicitly passed in kwargs.
+        DFT overall is independent of acceptance.
+        """
+        report = evaluate_dft_inspection(points, limits)
+        record = InspectionService.create_record(inspection_id, **kwargs)
+        return InspectionService.bind_dft_report(record, report)
+
+    @staticmethod
+    def create_record_with_dft_from_calculation(
+        inspection_id: str,
+        points: Sequence[DftMeasurementPoint],
+        result: SystemCalculationResult,
+        *,
+        use_material_recommended: bool = True,
+        **kwargs,
+    ) -> InspectionRecord:
+        report = InspectionService.evaluate_dft_against_calculation(
+            points, result, use_material_recommended=use_material_recommended
+        )
+        record = InspectionService.create_record(inspection_id, **kwargs)
+        return InspectionService.bind_dft_report(record, report)
