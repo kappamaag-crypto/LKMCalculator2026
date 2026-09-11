@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Optional, Sequence
 
 from .compatibility import CompatibilityRule, check_materials
-from .enums import CompatibilityStatus
+from .enums import BinderType, CompatibilityStatus
 from .models import LayerDefinition, Material, SystemCalculationResult
 
 SOURCE_URL = "https://www.lkm-prof.ru/razdel/sovmestim.php"
@@ -66,9 +66,9 @@ _PREVIOUS_COLUMNS = (
     "epoxy_ester",
 )
 
-# Exact transcription of the source snapshot. The source uses ``+`` for
-# compatible, ``1`` for adhesion check, ``2`` for roughening, and a blank cell
-# for no confirmed rule. Blanks remain UNKNOWN in the domain.
+# Exact transcription of the supplied source snapshot. The source uses ``+``
+# for compatible, ``1`` for adhesion check, ``2`` for roughening, and a blank
+# cell for no confirmed rule. Blanks remain UNKNOWN in the domain.
 _MATRIX_ROWS = {
     "ac": "+ + . . + + . . . + + . + 1 . + .",
     "mc": "+ + . + . + . . + . + . + . . . .",
@@ -131,14 +131,10 @@ def _parse_matrix() -> dict[tuple[str, str], CompatibilityRule]:
 
 RULES: dict[tuple[str, str], CompatibilityRule] = _parse_matrix()
 
-BINDER_TO_FAMILY: dict[object, str] = {}
-
 # These mappings are deliberately narrow. The source table's taxonomy is
 # finer than the current BinderType enum, so a generic ``алкид`` or
 # ``цинк-этилсиликат`` is not silently assigned to a row.
-from .enums import BinderType
-
-BINDER_TO_FAMILY = {
+BINDER_TO_FAMILY: dict[BinderType, str] = {
     BinderType.EPOXY: "epoxy",
     BinderType.POLYURETHANE: "polyurethane",
     BinderType.ACRYLIC: "polyacrylic",
