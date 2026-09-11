@@ -48,9 +48,9 @@
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | НЕ ВЫПОЛНЕНО | Управляемый LossProfile. |
-| 29 | ЧАСТИЧНО | Catalogue → draft → editor → explicit CONFIRM → persistence boundary реализовано; persistence блокирует UNKNOWN TDS. Calculation Scenario domain/service + UI boundary реализованы, persistence/confirmed-template source/acceptance остаются. |
+| 29 | ЧАСТИЧНО | Catalogue → draft → editor → explicit CONFIRM → persistence boundary реализовано; persistence блокирует UNKNOWN TDS. Scenario UI подключён, а источник альтернатив ограничен подтверждёнными и TDS-verified templates. Persistence/acceptance остаются. |
 | 30 | НЕ ВЫПОЛНЕНО | Engineering Decision Log. |
-| 31 | ЧАСТИЧНО | `CalculationScenario` + `CalculationScenarioService` + UI подключены к существующему `CalculationService`; результаты передаются в существующий Comparison/Excel workflow. Остаются сценарии из confirmed System Templates и acceptance. |
+| 31 | ЧАСТИЧНО | `CalculationScenario` + `CalculationScenarioService` + UI подключены к существующему `CalculationService`; Comparison/Excel workflow используется без второго расчётного движка. Добавлен read-only bridge confirmed + `tds_verified=KNOWN` templates → scenario alternatives. Acceptance остаётся. |
 | 32 | НЕ ВЫПОЛНЕНО | Полный inspection/DFT workflow. |
 
 ## Каталог `Системы 1–4`
@@ -77,13 +77,15 @@
 - `system_catalog_review_view.py` — `8b68ce1de37c39608d73a4d2a1699d275aaf4ebb`: selected row → draft/editor, controlled incomplete Material creation, CONFIRM → persistence wiring.
 - `tds_manifest.py` — `80e75053fc237e4b0c622304f1f502d57050016b`: explicit TDS document/rule verification boundary; extracted PDF text is not promoted automatically.
 - `calculation_scenario.py` — `f301f2ae08c65c5d230c91877a48f4470658f3e3`: immutable scenario boundary with named alternatives and shared object/context.
-- `calculation_scenario_service.py` — `1623aee6e51c211191fb786a4f9ecbeb0e1fc4b6`: initial scenario orchestration; later fixed repeated-material validation in `b36573abf795c1b13ba6706de6c9beb57c227816`.
+- `calculation_scenario_service.py` — `1623aee6e51c211191fb786a4f9ecbeb0e1fc4b6`: initial scenario orchestration; repeated-material validation fixed in `b36573abf795c1b13ba6706de6c9beb57c227816`.
 - `calculation_scenario_view.py` — `afc098441ad23130204377c8e2230330daebe8a8`: scenario UI with shared-object alternatives, result table and handoff to Comparison.
 - `main_window.py` — `ed2b1462cd03a7c09b9f5717660e471bb73cd4bb`: scenario service/view integration and engineering-context propagation.
 - `comparison_view.py` — `ce02fb4d2f07411e3575ad6156a1497e6c22b9a8`: public `clear()` boundary for scenario handoff.
 - `calculation_scenario_view.py` — `2657a414825046419d376d263574736a51af662f`: scenario uses public Comparison clear API.
+- `confirmed_system_template_service.py` — `09a6e732ff0744e200dd156904a877670d6ec27c`: read-only bridge that exposes only CONFIRMED + `tds_verified=KNOWN` templates with complete source/material/DFT data.
+- `main_window.py` — `047379bfaefb995b93e5e644bdbcdbf1d891b66e`: scenario alternatives now come only from confirmed, TDS-verified templates; ordinary catalogue systems are not promoted into scenarios.
 
-## §20/§27/§29 — следующий шаг
+## §20/§27/§29/§31 — следующий шаг
 
 1. Проверить фактическую структуру каждого листа/строки; не угадывать заголовки.
 2. Сохранить/показать однозначные DB matches.
@@ -92,7 +94,8 @@
 5. Редактор draft реализован.
 6. CONFIRM — отдельное действие.
 7. CONFIRM → persistence wiring реализован, но `tds_verified=KNOWN` обязателен.
-8. Scenario domain/service/UI boundary реализована на существующих `CoatingSystem`; следующий шаг — дать сценариям confirmed System Templates как единственный подтверждённый источник альтернатив и затем провести acceptance.
+8. Scenario domain/service/UI реализованы; bridge к confirmed System Templates готов и безопасно отбрасывает UNKNOWN/incomplete templates.
+9. Следующий инженерный блок — реальная TDS verification из `SPKEFFA` (§14/§25), после чего появятся первые допустимые confirmed-template alternatives. Затем — acceptance сценария/сравнения/экспорта.
 
 ## TDS verification boundary — §12/§14/§25
 
