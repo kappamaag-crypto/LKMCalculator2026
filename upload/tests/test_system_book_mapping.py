@@ -155,3 +155,82 @@ def test_side_by_side_layout_requires_layers():
         assert "layers" in str(exc)
     else:
         raise AssertionError("empty layers must be rejected")
+
+
+from app.services.system_book_mapping import (
+    SYSTEMS2_OGZ_SIDE_BY_SIDE,
+    SYSTEMS3_AKZ_SIDE_BY_SIDE,
+    REVIEWED_SIDE_BY_SIDE_LAYOUTS,
+)
+
+
+def test_optional_number_parses_unit_suffix():
+    cells = [None] * 10
+    cells[2] = "Maker"
+    cells[4] = "Грунт"
+    cells[5] = "80 мкм"
+    cells[6] = "ОГЗ Mat"
+    cells[7] = 3700
+    cells[8] = "Finish"
+    cells[9] = 50
+    drafts = SystemBookSideBySideMapper.map_rows(
+        [_wide_row(5, cells, sheet="ОГЗ")], SYSTEMS2_OGZ_SIDE_BY_SIDE, name_prefix="Системы2"
+    )
+    assert len(drafts) == 1
+    assert drafts[0].layers[0].dft_target == 80.0
+    assert drafts[0].layers[1].dft_target == 3700.0
+    assert drafts[0].layers[2].dft_target == 50.0
+
+
+def test_optional_number_rejects_composite_thickness_as_unknown():
+    cells = [None] * 16
+    cells[2] = "Maker"
+    cells[4] = "Грунт"
+    cells[5] = "80 мкм"
+    cells[6] = "ЭФФА-КТЭ + ЭФФА ЭП-150"
+    cells[7] = "3200 + 2570"
+    cells[8] = "Finish"
+    cells[9] = 50
+    drafts = SystemBookSideBySideMapper.map_rows(
+        [_wide_row(7, cells, sheet="ОГЗ")], SYSTEMS2_OGZ_SIDE_BY_SIDE
+    )
+    assert len(drafts) == 1
+    assert drafts[0].layers[1].material_name == "ЭФФА-КТЭ + ЭФФА ЭП-150"
+    assert drafts[0].layers[1].dft_target is None  # composite → UNKNOWN
+
+
+def test_systems3_akz_layout_expands_three_layer_row():
+    cells = [None] * 14
+    cells[0] = 1
+    cells[1] = 'ООО "Колоридо"'
+    cells[2] = "Грунт-эмаль Blank Universal"
+    cells[3] = 110
+    cells[4] = "EP"
+    cells[5] = "-"
+    cells[6] = "-"
+    cells[7] = "-"
+    cells[8] = "Эмаль Blank Finish"
+    cells[9] = 50
+    cells[10] = "PU"
+    cells[11] = "C2, C3, C4"
+    drafts = SystemBookSideBySideMapper.map_rows(
+        [_wide_row(8, cells, sheet="АКЗ")], SYSTEMS3_AKZ_SIDE_BY_SIDE, name_prefix="Системы3"
+    )
+    assert len(drafts) == 1
+    draft = drafts[0]
+    assert draft.status == "DRAFT"
+    assert draft.metadata["tds_verified"] == "UNKNOWN"
+    assert [l.material_name for l in draft.layers] == [
+        "Грунт-эмаль Blank Universal",
+        "Эмаль Blank Finish",
+    ]
+    assert draft.layers[0].dft_target == 110.0
+    assert draft.layers[1].dft_target == 50.0
+    assert "Системы3" in draft.name
+
+
+def test_reviewed_layout_registry_keys():
+    assert ("Системы 2.XLSX", "АКЗ") in REVIEWED_SIDE_BY_SIDE_LAYOUTS
+    assert ("Системы 2.XLSX", "ОГЗ") in REVIEWED_SIDE_BY_SIDE_LAYOUTS
+    assert ("Системы 3.xlsx", "АКЗ") in REVIEWED_SIDE_BY_SIDE_LAYOUTS
+    assert len(REVIEWED_SIDE_BY_SIDE_LAYOUTS) == 3

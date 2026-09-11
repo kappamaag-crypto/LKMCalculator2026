@@ -1,6 +1,7 @@
 """Explicit mapping boundary for reviewed Systems 1-4 workbook rows."""
 from __future__ import annotations
 from dataclasses import dataclass
+import re
 from typing import Optional, Sequence
 from app.domain.system_template import SystemTemplateDraft, TemplateLayer
 from app.services.system_book_importer import SystemBookRow
@@ -133,6 +134,43 @@ SYSTEMS2_AKZ_SIDE_BY_SIDE = SideBySideLayout(
     ),
 )
 
+# Reviewed layout for books/Системы 2.XLSX sheet «ОГЗ» (staging only; §15 OGZ calc deferred).
+# Data from row 5. Columns 0-based:
+# B=№, C=manufacturer, D=metal thickness (not a coating layer),
+# E–F=primer, G–H=ОГЗ, I–J=finish, K=R-group, L–N=consumption, O=notes.
+# Composite thickness cells (e.g. "3200 + 2570") remain UNKNOWN DFT.
+SYSTEMS2_OGZ_SIDE_BY_SIDE = SideBySideLayout(
+    manufacturer=2,
+    row_number_col=1,
+    service_conditions=14,
+    layers=(
+        LayerColumnGroup(1, material_name=4, thickness=5, material_type=None),
+        LayerColumnGroup(2, material_name=6, thickness=7, material_type=None),
+        LayerColumnGroup(3, material_name=8, thickness=9, material_type=None),
+    ),
+)
+
+# Reviewed layout for books/Системы 3.xlsx sheet «АКЗ».
+# Header rows 4–7; data from row 8. Columns 0-based:
+# A=№, B=manufacturer, C–E=layer1, F–H=layer2, I–K=layer3, L=conditions.
+SYSTEMS3_AKZ_SIDE_BY_SIDE = SideBySideLayout(
+    manufacturer=1,
+    row_number_col=0,
+    service_conditions=11,
+    layers=(
+        LayerColumnGroup(1, material_name=2, thickness=3, material_type=4),
+        LayerColumnGroup(2, material_name=5, thickness=6, material_type=7),
+        LayerColumnGroup(3, material_name=8, thickness=9, material_type=10),
+    ),
+)
+
+# Registry of reviewed layouts keyed by (workbook file name, sheet title).
+REVIEWED_SIDE_BY_SIDE_LAYOUTS: dict[tuple[str, str], SideBySideLayout] = {
+    ("Системы 2.XLSX", "АКЗ"): SYSTEMS2_AKZ_SIDE_BY_SIDE,
+    ("Системы 2.XLSX", "ОГЗ"): SYSTEMS2_OGZ_SIDE_BY_SIDE,
+    ("Системы 3.xlsx", "АКЗ"): SYSTEMS3_AKZ_SIDE_BY_SIDE,
+}
+
 
 class SystemBookSideBySideMapper:
     """Expand reviewed side-by-side layer columns into DRAFT SystemTemplateDraft.
@@ -160,16 +198,30 @@ class SystemBookSideBySideMapper:
 
     @classmethod
     def _optional_number(cls, row: SystemBookRow, index: Optional[int]) -> Optional[float]:
-        """Soft parse: missing or non-numeric → None (UNKNOWN). Negative rejected."""
+        """Soft parse: missing or non-numeric → None (UNKNOWN). Negative rejected.
+
+        Accepts a single leading number optionally followed by a unit token
+        (e.g. ``80 мкм`` → 80.0). Composite cells such as ``3200 + 2570`` stay
+        UNKNOWN — no arithmetic is invented.
+        """
         value = cls._cell(row, index)
         if value in (None, ""):
             return None
-        if isinstance(value, str) and value.strip() in ("-", "—", "–"):
-            return None
-        try:
+        if isinstance(value, (int, float)):
             number = float(value)
-        except (TypeError, ValueError):
+            if number < 0:
+                raise ValueError(f"negative thickness in row {row.row_number}: {number}")
+            return number
+        text = str(value).strip()
+        if text in ("-", "—", "–"):
             return None
+        # Composite / multi-value → UNKNOWN
+        if any(sep in text for sep in ("+", "/", ";")):
+            return None
+        match = re.match(r"^\s*(\d+(?:[.,]\d+)?)\s*(?:[a-zA-Zа-яА-Яµμ°%].*)?$", text)
+        if not match:
+            return None
+        number = float(match.group(1).replace(",", "."))
         if number < 0:
             raise ValueError(f"negative thickness in row {row.row_number}: {number}")
         return number
