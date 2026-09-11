@@ -225,7 +225,7 @@ class CalculationService:
         return format_explanation_text(explain_system_calculation(result))
 
     def format_summary(self, result: SystemCalculationResult) -> str:
-        """Краткая текстовая сводка расчёта, включая расход разбавителя и совместимость."""
+        """Краткая сводка расчёта, включая расход разбавителя и source-backed совместимость."""
         thinner_l_m2 = sum(lr.thinner_consumption_l for lr in result.layers)
         thinner_kg_m2 = sum(lr.thinner_consumption_kg for lr in result.layers)
         area = result.object_data.area_m2
@@ -241,4 +241,20 @@ class CalculationService:
             lines.append(f"Разбавитель: {thinner_l_m2:g} л/м²")
         if thinner_l_total is not None:
             lines.append(f"Разбавитель всего: {thinner_l_total:g} л")
+
+        if len(result.layers) >= 2:
+            compatibility = self.compatibility_report(result)
+            status_labels = {
+                "разрешено": "РАЗРЕШЕНО",
+                "предупреждение": "ПРЕДУПРЕЖДЕНИЕ",
+                "запрещено": "ЗАПРЕЩЕНО",
+                "нет подтвержденных данных": "UNKNOWN — НЕТ ПОДТВЕРЖДЁННЫХ ДАННЫХ",
+            }
+            lines.append(
+                "Совместимость слоёв: "
+                + status_labels.get(compatibility.status.value, compatibility.status.value)
+            )
+            for transition in compatibility.transitions:
+                lines.append(f"{transition.message} [источник: {transition.rule.source}]")
+
         return "\n".join(lines)
