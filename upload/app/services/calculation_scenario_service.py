@@ -33,16 +33,27 @@ class CalculationScenarioService:
         scenario.validate()
         evaluated: list[ScenarioAlternativeResult] = []
         for system in scenario.alternatives:
+            layers_with_material_ids = [
+                layer for layer in system.layers if layer.material_id is not None
+            ]
             materials_by_id = {
                 layer.material_id: layer.material
-                for layer in system.layers
-                if layer.material_id is not None and layer.material is not None
+                for layer in layers_with_material_ids
+                if layer.material is not None
             }
-            if len(materials_by_id) != len(
-                [layer for layer in system.layers if layer.material_id is not None]
-            ):
+            missing_materials = [
+                layer.layer_number
+                for layer in layers_with_material_ids
+                if layer.material is None
+            ]
+            if missing_materials:
                 raise ValueError(
-                    f"Система «{system.system_name}» содержит слой без Material"
+                    f"Система «{system.system_name}» содержит слой(и) без Material: "
+                    + ", ".join(str(number) for number in missing_materials)
+                )
+            if any(layer.material_id is None for layer in system.layers):
+                raise ValueError(
+                    f"Система «{system.system_name}» содержит слой без material_id"
                 )
             result, validation = self.calculation_service.calculate_from_template(
                 scenario.object_data,
