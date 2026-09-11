@@ -47,7 +47,7 @@
 | 25 | НЕ ВЫПОЛНЕНО | Полная normative traceability. |
 | 26 | НЕ ВЫПОЛНЕНО | Explanation Engine. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
-| 28 | НЕ ВЫПОЛНЕНО | Управляемый LossProfile. |
+| 28 | ВЫПОЛНЕНО | Controlled LossProfile: domain model + integration into SystemCalculator/LayerInput; explicit losses_percent priority over profile; LossProfile.none(); no hidden engineering defaults; regression tests in test_loss_profile.py. Commits: eac21b6 (model), d93f48e (integration), 3e3873f (tests). |
 | 29 | ЧАСТИЧНО | Catalogue → draft → editor → explicit CONFIRM → persistence boundary реализовано; persistence блокирует UNKNOWN TDS. Scenario UI подключён, а источник альтернатив ограничен подтверждёнными и TDS-verified templates. Persistence/acceptance остаются. |
 | 30 | НЕ ВЫПОЛНЕНО | Engineering Decision Log. |
 | 31 | ЧАСТИЧНО | `CalculationScenario` + `CalculationScenarioService` + UI подключены к существующему `CalculationService`; Comparison/Excel workflow используется без второго расчётного движка. Добавлен read-only bridge confirmed + `tds_verified=KNOWN` templates → scenario alternatives. Acceptance остаётся. |
@@ -84,6 +84,9 @@
 - `calculation_scenario_view.py` — `2657a414825046419d376d263574736a51af662f`: scenario uses public Comparison clear API.
 - `confirmed_system_template_service.py` — `09a6e732ff0744e200dd156904a877670d6ec27c`: read-only bridge that exposes only CONFIRMED + `tds_verified=KNOWN` templates with complete source/material/DFT data.
 - `main_window.py` — `047379bfaefb995b93e5e644bdbcdbf1d891b66e`: scenario alternatives now come only from confirmed, TDS-verified templates; ordinary catalogue systems are not promoted into scenarios.
+- `loss_profile.py` — `eac21b6df1b7989961740ec3a36f3a6dd3a0f36c`: controlled LossProfile domain model (name/percent/source, resolve, none()).
+- `calculator.py` — `d93f48e3ff999c802457d1e842f23848c37edbcb`: LossProfile integrated into SystemCalculator/LayerInput; explicit losses_percent priority; legacy default_losses preserved as 0.0 without hidden engineering values.
+- `test_loss_profile.py` — `3e3873fc9445d87694433be93701e5ed772fd27c`: regression coverage for profile usage, explicit override, none(), invalid rejection, legacy compatibility.
 
 ## §20/§27/§29/§31 — следующий шаг
 
@@ -100,3 +103,12 @@
 ## TDS verification boundary — §12/§14/§25
 
 `kappamaag-crypto/SPKEFFA` используется только read-only. Git blob SHA-1 не является SHA-256 бинарного PDF. Для `KNOWN` нужны реальный SHA-256 PDF, явный source identity, locator и applicability правила. Пока бинарные SHA-256 и rule-by-rule verification не внесены, технологические ограничения остаются `UNKNOWN`.
+
+## §28 — Controlled LossProfile (закрыто)
+
+Приоритет разрешения потерь:
+1. явный `losses_percent` (включая 0.0);
+2. `LayerInput.loss_profile` или `SystemCalculator.loss_profile`;
+3. legacy `default_losses` (по умолчанию 0.0 — не скрытое инженерное значение).
+
+`LossProfile.none()` — явный нулевой профиль (`source=SYSTEM`). Некорректный percent отклоняется. Существующий API `LayerCalculator.calculate(..., losses_percent=0.0)` сохранён.
