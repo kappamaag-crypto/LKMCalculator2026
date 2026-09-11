@@ -39,7 +39,7 @@
 | 17 | НЕ ВЫПОЛНЕНО | Inspection workflow. |
 | 18 | НЕ ВЫПОЛНЕНО | Release/regression/smoke/DB backup/docs acceptance. |
 | 19 | НЕ ВЫПОЛНЕНО | Legacy parity matrix. |
-| 20 | ЧАСТИЧНО | `book_index.py` индексирует source identity/integrity файлов `books/`. Добавлен `book_content_index.py`: детерминированное извлечение searchable content из PDF и UTF-8 text-like файлов с привязкой каждого chunk к `relative_path`, SHA-256 и locator страницы/части. Поиск возвращает только source-linked chunks и не превращает извлечённый текст в `NormativeRule`. Для PDF добавлена явная зависимость `pypdf`. Полноценная UI/DB KB и acceptance остаются. |
+| 20 | ЧАСТИЧНО | `book_index.py` индексирует source identity/integrity файлов `books/`. `book_content_index.py` извлекает searchable content из PDF и UTF-8 text-like файлов в детерминированные source-linked chunks с path/SHA-256/locator. `BookSearchService` предоставляет lazy rebuild и source-linked search API поверх этого индекса. Извлечённый текст не превращается в нормативные правила. Полноценная UI/DB KB и acceptance остаются. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix есть; applicability к реальной chemistry/TDS остаётся. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` подключён к `CalculationService.format_summary()`, поэтому обычный `CalculationView` уже получает source-backed результат проверки соседних слоёв после расчёта. Проверка не блокирует расчёт и `UNKNOWN` не превращается в запрет. Остаётся прямое workflow-подключение `SystemsView`, UI regression и TDS-backed conditions. |
 | 23 | НЕ ВЫПОЛНЕНО | — |
@@ -59,7 +59,7 @@
 Code commit: `709eadea3be513fb3a2a540dc195ef93956f4b09` — immutable source-backed normative model с версиями, правилами, registry и явным `UNKNOWN`.
 
 ### §13 — Structured Sa/St/profile foundation
-Code commit: `6d3c86145e99c8a653cb1dff9823639c3fef41` — structured surface preparation/profile model без hard-coded нормативных значений.
+Code commit: `6d3c86145e99c8c9a653cb1dff9823639c3fef41` — structured surface preparation/profile model без hard-coded нормативных значений.
 
 ### §12/§13 — Persistence serialization foundation
 Code commit: `4a623ed5bf0b19d34bb57009135f8b96b54cb634` — source-preserving serializer для `NormativeModel` и `SurfaceCondition`.
@@ -86,7 +86,7 @@ Code commit: `6e112c2621af2adef23b4d72c4025bfdb627543c` — History snapshot v7 
 Code commit: `b545603bef83dfb10b346516f9f19a7b305d8494` — `CalculationService.calculate_system()` и `calculate_from_template()` принимают явный `EngineeringContext` и передают его в domain calculator.
 
 ### §12/§13 — CalculationView workflow integration
-Code commit: `98d3fe008f420067ee8db8ae30447682d5c2730d` — `CalculationView` хранит typed engineering context, передаёт его при расчёте и восстанавливает из snapshot, включая legacy v6 representation.
+Code commit: `98d3fe008f420067ee8db8ae30447682d5c273c` — `CalculationView` хранит typed engineering context, передаёт его при расчёте и восстанавливает из snapshot, включая legacy v6 representation.
 
 ### §12/§13 — UI source/context editor
 Code commit: `4f9175755f8e43100b80f4f43cddf58a3248ef4a` — добавлен отдельный диалог редактирования нормативного source identity, подготовки поверхности и профиля; значения не подменяются нормативными догадками.
@@ -118,6 +118,9 @@ Code commit: `5805f111719b5b664d01a447d9e76596d5393cda` — добавлен `bo
 ### §20 — PDF extraction dependency
 Code commit: `83f12f8b0eb2d261ac04f19a257e4a91553fc028` — добавлен `pypdf>=5.0.0` в `upload/requirements.txt` для явной поддержки PDF content indexing.
 
+### §20 — Source-linked book search service
+Code commit: `2c084a315d27b5bc181ff57177a1cdae6c02dcaa` — добавлен `BookSearchService`: lazy построение контентного индекса и детерминированный API поиска, возвращающий `relative_path`, `locator`, SHA-256 и текст каждого результата. Сервис остаётся reference-search слоем и не создаёт нормативных правил.
+
 ### §22 — Calculation workflow integration
 Code commit: `2ea726933b859c8e00dd17069be437cb6251a302` — `CalculationService` получил `LayerCompatibilityEngine`; добавлен `compatibility_report()` и source-backed блок совместимости в `format_summary()`. После расчёта `CalculationView` получает статус и сообщения по каждому переходу между соседними слоями. Проверка информационная: `UNKNOWN` не блокирует расчёт и не превращается в запрет. TDS-specific cure/recoat conditions намеренно не выводятся из общих предположений.
 
@@ -139,6 +142,6 @@ Code commit: `2ea726933b859c8e00dd17069be437cb6251a302` — `CalculationService`
 5. §11 и §11.1 не закрывать до общего runtime acceptance.
 6. §12/§13: механизм безопасной загрузки verified source-backed rules создан; добавлена сборка явно перечисленного набора sidecar-манифестов в `NormativeRegistry`. Следующий шаг — добавить только фактически проверенные sidecar-манифесты для выбранных документов с SHA-256 исходного PDF и без придуманных значений, затем подключить фактический registry к инженерному workflow.
 7. После фактического набора verified rules перейти к §14 TDS-backed technological validation.
-8. §20: source/integrity index и source-preserving content/search index созданы. Следующий шаг — при наличии принятого формата интегрировать поиск в инженерный workflow/KB, не превращая извлечённый текст в нормативные правила и сохраняя source identity.
+8. §20: source/integrity index и source-preserving content/search index созданы. Следующий шаг — интегрировать `BookSearchService` в инженерный workflow/KB с явным source-linked результатом, не превращая извлечённый текст в нормативные правила и сохраняя source identity.
 9. §22 вести отдельно: CalculationView workflow integration выполнена, следующий шаг — SystemsView и UI regression; формально не закрывать до полного workflow integration.
 10. После каждого code commit — отдельный plan/docs commit с фактическим SHA и текущим статусом.
