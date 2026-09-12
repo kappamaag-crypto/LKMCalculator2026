@@ -8,7 +8,7 @@ This matrix defines what must be compared before declaring legacy parity. It int
 | Multilayer calculation | v2 calculation flow | `SystemCalculationResult` / system calculator | VERIFIED — sum-of-layers aggregation; binary-friendly inputs match v2 numerically; invalid losses → validation error. Evidence: `upload/tests/test_legacy_multilayer_parity.py` |
 | Two-component materials | v2 material/calculation behavior | v3 2K domain/service | VERIFIED — N/A in v2 (no 2K module); v3 informational-only + single mixed layer calc. Evidence: `upload/tests/test_legacy_two_component_parity.py` |
 | Material persistence | v2 repository/SQLite | v3 repositories + migrations | PENDING |
-| History | v2 history service/view | immutable snapshots + integrity | PENDING |
+| History | v2 history service/view | immutable snapshots + integrity | VERIFIED — v3 seals SHA-256 snapshots; tamper rejected; v2 had no seal. Evidence: `upload/tests/test_legacy_history_parity.py` |
 | Recommendations | v2 recommendation engine | v3 recommendation engine + engineering limitations | VERIFIED — shared hard-filter→score; ScoreBreakdown retained; no hidden weights; unknown cost safe. Evidence: `upload/tests/test_legacy_recommendations_parity.py` |
 | Excel export | v2 exporter | v3 engineering/customer exporters | VERIFIED — from SystemCalculationResult; missing price → «—»; engineering/customer split intentional. Evidence: `upload/tests/test_legacy_export_parity.py` |
 | PDF export | v2 exporter | v3 exporter from calculation result | VERIFIED — shared export_calculation(SystemCalculationResult); None cost → «—». Evidence: `upload/tests/test_legacy_export_parity.py` |
@@ -71,3 +71,10 @@ A row is not `PASS` merely because the v3 implementation exists. It requires a r
 - v3 Excel missing price produces a file without inventing 0 cost (see also `test_excel_missing_price.py`).
 - Intentional: v3 splits engineering vs customer Excel exporters; v2 had a single excel_exporter.
 - Regression: `upload/tests/test_legacy_export_parity.py` (5 cases).
+
+### History (2026-09-12)
+- v2 `HistoryService` persists calculations without integrity hash / seal helpers.
+- v3 `snapshot_utils.seal_snapshot` / `verify_snapshot` / `load_and_verify_snapshot` (SHA-256 over canonical JSON).
+- Tampered or unsealed payloads raise ValueError; `snapshot_number(None)` stays None (no invented zero).
+- `HistoryService.save_calculation` documents immutable material snapshot capture.
+- Regression: `upload/tests/test_legacy_history_parity.py` (6 cases).
