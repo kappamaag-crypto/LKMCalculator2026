@@ -60,7 +60,7 @@ if (-not $SkipCollect) {
     }
     elseif (Test-Path $collectFile) {
         $collected = Get-Content $collectFile | Where-Object {
-            $_ -match '^upload[\\/].*::test_' -or $_ -match '^tests[\\/].*::test_'
+            $_ -match '^(upload[\\/])?tests[\\/].*::test_'
         }
     }
 }
@@ -137,23 +137,25 @@ function Get-SectionEvidence([string]$section) {
 
 function Get-JunitSectionStatus([string]$section) {
     if (-not (Test-Path $junit)) { return "UNKNOWN" }
-    $evidence = Get-SectionEvidence $section
-    if ($evidence.Count -eq 0) { return "NO_DIRECT_TEST" }
+    $patterns = $sectionTests[$section]
+    if ($null -eq $patterns -or $patterns.Count -eq 0) { return "NO_DIRECT_TEST" }
 
     try {
         [xml]$xml = Get-Content $junit
         $cases = @($xml.testsuites.testsuite.testcase)
         $matched = @()
         foreach ($case in $cases) {
-            $name = "$($case.classname)::$($case.name)"
-            foreach ($nodeid in $evidence) {
-                if ($nodeid -match [regex]::Escape("$($case.classname)::$($case.name)")) {
-                    $matched += $case
+            $identity = "$($case.classname)::$($case.name)"
+            $isMatch = $false
+            foreach ($pattern in $patterns) {
+                if ($identity -match [regex]::Escape($pattern)) {
+                    $isMatch = $true
                     break
                 }
             }
+            if ($isMatch) { $matched += $case }
         }
-        if ($matched.Count -eq 0) { return "UNKNOWN" }
+        if ($matched.Count -eq 0) { return "NO_DIRECT_TEST" }
         if ($matched | Where-Object { $_.failure -or $_.error -or $_.skipped }) { return "FAIL_OR_SKIPPED" }
         return "PASS"
     }
@@ -181,12 +183,7 @@ foreach ($section in $sectionTests.Keys) {
     $p = if ($planStatus.ContainsKey($section)) { $planStatus[$section] } else { "UNKNOWN" }
     $t = Get-JunitSectionStatus $section
     $evidence = Get-SectionEvidence $section
-    if ($manualSections.ContainsKey($section)) {
-        $manual = $manualSections[$section]
-    }
-    else {
-        $manual = ""
-    }
+    $manual = if ($manualSections.ContainsKey($section)) { $manualSections[$section] } else { "" }
 
     $detail = if ($evidence.Count -gt 0) { "tests=$($evidence.Count)" } else { "tests=0" }
     if ($manual) { $detail += "; manual=$manual" }
