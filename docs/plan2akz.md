@@ -38,7 +38,7 @@
 | 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; ScoreBreakdown сохранён в RecommendationItem и теперь прозрачно отображается в RecommendationView и текстовом отчёте. Остаются фактический pytest-run и полная scoring/E2E-проверка. |
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI; добавлен DFT UI workflow; acceptance позже. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
-| 19 | ЧАСТИЧНО | Legacy parity matrix; строки PENDING. |
+| 19 | ЧАСТИЧНО | Legacy parity matrix; **Calculation formulas VERIFIED** (algebraic match; intentional no intermediate round3 + stricter loss validation). Остальные строки PENDING. |
 | 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + incomplete Material. Side-by-side DRAFT + expand + load_reviewed + CatalogReview + bind/prepare + `confirm_draft` (service gate: unique material + provenance + tds_verified=KNOWN → CONFIRMED; prepare never auto-CONFIRM). Системы 1/4 layout N/A. Остаются фактический pytest-run и полный UI/E2E acceptance. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` использует точную матрицу из `books/совместимость_лкм.png` (Таблица 1) с опубликованным источником LKM-Prof; пустая ячейка = UNKNOWN, 1 = WARNING/проверка адгезии, 2 = WARNING/требуется шероховатость. Матрица участвует в `CalculationService` summary/UI, source identity зафиксирована в коде и regression-test. Остаются реальные material-specific TDS-backed conditions и полноценный UI/E2E acceptance. |
@@ -115,6 +115,7 @@ Staging boundary (v3):
 - `SystemTemplateService.load_reviewed_side_by_side_drafts` + CatalogReview reviewed-DRAFT table; 4 service tests; lazy xlrd import.
 - `bind_unique_materials` + `prepare_reviewed_draft_for_review`; 6 unit tests; CatalogReview open uses prepare path.
 - `confirm_draft` service gate + editor wiring; TDS gate regression extended (14 tests in gate/bind suites).
+- §19 formula parity: `test_legacy_formula_parity.py` (19 cases); matrix row Calculation formulas → VERIFIED.
 - `test_system_template_tds_gate.py` — service-level regression coverage for unique bind → KNOWN, ambiguous bind → unbound, missing provenance block, mandatory KNOWN TDS, and `confirm_draft` success/reject paths.
 
 ## TDS verification boundary — §12/§14/§25
