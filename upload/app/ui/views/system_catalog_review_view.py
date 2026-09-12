@@ -275,9 +275,11 @@ class SystemCatalogReviewView(QWidget):
             QMessageBox.information(self, "Reviewed DRAFT", "Выберите DRAFT в таблице.")
             return
         try:
-            # Keep status DRAFT; re-evaluate TDS without inventing KNOWN.
-            verified = SystemTemplateService.with_tds_verification(draft, self._materials)
-            self.editor.load_draft(verified)
+            # Unique material bind + TDS evaluate; never auto-CONFIRM.
+            prepared = SystemTemplateService.prepare_reviewed_draft_for_review(
+                draft, self._materials
+            )
+            self.editor.load_draft(prepared)
             self.editor.show()
             self.editor.raise_()
         except Exception as exc:
@@ -331,7 +333,6 @@ class SystemCatalogReviewView(QWidget):
             QMessageBox.information(
                 self, "Material", f"Создана неполная карточка id={material_id}"
             )
-            # refresh materials list is caller's responsibility; keep local cache
             self._materials.append(material)
             self.set_materials(self._materials)
         except Exception as exc:
