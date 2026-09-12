@@ -4,7 +4,7 @@ This matrix defines what must be compared before declaring legacy parity. It int
 
 | Area | Legacy v2 baseline | v3 target | Verification |
 |---|---|---|---|
-| Calculation formulas | `v2/app/domain/calculator.py`, `formulas.py` | `upload/app/domain/calculator.py`, `formulas.py` | PENDING |
+| Calculation formulas | `v2/app/domain/calculator.py`, `formulas.py` | `upload/app/domain/calculator.py`, `formulas.py` | VERIFIED — algebraic identity; intentional: v3 no intermediate round3; invalid losses → ValueError (v2 returned 1.0). Evidence: `upload/tests/test_legacy_formula_parity.py` |
 | Multilayer calculation | v2 calculation flow | `SystemCalculationResult` / system calculator | PENDING |
 | Two-component materials | v2 material/calculation behavior | v3 2K domain/service | PENDING |
 | Material persistence | v2 repository/SQLite | v3 repositories + migrations | PENDING |
@@ -20,3 +20,11 @@ This matrix defines what must be compared before declaring legacy parity. It int
 ## Rule
 
 A row is not `PASS` merely because the v3 implementation exists. It requires a reproducible comparison against the legacy behavior or an explicit documented reason why parity is not applicable.
+
+## Evidence notes
+
+### Calculation formulas (2026-09-12)
+- Core identities (WFT, loss coefficient on valid range, consumption_l, exact binary-friendly cases) match v2 numerically.
+- v2 applied intermediate `round3` on WFT / theoretical coverage / practical coverage / consumption_kg; v3 keeps full float precision (no intermediate rounding invariant, aligned with §7).
+- Invalid `losses_percent` (<0 or ≥100): v2 returned `1.0`; v3 raises `ValueError` (stricter validation, not silent fallback).
+- Regression: `upload/tests/test_legacy_formula_parity.py` (19 cases).
