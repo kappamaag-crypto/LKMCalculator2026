@@ -110,8 +110,6 @@ class CalculationService:
 
     def check_system_tds_dft(self, system, materials_by_id=None):
         """Check target DFT of each layer against known TDS rules when available."""
-        from app.services.tds_known_rules import resolve_material_document
-
         materials_by_id = materials_by_id or {}
         findings = []
         for layer in system.layers:
@@ -131,9 +129,15 @@ class CalculationService:
         return findings
 
     def build_tds_engineering_context(self, system, materials_by_id=None, base=None):
-        return engineering_context_from_known_tds(
-            system, materials_by_id=materials_by_id, base=base
-        )
+        materials_by_id = materials_by_id or {}
+        names = []
+        for layer in system.layers:
+            mat = layer.material
+            if mat is None and layer.material_id is not None:
+                mat = materials_by_id.get(layer.material_id)
+            if mat is not None:
+                names.append(mat.material_name or mat.display_name())
+        return engineering_context_from_known_tds(names, base=base)
 
     def tds_trace_for_system(self, system, materials_by_id=None):
         materials_by_id = materials_by_id or {}
@@ -144,7 +148,7 @@ class CalculationService:
                 mat = materials_by_id.get(layer.material_id)
             if mat is None:
                 continue
-            traces.append(tds_trace_for_material(mat))
+            traces.append(tds_trace_for_material(mat.material_name or mat.display_name()))
         return traces
 
     def check_chemical_resistance(
@@ -231,11 +235,13 @@ class CalculationService:
         area = result.object_data.area_m2
         thinner_l_total = thinner_l_m2 * area if area is not None else None
         thinner_kg_total = thinner_kg_m2 * area if area is not None else None
+        cost_m2 = result.total_cost_per_m2
+        cost_m2_text = "—" if cost_m2 is None else f"{cost_m2:g}"
         lines = [
             f"Система: {result.system.system_name}",
             f"Слоёв: {len(result.layers)}",
             f"Суммарная DFT: {result.total_dft:g} мкм",
-            f"Стоимость / м²: {result.total_cost_per_m2:g}",
+            f"Стоимость / м²: {cost_m2_text}",
         ]
         if thinner_l_m2:
             lines.append(f"Разбавитель: {thinner_l_m2:g} л/м²")
