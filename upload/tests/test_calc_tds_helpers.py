@@ -11,7 +11,7 @@ def test_check_system_tds_dft_and_trace():
     svc = CalculationService()
     checks = svc.check_system_tds_dft(system)
     assert len(checks) == 1
-    assert any(i.code == "TECH_TDS_DFT_OK" for i in checks[0][1].issues)
+    assert any(i.code == "TECH_TDS_DFT_OK" for i in checks[0].issues)
     traces = svc.tds_trace_for_system(system)
     assert traces[0]["tds_verified"] == "KNOWN"
     ctx = svc.build_tds_engineering_context(system)

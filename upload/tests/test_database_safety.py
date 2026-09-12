@@ -58,6 +58,6 @@ def test_alembic_upgrade_is_idempotent_and_reaches_head(tmp_path: Path) -> None:
             )
         }
 
-    assert revision == ("004_nullable_calculation_inputs",)
+    assert revision == ("007_system_templates",)
     assert "calculations" in tables
     assert "coating_system_layers" in tables

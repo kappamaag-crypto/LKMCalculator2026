@@ -1,3 +1,4 @@
+import pytest
 from app.domain.models import Package
 from app.domain.packaging import PackagingPlanner
 
@@ -19,7 +20,7 @@ def test_packaging_reserve_is_commercial_only():
     plan = PackagingPlanner.plan(50.0, package, reserve_percent=10)
 
     assert plan.required_quantity == 50.0
-    assert plan.quantity_to_purchase == 55.0
+    assert plan.quantity_to_purchase == pytest.approx(55.0)
     assert plan.purchase_units == 3
 
 
