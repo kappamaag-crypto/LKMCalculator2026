@@ -187,3 +187,31 @@ class SystemTemplateService:
         if not draft.provenance_complete: reasons.append("Неполная provenance цепочка источника")
         if draft.metadata.get("tds_verified") != "KNOWN": reasons.append("TDS применимости ещё не подтверждены")
         return not reasons, tuple(reasons)
+
+    @staticmethod
+    def confirm_draft(draft: SystemTemplateDraft) -> SystemTemplateDraft:
+        """Explicit CONFIRM gate after review.
+
+        Requires can_confirm (unique materials, full provenance, tds_verified=KNOWN).
+        Does not persist and does not invent material bindings or TDS status.
+        """
+        draft.validate()
+        ok, reasons = SystemTemplateService.can_confirm(draft)
+        if not ok:
+            raise ValueError("CONFIRM запрещён: " + "; ".join(reasons))
+        confirmed = SystemTemplateDraft(
+            name=draft.name,
+            manufacturer=draft.manufacturer,
+            description=draft.description,
+            substrate=draft.substrate,
+            source_path=draft.source_path,
+            source_sheet=draft.source_sheet,
+            source_row=draft.source_row,
+            source_sha256=draft.source_sha256,
+            layers=draft.layers,
+            notes=draft.notes,
+            status="CONFIRMED",
+            metadata=dict(draft.metadata),
+        )
+        confirmed.validate()
+        return confirmed
