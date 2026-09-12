@@ -31,7 +31,7 @@
 | 10 | ВЫПОЛНЕНО | Alembic + SQLite backup/restore. |
 | 11 | ВЫПОЛНЕНО | SHA-256 seal/verify + material restore. |
 | 11.1 | ВЫПОЛНЕНО | Durable outbox: idempotency, retry/FAILED, worker gate, без SMTP secrets в БД. Evidence: `test_notification_outbox.py` (6). Live SMTP optional. |
-| 12 | ЧАСТИЧНО | Engineering context + History TDS traces (v8). |
+| 12 | ЧАСТИЧНО | Engineering context + History TDS traces (v8); added serializer round-trip regression and explicit UNKNOWN-state regression. Runtime pytest remains pending. |
 | 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI. |
 | 14 | ЧАСТИЧНО | SPKEFFA KNOWN rules; E2E remains. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
@@ -60,6 +60,7 @@
 - §32 DFT multi-layer policy: calculation-backed inspection requires at least one measured point for every calculated layer by default; missing layer coverage remains `UNKNOWN` and is explicitly reported.
 - §5 customer Excel print-layout regression added: 2-layer and 5-layer cases assert dynamic print area, repeated header rows, fit-to-page, and totals row.
 - §4 comparison cost provenance regression added: missing thinner cost remains `UNKNOWN` instead of being coerced to zero; explicit zero remains zero.
+- §12 engineering-context snapshot regression added: verified source metadata and explicit UNKNOWN surface state survive serialize/restore without manufacturing normative values.
 
 ## TDS verification boundary — §12/§14/§25
 
