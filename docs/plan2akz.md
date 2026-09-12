@@ -38,7 +38,7 @@
 | 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; ScoreBreakdown сохранён в RecommendationItem и теперь прозрачно отображается в RecommendationView и текстовом отчёте. Остаются фактический pytest-run и полная scoring/E2E-проверка. |
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI; добавлен DFT UI workflow; acceptance позже. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
-| 19 | ЧАСТИЧНО | Legacy parity matrix; **formulas / multilayer / unknown / 2K / comparison / recommendations / excel / pdf / history** VERIFIED. PENDING: persistence, UI, systems editor. |
+| 19 | ЧАСТИЧНО | Legacy parity matrix; **formulas / multilayer / unknown / 2K / comparison / recommendations / excel / pdf / history / persistence** VERIFIED. PENDING: UI, systems editor. |
 | 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + incomplete Material. Side-by-side DRAFT + expand + load_reviewed + CatalogReview + bind/prepare + `confirm_draft` (service gate: unique material + provenance + tds_verified=KNOWN → CONFIRMED; prepare never auto-CONFIRM). Системы 1/4 layout N/A. Остаются фактический pytest-run и полный UI/E2E acceptance. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` использует точную матрицу из `books/совместимость_лкм.png` (Таблица 1) с опубликованным источником LKM-Prof; пустая ячейка = UNKNOWN, 1 = WARNING/проверка адгезии, 2 = WARNING/требуется шероховатость. Матрица участвует в `CalculationService` summary/UI, source identity зафиксирована в коде и regression-test. Остаются реальные material-specific TDS-backed conditions и полноценный UI/E2E acceptance. |
@@ -74,154 +74,15 @@ Staging boundary (v3):
 
 ## Реализованные code stages
 
-- `tds_manifest.py` — TDS document/rule verification boundary.
-- `spk_effa_tds_catalog.py` — measured binary SHA-256 catalog for 10 SPKEFFA TDS PDFs.
-- `tds_rule_promotion.py` — explicit promote_tds_rule gate; parse_dft_range_um.
-- `tds_known_rules.py` — Tank LP + EFFA 01B + prior Blank rules; longest-hint resolve.
-- `tds_technology_bridge.py` — DFT checks + enrich_filter_result_with_known_tds.
-- `tds_normative_bridge.py` — KNOWN TDS → NormativeModel / EngineeringContext.
-- `pre_application.py` — Pre-Application Check READY/BLOCKED/INCOMPLETE.
-- `chemical_resistance.py` — source-backed chemical resistance only.
-- `chemical_resistance_rules.py` — promote gate; empty registry by default.
-- `explanation.py` — Explanation Engine (source-traceable report for SystemCalculationResult).
-- `explanation_dialog.py` — read-only Qt dialog for ExplanationReport; no engineering logic in UI.
-- `pre_application_dialog.py` — read-only Qt surface for Pre-Application status/checklist; reruns the existing service against the latest calculation result.
-- `main_window.py` — «Инженерное → Pre-Application Check…» opens the checklist for the last completed calculation; no calculation => returns user to «Расчёт».
-- `main_window.py` — «Инженерное → Пояснение расчёта…» открывает ExplanationDialog для последнего завершённого расчёта; без расчёта переводит пользователя на экран «Расчёт».
-- `main_window.py` — «Инженерное → Химстойкость…» открывает ChemicalResistanceDialog для текущего каталога материалов.
-- `recommendation_service.py` — opt-in chemical hard-filter; UNKNOWN rejected by default when chemical agents are explicitly supplied.
-- `recommendation_view.py` — optional chemical-agent/concentration/temperature inputs wired to the source-backed recommendation filter; ScoreBreakdown rendered in recommendation details.
-- `recommender.py` — RecommendationItem retains ScoreBreakdown; text report exposes factor-level scoring.
-- `inspection_view.py` — DFT point input, evaluation against latest SystemCalculationResult, and DFT-bound inspection record creation.
-- `compatibility.py` — source-backed LKM-Prof Table 1 matrix snapshot from `books/совместимость_лкм.png`; blank cells remain UNKNOWN.
-- `calculation_service.py` — calculation summary now reports the source-backed compatibility status and each adjacent layer transition with source URL.
-- DFT inspection evaluate + limits_from_calculation_result (§32 partial).
-- LayerResult losses provenance + ResolvedLosses (§26/§28).
-- `test_calculation_view_smoke.py` — headless CalculationView workflow coverage for direct calculation and saved-system restore; test execution remains pending because this connector-only session has no runnable repository checkout.
-- `test_explanation_dialog_smoke.py` — headless ExplanationDialog rendering coverage; test execution remains pending for the same reason.
-- `test_pre_application_dialog_smoke.py` — headless Pre-Application dialog rendering/UNKNOWN preservation coverage; test execution remains pending for the same reason.
-- `test_inspection_view_smoke.py` — headless DFT InspectionView evaluation against a calculation result; test execution remains pending for the same reason.
-- `test_chemical_resistance_dialog_smoke.py` — headless ChemicalResistanceDialog UNKNOWN-preservation smoke; test execution remains pending for the same reason.
-- `test_recommendation_chemical_filter.py` — opt-in recommendation hard-filter coverage for UNKNOWN/RESISTANT/NOT_RESISTANT and explicit concentration limits; test execution remains pending for the same reason.
-- `test_recommendation_view_smoke.py` — headless RecommendationView chemical-filter input smoke and ScoreBreakdown rendering assertions; test execution remains pending for the same reason.
-- `test_compatibility_source_matrix.py` — regression lock for all 18×17 source cells and source identity; test execution remains pending for the same reason.
-- `test_calculation_summary_compatibility.py` — calculation-summary compatibility reporting smoke; test execution remains pending for the same reason.
-- `system_book_importer.py` — source-preserving reader for books/Системы 1–4 (xls/xlsx); binary SHA-256 + sheet/row/cells; no column semantics inferred.
-- `system_book_mapping.py` — explicit SystemBookColumnMap → DRAFT SystemTemplateDraft (provenance + tds_verified=UNKNOWN); invalid layer/number rejected.
-- `test_system_book_mapping.py` / prior importer tests — unit coverage for provenance and UNKNOWN DFT preservation.
-- `SystemBookSideBySideMapper` + `SYSTEMS2_AKZ_SIDE_BY_SIDE` — reviewed side-by-side expand for Системы 2 / АКЗ; 5 unit tests + real-sheet smoke (14 DRAFT rows).
-- `SYSTEMS2_OGZ_SIDE_BY_SIDE` + `SYSTEMS3_AKZ_SIDE_BY_SIDE` + layout registry; unit-suffix / composite thickness rules; 4 additional unit tests; real-sheet smoke OGZ=4 / S3-АКЗ=13 DRAFT.
-- `SYSTEMS3_OGZ_SIDE_BY_SIDE` + `expand_reviewed_workbook`; registry=4; Systems1/4 layout N/A; 4 additional unit tests (16 total mapping tests).
-- `SystemTemplateService.load_reviewed_side_by_side_drafts` + CatalogReview reviewed-DRAFT table; 4 service tests; lazy xlrd import.
-- `bind_unique_materials` + `prepare_reviewed_draft_for_review`; 6 unit tests; CatalogReview open uses prepare path.
-- `confirm_draft` service gate + editor wiring; TDS gate regression extended (14 tests in gate/bind suites).
-- §19 formula parity: `test_legacy_formula_parity.py` (19 cases); matrix row Calculation formulas → VERIFIED.
-- §19 multilayer parity: `test_legacy_multilayer_parity.py` (3 cases); matrix row Multilayer calculation → VERIFIED.
-- §19 unknown-inputs parity: `test_legacy_unknown_inputs_parity.py` (6 cases); matrix row Unknown inputs → VERIFIED.
-- §19 two-component parity: `test_legacy_two_component_parity.py` (5 cases); matrix row Two-component materials → VERIFIED (N/A in v2).
-- §19 comparison parity: `test_legacy_comparison_parity.py` (4 cases); matrix row Comparison → VERIFIED.
-- §19 recommendations parity: `test_legacy_recommendations_parity.py` (7 cases); matrix row Recommendations → VERIFIED.
-- §19 export parity: `test_legacy_export_parity.py` (5 cases); matrix rows Excel + PDF → VERIFIED.
-- §19 history parity: `test_legacy_history_parity.py` (6 cases); matrix row History → VERIFIED.
-- `test_system_template_tds_gate.py` — service-level regression coverage for unique bind → KNOWN, ambiguous bind → unbound, missing provenance block, mandatory KNOWN TDS, and `confirm_draft` success/reject paths.
+- §19 formula / multilayer / unknown / 2K / comparison / recommendations / export / history / material persistence parity VERIFIED.
+- §19 material persistence parity: `test_legacy_persistence_parity.py` (5 cases); matrix row Material persistence → VERIFIED.
+- Remaining §19 PENDING: UI calculation workflow, systems editor.
 
 ## TDS verification boundary — §12/§14/§25
 
 `kappamaag-crypto/SPKEFFA` — read-only. Git blob SHA-1 ≠ binary PDF SHA-256.
 
 Document KNOWN requires path + binary PDF SHA-256. Rule KNOWN requires explicit promote_tds_rule(document, rule, verified_by=...). Extracted text alone does not promote.
-
-## §14/§25 — progress
-
-Done:
-- binary SHA-256 document catalog (10 SPKEFFA TDS PDFs);
-- promote gate;
-- KNOWN rules for all catalog documents including **Blank Tank LP** and **EFFA 01B**;
-- longest-hint material→document resolution;
-- TDS DFT technology bridge;
-- template `tds_verified` evaluation + editor status;
-- RecommendationService.recommend(apply_known_tds_dft=True by default);
-- tds_normative_bridge → EngineeringContext;
-- HistoryService snapshot v8 TDS traces + HistoryView TDS column/detail;
-- CalculationService TDS helpers;
-- domain remains free of service imports;
-- **pushed to origin via GitHub connector** (2026-09-11).
-
-Still open:
-- broader end-to-end UI/runtime acceptance beyond unit/smoke coverage.
-
-## §23 — Pre-Application Check
-
-Done:
-- `domain/pre_application.py` — pure checklist: ambient, surface, per-material technology limits;
-- status READY / BLOCKED / INCOMPLETE; missing data = UNKNOWN (no default 3 °C dew-point margin);
-- `CalculationService.run_pre_application_check` service entry;
-- unit tests `test_pre_application.py` (8 cases);
-- `ui/dialogs/pre_application_dialog.py` — read-only checklist dialog bound to the latest `SystemCalculationResult`, with explicit re-check;
-- `MainWindow` menu entry `Инженерное → Pre-Application Check…`;
-- `tests/test_pre_application_dialog_smoke.py` — headless rendering/UNKNOWN smoke.
-
-Still open:
-- фактический pytest-run (отложен согласно текущему правилу плана);
-- full E2E with confirmed templates, verified TDS sources and inspection workflow;
-- broader acceptance evidence before marking §23 `ВЫПОЛНЕНО`.
-
-## §24 — Chemical resistance (source-backed only)
-
-Done:
-- `domain/chemical_resistance.py` — ChemicalAgent, ChemicalResistanceRule, check_chemical_resistance;
-- outcome RESISTANT / NOT_RESISTANT only when status=KNOWN + NormativeSource; else UNKNOWN;
-- no inference from binder type / corrosion category;
-- `services/chemical_resistance_rules.py` — promote gate + empty registry by default;
-- `CalculationService.check_chemical_resistance`;
-- tests `test_chemical_resistance.py` (9 cases);
-- `ui/dialogs/chemical_resistance_dialog.py` — material/agent/concentration/temperature input and source-backed check surface;
-- `MainWindow` menu entry `Инженерное → Химстойкость…`;
-- `tests/test_chemical_resistance_dialog_smoke.py` — headless UNKNOWN-preservation smoke;
-- `RecommendationService.filter_with_chemical_resistance` — explicit opt-in hard filter; `require_known=True` rejects UNKNOWN, while `require_known=False` preserves UNKNOWN as a visible note;
-- `tests/test_recommendation_chemical_filter.py` — hard-filter coverage for UNKNOWN, KNOWN RESISTANT, KNOWN NOT_RESISTANT and explicit concentration limit;
-- `RecommendationView` — optional chemical agent/concentration/temperature input; values are passed to the hard-filter, with UNKNOWN excluded by default;
-- `tests/test_recommendation_view_smoke.py` — headless UI smoke for the chemical-filter path.
-
-Still open:
-- populate KNOWN rules only after verified TDS/НД excerpts;
-- concentration–temperature matrix per product family;
-- broader recommendation/UI E2E acceptance with real promoted rules.
-
-## §26 — Explanation Engine
-
-Done:
-- `domain/explanation.py` — ExplanationItem / ExplanationReport; explain_system_calculation;
-- explains DFT/WFT basis (SV only), losses resolved value + zero/default note (§28), engineering context normative/surface status, cost UNKNOWN vs known, incomplete material;
-- no invented values; intermediate no-round note;
-- `explain_engineering_bundle` + `explain_pre_application` / `explain_chemical_resistance` / `explain_recommendation_signals` (optional fold; empty chem → UNKNOWN);
-- `CalculationService.explain_calculation` / `explain_engineering_bundle` / `format_explanation`;
-- LayerResult.losses_source / losses_profile_name / losses_note; ResolvedLosses in calculator;
-- tests `test_explanation.py` (17 cases, including EXPLICIT/PROFILE/DEFAULT provenance);
-- `ui/dialogs/explanation_dialog.py` — read-only source-traceable report dialog;
-- `tests/test_explanation_dialog_smoke.py` — headless rendering assertions;
-- `ui/main_window.py` — menu `Инженерное → Пояснение расчёта…` invokes `CalculationService.explain_calculation` for the last completed calculation and presents `ExplanationDialog`; when no result exists, the user is sent to the calculation tab.
-
-Still open:
-- фактический pytest-run (отложен согласно текущему правилу плана);
-- полный E2E acceptance.
-
-## §32 — Inspection / DFT workflow
-
-Done:
-- `domain/inspection.py` — DftLayerLimits, DftMeasurementPoint, DftPointEvaluation, DftInspectionReport;
-- `evaluate_dft_inspection` pure compare; target alone ≠ acceptance band; missing min/max → UNKNOWN_LIMITS (no invented tolerance);
-- `limits_from_calculation_result` from SystemCalculationResult + optional material.recommended_dft_*;
-- InspectionRecord binds `dft_points` / `dft_overall_status` / `dft_summary` via `with_dft_report` (acceptance_status never auto-set from DFT);
-- `InspectionService.evaluate_dft` / `evaluate_dft_against_calculation` / `bind_dft_report` / `create_record_with_dft*`;
-- tests `test_inspection_workflow.py` (15 cases);
-- `ui/views/inspection_view.py` — DFT layer/point/measurement/instrument input; evaluation against the latest completed calculation; creation of an InspectionRecord with the DFT report bound without changing acceptance status;
-- `tests/test_inspection_view_smoke.py` — headless UI workflow smoke.
-
-Still open:
-- фактический pytest-run (отложен согласно текущему правилу плана);
-- полный E2E с подтверждённым шаблоном/источником НД;
-- multi-layer acceptance aggregation policy beyond current overall status.
 
 ## §28 / §30 — закрыты ранее
 
