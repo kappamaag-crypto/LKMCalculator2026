@@ -12,51 +12,51 @@
 7. Существенный этап — отдельный code commit; после него — отдельный docs/plan commit.
 8. `ВЫПОЛНЕНО` только при реализации и проверочном доказательстве.
 9. Отсутствующие/непроверенные данные = `UNKNOWN`.
-10. GitHub Actions не запускать. Тесты пока не запускать; общий прогон позже по отдельной команде.
-11. `kappamaag-crypto/SPKEFFA` — только read-only источник TDS; его не изменять.
+10. GitHub Actions не запускать.
+11. `kappamaag-crypto/SPKEFFA` — только read-only источник TDS.
 
 ## Матрица статуса
 
 | § | Статус | Состояние / следующий шаг |
 |---|---|---|
 | 1 | ВЫПОЛНЕНО | Базовое ядро расчёта сохранено. |
-| 2 | ЧАСТИЧНО | Динамический редактор есть; headless smoke есть; полный UI smoke остаётся (нужен PySide6). |
+| 2 | ЧАСТИЧНО | Динамический редактор; headless smoke; полный UI smoke нужен PySide6. |
 | 3 | ВЫПОЛНЕНО | AdHocMaterialDialog, normalisation, duplicate reuse, persistence. |
-| 4 | ЧАСТИЧНО | Comparison/2K/multilayer есть; остаются smoke и source-backed wording. |
-| 5 | ЧАСТИЧНО | Engineering Excel есть; остаётся визуальная/печатаемая проверка. |
-| 6 | ЧАСТИЧНО | PDF из SystemCalculationResult; остаётся visual/print smoke. |
+| 4 | ЧАСТИЧНО | Comparison/2K/multilayer; smoke/source-backed wording remains. |
+| 5 | ЧАСТИЧНО | Engineering Excel; visual/print remains. |
+| 6 | ЧАСТИЧНО | PDF из SystemCalculationResult; visual/print remains. |
 | 7 | ВЫПОЛНЕНО | Precision/unit invariants и golden multilayer cases. |
-| 8 | ВЫПОЛНЕНО | 2K — один смешанный материальный слой; TDS rules вынесены в §14. |
-| 9 | ВЫПОЛНЕНО | PackagingPlanner: ceil фасовок, reserve только commercial, unknown price=None, склад не добавлен. Evidence: `test_packaging.py` (8 cases). |
-| 10 | ЧАСТИЧНО | Alembic + SQLite backup/restore; acceptance позже. |
+| 8 | ВЫПОЛНЕНО | 2K — один смешанный слой; TDS в §14. |
+| 9 | ВЫПОЛНЕНО | PackagingPlanner; склад не добавлен. `test_packaging.py` (8). |
+| 10 | ВЫПОЛНЕНО | Alembic head `007_system_templates` + SQLite online backup/restore. Evidence: `test_database_safety.py` (7 cases). |
 | 11 | ЧАСТИЧНО | Material snapshots/verified reads/integrity hashing; runtime acceptance позже. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox; runtime/SMTP acceptance позже. |
 | 12 | ЧАСТИЧНО | Engineering context + History TDS traces (v8) + HistoryView TDS UI. |
-| 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI; acceptance позже. |
-| 14 | ЧАСТИЧНО | All 10 SPKEFFA catalog docs have KNOWN rules + wiring. E2E remains. |
+| 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI. |
+| 14 | ЧАСТИЧНО | SPKEFFA catalog KNOWN rules + wiring; E2E remains. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
-| 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; ScoreBreakdown в RecommendationItem/View. |
-| 17 | ЧАСТИЧНО | Inspection domain/service/UI; DFT UI workflow; acceptance позже. |
+| 16 | ЧАСТИЧНО | Recommendations + ScoreBreakdown. |
+| 17 | ЧАСТИЧНО | Inspection DFT UI; acceptance позже. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
-| 19 | ВЫПОЛНЕНО | Legacy parity matrix все строки VERIFIED. Qt visual E2E remains in §20. |
-| 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging. Остаются полный UI/E2E acceptance. |
-| 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
-| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LayerCompatibilityEngine + LKM-Prof Table 1; empty=UNKNOWN. |
-| 23 | ЧАСТИЧНО | Pre-Application READY/BLOCKED/INCOMPLETE; no invented dew-margin. |
-| 24 | ЧАСТИЧНО | Chemical resistance source-backed only; empty registry ⇒ UNKNOWN. |
-| 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. |
-| 26 | ЧАСТИЧНО | Explanation + losses provenance; E2E remains. |
-| 27 | ЧАСТИЧНО | Staging/matching/provenance; TDS enrichment remains. |
+| 19 | ВЫПОЛНЕНО | Legacy parity matrix все строки VERIFIED. |
+| 20 | ЧАСТИЧНО | KB + Системы 1–4; UI/E2E remains. |
+| 21 | ЧАСТИЧНО | Source-backed compatibility matrix. |
+| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LKM-Prof Table 1; empty=UNKNOWN. |
+| 23 | ЧАСТИЧНО | Pre-Application; no invented dew-margin. |
+| 24 | ЧАСТИЧНО | Chemical resistance source-backed only. |
+| 25 | ЧАСТИЧНО | Full catalog KNOWN rules chain. |
+| 26 | ЧАСТИЧНО | Explanation + losses provenance. |
+| 27 | ЧАСТИЧНО | Staging/matching/provenance. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
-| 29 | ЧАСТИЧНО | confirm_draft service gate; UI/E2E remains. |
+| 29 | ЧАСТИЧНО | confirm_draft service gate. |
 | 30 | ВЫПОЛНЕНО | Engineering Decision Log. |
-| 31 | ЧАСТИЧНО | Scenario service/UI; acceptance remains. |
-| 32 | ЧАСТИЧНО | DFT inspection evaluate + UI; multi-layer policy / E2E remain. |
+| 31 | ЧАСТИЧНО | Scenario service/UI. |
+| 32 | ЧАСТИЧНО | DFT inspection; multi-layer policy remains. |
 
 ## Реализованные code stages
 
-- §19 parity matrix closed (all rows VERIFIED; Qt E2E §20).
-- §9 PackagingPlanner closed: `test_packaging.py` (8 cases); no warehouse/inventory module.
+- §19 parity closed; §9 PackagingPlanner closed.
+- §10 Alembic + SQLite backup/restore closed: `test_database_safety.py` (7 cases).
 
 ## TDS verification boundary — §12/§14/§25
 
