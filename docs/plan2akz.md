@@ -20,102 +20,47 @@
 | § | Статус | Состояние / следующий шаг |
 |---|---|---|
 | 1 | ВЫПОЛНЕНО | Базовое ядро расчёта сохранено. |
-| 2 | ЧАСТИЧНО | Динамический редактор есть; добавлен headless smoke-тест основного workflow (расчёт + загрузка сохранённой системы); остаются фактический pytest-run и полный UI smoke. |
+| 2 | ЧАСТИЧНО | Динамический редактор есть; добавлен headless smoke-тест основного workflow; остаются полный UI smoke. |
 | 3 | ВЫПОЛНЕНО | AdHocMaterialDialog, normalisation, duplicate reuse, persistence. |
 | 4 | ЧАСТИЧНО | Comparison/2K/multilayer есть; остаются smoke и source-backed wording. |
 | 5 | ЧАСТИЧНО | Engineering Excel есть; остаётся визуальная/печатаемая проверка. |
 | 6 | ЧАСТИЧНО | PDF из SystemCalculationResult; остаётся visual/print smoke. |
 | 7 | ВЫПОЛНЕНО | Precision/unit invariants и golden multilayer cases. |
-| 8 | ВЫПОЛНЕНО | 2K — один смешанный материалный слой; TDS rules вынесены в §14. |
+| 8 | ВЫПОЛНЕНО | 2K — один смешанный материальный слой; TDS rules вынесены в §14. |
 | 9 | ЧАСТИЧНО | PackagingPlanner; склада нет и не добавлять. |
 | 10 | ЧАСТИЧНО | Alembic + SQLite backup/restore; acceptance позже. |
 | 11 | ЧАСТИЧНО | Material snapshots/verified reads/integrity hashing; runtime acceptance позже. |
 | 11.1 | ЧАСТИЧНО | Durable notification outbox; runtime/SMTP acceptance позже. |
 | 12 | ЧАСТИЧНО | Engineering context + History TDS traces (v8) + HistoryView TDS UI. Broader runtime acceptance remains. |
 | 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI; acceptance позже. |
-| 14 | ЧАСТИЧНО | All 10 SPKEFFA catalog docs have KNOWN rules + full service/UI wiring (template, calc, recommend default, History). Broader E2E acceptance remains. |
+| 14 | ЧАСТИЧНО | All 10 SPKEFFA catalog docs have KNOWN rules + full service/UI wiring. Broader E2E acceptance remains. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
-| 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; ScoreBreakdown сохранён в RecommendationItem и теперь прозрачно отображается в RecommendationView и текстовом отчёте. Остаются фактический pytest-run и полная scoring/E2E-проверка. |
-| 17 | ЧАСТИЧНО | Inspection domain/service/UI; добавлен DFT UI workflow; acceptance позже. |
+| 16 | ЧАСТИЧНО | Legacy ranking + compatibility warnings; ScoreBreakdown в RecommendationItem/View. |
+| 17 | ЧАСТИЧНО | Inspection domain/service/UI; DFT UI workflow; acceptance позже. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
-| 19 | ЧАСТИЧНО | Legacy parity matrix; **formulas / multilayer / unknown / 2K / comparison / recommendations / excel / pdf / history / persistence** VERIFIED. PENDING: UI, systems editor. |
-| 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + incomplete Material. Side-by-side DRAFT + expand + load_reviewed + CatalogReview + bind/prepare + `confirm_draft` (service gate: unique material + provenance + tds_verified=KNOWN → CONFIRMED; prepare never auto-CONFIRM). Системы 1/4 layout N/A. Остаются фактический pytest-run и полный UI/E2E acceptance. |
+| 19 | ВЫПОЛНЕНО | Legacy parity matrix: formulas / multilayer / unknown / 2K / comparison / recommendations / excel / pdf / history / persistence / UI / systems editor VERIFIED. Qt visual E2E remains in §20. |
+| 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + incomplete Material. Остаются полный UI/E2E acceptance. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
-| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` использует точную матрицу из `books/совместимость_лкм.png` (Таблица 1) с опубликованным источником LKM-Prof; пустая ячейка = UNKNOWN, 1 = WARNING/проверка адгезии, 2 = WARNING/требуется шероховатость. Матрица участвует в `CalculationService` summary/UI, source identity зафиксирована в коде и regression-test. Остаются реальные material-specific TDS-backed conditions и полноценный UI/E2E acceptance. |
-| 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. Добавлен read-only UI диалог из последнего расчёта с повторной проверкой и headless smoke. Остаются фактический pytest-run и полный E2E с подтверждёнными шаблонами/источниками НД и inspection workflow (§32). |
-| 24 | ЧАСТИЧНО | Domain ChemicalResistanceRule/check + promote gate + CalculationService; empty registry ⇒ UNKNOWN (no invention). Добавлен opt-in hard-filter химстойкости в RecommendationService и тесты; UI диалог/меню уже есть; RecommendationView теперь передаёт явную химсреду в hard-filter. Остаются каталог KNOWN TDS-backed agents и concentration–temperature matrix. |
-| 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. Broader E2E acceptance remains. |
-| 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests; ExplanationDialog + headless dialog smoke-test; MainWindow exposes «Пояснение расчёта…». Остаются фактический pytest-run и E2E acceptance. |
-| 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
+| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LayerCompatibilityEngine + LKM-Prof Table 1; empty=UNKNOWN. TDS-backed material conditions remain. |
+| 23 | ЧАСТИЧНО | Pre-Application READY/BLOCKED/INCOMPLETE; no invented dew-margin. E2E remains. |
+| 24 | ЧАСТИЧНО | Chemical resistance source-backed only; empty registry ⇒ UNKNOWN. |
+| 25 | ЧАСТИЧНО | Full catalog KNOWN rules + normative/History/recommend/template chain. |
+| 26 | ЧАСТИЧНО | Explanation + losses provenance; E2E remains. |
+| 27 | ЧАСТИЧНО | Staging/matching/provenance; TDS enrichment remains. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
-| 29 | ЧАСТИЧНО | Catalogue → draft → unique bind → prepare → `can_confirm` → `confirm_draft` → persist. Service-level CONFIRM gate covered by regression. Остаются фактический pytest-run и полный UI/E2E acceptance. |
+| 29 | ЧАСТИЧНО | confirm_draft service gate; UI/E2E remains. |
 | 30 | ВЫПОЛНЕНО | Engineering Decision Log. |
-| 31 | ЧАСТИЧНО | Scenario service/UI + confirmed-template bridge; acceptance remains. |
-| 32 | ЧАСТИЧНО | Domain DFT evaluate + bind into InspectionRecord + service + 15 tests; добавлен UI для ввода DFT-точек, проверки против последнего расчёта и формирования записи с DFT. Остаются фактический pytest-run, полный E2E, multi-layer acceptance policy. |
-
-## Каталог `Системы 1–4`
-
-Файлы в `books/`: `Системы 1.xls`, `Системы 2.XLSX`, `Системы 3.xlsx`, `Системы 4.xlsx`.
-
-Каталог является исходным набором вариантов систем и кандидатов материалов, но не TDS/нормативом. Сохраняются file/sheet/row/SHA-256; неизвестное/неоднозначное = `UNKNOWN`; автоматического доказательства применимости нет.
-
-Staging boundary (v3):
-- `SystemBookImporter` читает только сырые ячейки + identity (path/SHA-256); не угадывает колонки.
-- `SystemBookMapper` принимает **явную** `SystemBookColumnMap` и строит только `DRAFT` `SystemTemplateDraft` с provenance; `tds_verified=UNKNOWN` до review/TDS gate.
-- `SystemBookSideBySideMapper` + reviewed layouts: SYSTEMS2_AKZ/OGZ, SYSTEMS3_AKZ/OGZ; registry `REVIEWED_SIDE_BY_SIDE_LAYOUTS` (4 entries).
-- `expand_reviewed_workbook(path)` — expand only sheets with explicit layout; others skipped (no guessing).
-- `SystemTemplateService.load_reviewed_side_by_side_drafts` — service entry; status DRAFT, tds_verified UNKNOWN.
-- `bind_unique_materials` / `prepare_reviewed_draft_for_review` — unique name→material_id only; then TDS evaluate; never auto-CONFIRM.
-- `confirm_draft` — explicit service CONFIRM only when can_confirm; editor uses this gate.
-- CatalogReview UI: table + open via prepare path; no DB write on load.
-- Одна строка → один DRAFT; «-» skipped; unit-suffix OK; composite → DFT UNKNOWN.
-- Системы 1.xls empty/corrupt; Системы 4.xlsx empty — layout N/A (documented).
-- Остаются полный UI/E2E acceptance и явный TDS gate → CONFIRM при KNOWN.
+| 31 | ЧАСТИЧНО | Scenario service/UI; acceptance remains. |
+| 32 | ЧАСТИЧНО | DFT inspection evaluate + UI; multi-layer policy / E2E remain. |
 
 ## Реализованные code stages
 
-- `tds_manifest.py` / SPKEFFA catalog / promote gate / known rules / technology+normative bridges.
-- Pre-Application, chemical resistance, explanation, inspection DFT, compatibility matrix, system book staging, CONFIRM gate.
-- §19 formula parity: `test_legacy_formula_parity.py` (19 cases).
-- §19 multilayer parity: `test_legacy_multilayer_parity.py` (3 cases).
-- §19 unknown-inputs parity: `test_legacy_unknown_inputs_parity.py` (6 cases).
-- §19 two-component parity: `test_legacy_two_component_parity.py` (5 cases).
-- §19 comparison parity: `test_legacy_comparison_parity.py` (4 cases).
-- §19 recommendations parity: `test_legacy_recommendations_parity.py` (7 cases).
-- §19 export parity: `test_legacy_export_parity.py` (5 cases); Excel + PDF → VERIFIED.
-- §19 history parity: `test_legacy_history_parity.py` (6 cases); History → VERIFIED.
-- §19 material persistence parity: `test_legacy_persistence_parity.py` (5 cases); Material persistence → VERIFIED.
-- Remaining §19 PENDING: UI calculation workflow, systems editor.
+- §19 formula / multilayer / unknown / 2K / comparison / recommendations / export / history / persistence VERIFIED.
+- §19 UI + systems editor source-contract parity: `test_legacy_ui_workflow_parity.py` (7 cases); matrix rows → VERIFIED. Qt E2E remains §20.
 
 ## TDS verification boundary — §12/§14/§25
 
-`kappamaag-crypto/SPKEFFA` — read-only. Git blob SHA-1 ≠ binary PDF SHA-256.
-Document KNOWN requires path + binary PDF SHA-256. Rule KNOWN requires explicit promote_tds_rule(...).
-
-## §14/§25 — progress
-
-Done: binary SHA-256 catalog (10 SPKEFFA TDS), promote gate, KNOWN rules, technology/normative bridges, History v8 TDS traces.
-Still open: broader UI/runtime E2E acceptance.
-
-## §23 — Pre-Application Check
-
-Done: domain READY/BLOCKED/INCOMPLETE; no invented dew-margin; service + UI dialog + smoke.
-Still open: full E2E acceptance.
-
-## §24 — Chemical resistance
-
-Done: source-backed only; empty registry ⇒ UNKNOWN; recommendation hard-filter opt-in.
-Still open: KNOWN agent catalog from TDS.
-
-## §26 — Explanation Engine
-
-Done: explain_system_calculation; losses provenance; UI dialog.
-Still open: full E2E acceptance.
-
-## §32 — Inspection / DFT
-
-Done: evaluate_dft_inspection; bind into InspectionRecord; UI points.
-Still open: multi-layer acceptance policy; full E2E.
+`kappamaag-crypto/SPKEFFA` — read-only. Document KNOWN requires path + binary PDF SHA-256.
 
 ## §28 / §30 — закрыты ранее
 
