@@ -1,12 +1,11 @@
-"""Manual review/editor for catalogue-derived System Template drafts."""
+"""Explicit System Template review editor: materials, DFT, CONFIRM gate."""
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QMessageBox, QDoubleSpinBox, QComboBox, QFormLayout, QDialog,
-    QDialogButtonBox, QGroupBox, QTextEdit,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit,
+    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
+    QMessageBox, QDialog, QDialogButtonBox, QLineEdit as QFilterEdit,
 )
 
 from app.domain.models import Material
@@ -18,13 +17,15 @@ class MaterialSelectDialog(QDialog):
     def __init__(self, materials: list[Material], current_id: int | None = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Выбор материала")
-        self.setMinimumWidth(620)
+        self._materials = list(materials)
+        self._current_id = current_id
         layout = QVBoxLayout(self)
-        self.search = QLineEdit()
-        self.search.setPlaceholderText("Поиск по названию, бренду, производителю…")
-        layout.addWidget(self.search)
+        self.filter = QFilterEdit()
+        self.filter.setPlaceholderText("Фильтр…")
+        self.filter.textChanged.connect(self._reload)
+        layout.addWidget(self.filter)
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["ID", "Материал", "Производитель", "Статус"])
+        self.table.setHorizontalHeaderLabels(["id", "Имя", "Производитель", "Статус"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -33,16 +34,14 @@ class MaterialSelectDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
-        self._materials = list(materials)
-        self._current_id = current_id
-        self.search.textChanged.connect(self._reload)
         self._reload()
 
     def _reload(self) -> None:
-        q = self.search.text().strip().casefold()
+        q = self.filter.text().strip().casefold()
         items = [m for m in self._materials if not q or q in m.display_name().casefold()]
-        self.table.setRowCount(len(items))
+        self.table.setRowCount(0)
         for r, material in enumerate(items):
+            self.table.insertRow(r)
             values = [str(material.id or ""), material.display_name(), material.manufacturer or "—",
                       "НЕПОЛНАЯ" if material.is_incomplete else "полная"]
             for c, value in enumerate(values):
@@ -51,10 +50,10 @@ class MaterialSelectDialog(QDialog):
                 self.table.selectRow(r)
 
     def selected_material(self) -> Material | None:
-        r = self.table.currentRow()
-        if r < 0:
+        rows = self.table.selectionModel().selectedRows()
+        if not rows:
             return None
-        mid = self.table.item(r, 0).text()
+        mid = self.table.item(rows[0].row(), 0).text()
         return next((m for m in self._materials if str(m.id) == mid), None)
 
 
@@ -85,40 +84,45 @@ class SystemTemplateEditorView(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        form = QFormLayout()
+        form = QHBoxLayout()
+        form.addWidget(QLabel("Имя:"))
         self.name = QLineEdit()
+        form.addWidget(self.name, 2)
+        form.addWidget(QLabel("Производитель:"))
         self.manufacturer = QLineEdit()
-        self.description = QTextEdit()
-        self.description.setMaximumHeight(70)
-        form.addRow("Название системы*:", self.name)
-        form.addRow("Производитель:", self.manufacturer)
-        form.addRow("Описание:", self.description)
+        form.addWidget(self.manufacturer, 1)
         root.addLayout(form)
+        root.addWidget(QLabel("Описание:"))
+        self.description = QTextEdit()
+        self.description.setMaximumHeight(60)
+        root.addWidget(self.description)
 
-        box = QGroupBox("Слои")
-        box_layout = QVBoxLayout(box)
         self.layers = QTableWidget(0, 6)
-        self.layers.setHorizontalHeaderLabels(["№", "Материал", "DFT min, мкм", "DFT target, мкм", "DFT max, мкм", "ID"])
+        self.layers.setHorizontalHeaderLabels([
+            "№", "Материал", "DFT min", "DFT target", "DFT max", "material_id",
+        ])
         self.layers.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.layers.setSelectionMode(QAbstractItemView.SingleSelection)
         self.layers.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        box_layout.addWidget(self.layers)
+        root.addWidget(self.layers, 1)
+
         actions = QHBoxLayout()
-        self.btn_select = QPushButton("Выбрать материал")
+        self.btn_select = QPushButton("Выбрать материал…")
         self.btn_select.clicked.connect(self._select_material)
         actions.addWidget(self.btn_select)
         actions.addStretch()
-        box_layout.addLayout(actions)
-        root.addWidget(box, 1)
+        root.addLayout(actions)
 
-        self.provenance = QTextEdit()
-        self.provenance.setReadOnly(True)
-        self.provenance.setMaximumHeight(110)
-        root.addWidget(QLabel("Provenance / TDS status"))
+        self.provenance = QLabel()
+        self.provenance.setWordWrap(True)
         root.addWidget(self.provenance)
 
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        root.addWidget(self.status)
+
         bottom = QHBoxLayout()
-        self.status = QLabel("Нет draft")
-        bottom.addWidget(self.status, 1)
+        bottom.addStretch()
         self.btn_confirm = QPushButton("CONFIRM")
         self.btn_confirm.setEnabled(False)
         self.btn_confirm.clicked.connect(self._confirm)
@@ -129,23 +133,22 @@ class SystemTemplateEditorView(QWidget):
         values = [str(layer.layer_number), layer.material_name, self._fmt(layer.dft_min),
                   self._fmt(layer.dft_target), self._fmt(layer.dft_max), str(layer.material_id or "")]
         for c, value in enumerate(values):
-            item = QTableWidgetItem(value)
-            item.setFlags(item.flags() & ~item.flags().__class__(0)) if False else None
-            self.layers.setItem(r, c, item)
+            self.layers.setItem(r, c, QTableWidgetItem(value))
 
     @staticmethod
     def _fmt(value: float | None) -> str:
-        return "UNKNOWN" if value is None else f"{value:g}"
+        return "" if value is None else str(value)
 
     def _show_provenance(self, draft: SystemTemplateDraft) -> None:
-        self.provenance.setPlainText(
-            f"Источник: {draft.source_path}\nЛист: {draft.source_sheet}\n"
-            f"Строка: {draft.source_row}\nSHA-256: {draft.source_sha256}\n"
+        self.provenance.setText(
+            f"Источник: {draft.source_path} / {draft.source_sheet} / row={draft.source_row}\n"
+            f"SHA-256: {draft.source_sha256}\n"
             f"TDS verified: {draft.metadata.get('tds_verified', 'UNKNOWN')}"
         )
 
     def _selected_layer(self) -> int:
-        return self.layers.currentRow()
+        rows = self.layers.selectionModel().selectedRows()
+        return rows[0].row() if rows else -1
 
     def _select_material(self) -> None:
         r = self._selected_layer()
@@ -236,17 +239,14 @@ class SystemTemplateEditorView(QWidget):
             draft = self._current_draft()
             if draft is None:
                 return
-            confirmed = SystemTemplateDraft(
-                name=draft.name, manufacturer=draft.manufacturer, description=draft.description,
-                substrate=draft.substrate, source_path=draft.source_path, source_sheet=draft.source_sheet,
-                source_row=draft.source_row, source_sha256=draft.source_sha256, layers=draft.layers,
-                notes=draft.notes, status="CONFIRMED", metadata=dict(draft.metadata),
-            )
-            confirmed.validate()
-            ok, reasons = SystemTemplateService.can_confirm(confirmed)
-            if not ok:
-                QMessageBox.warning(self, "System Template", "Подтверждение запрещено:\n" + "\n".join(reasons))
-                return
+            confirmed = SystemTemplateService.confirm_draft(draft)
             self.template_confirmed.emit(confirmed)
         except Exception as exc:
             QMessageBox.warning(self, "System Template", f"Не удалось подтвердить draft:\n{exc}")
+
+    def _reload_material_column(self) -> None:
+        if self._draft is None:
+            return
+        for r, layer in enumerate(self._draft.layers):
+            if r < self.layers.rowCount():
+                self.layers.setItem(r, 5, QTableWidgetItem(str(layer.material_id or "")))
