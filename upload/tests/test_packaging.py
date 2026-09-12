@@ -48,3 +48,38 @@ def test_plan_options_skips_invalid_packages_and_keeps_valid_options():
     assert plans[0].estimated_material_cost == 2000.0
     assert plans[1].purchase_units == 3
     assert plans[1].estimated_material_cost == 1800.0
+
+
+def test_zero_requirement_buys_zero_units():
+    package = Package(id=1, material_id=10, package_name="20 kg", net_weight_kg=20)
+    plan = PackagingPlanner.plan(0.0, package)
+    assert plan.required_quantity == 0.0
+    assert plan.purchase_units == 0
+    assert plan.estimated_material_cost is None
+
+
+def test_negative_requirement_and_reserve_rejected():
+    package = Package(id=1, material_id=10, package_name="20 kg", net_weight_kg=20)
+    with pytest.raises(ValueError):
+        PackagingPlanner.plan(-1.0, package)
+    with pytest.raises(ValueError):
+        PackagingPlanner.plan(10.0, package, reserve_percent=-5)
+    with pytest.raises(ValueError):
+        PackagingPlanner.plan(10.0, package, unit_price=-1)
+
+
+def test_unknown_unit_price_stays_none():
+    package = Package(id=1, material_id=10, package_name="20 kg", net_weight_kg=20)
+    plan = PackagingPlanner.plan(10.0, package, unit_price=None)
+    assert plan.estimated_material_cost is None
+
+
+def test_no_warehouse_or_inventory_module_exists():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1] / "app"
+    names = [p.name.lower() for p in root.rglob("*.py")]
+    forbidden = ("warehouse", "inventory", "stock_balance", "склад")
+    assert not any(any(tok in name for tok in forbidden) for name in names)
+    src = (root / "domain" / "packaging.py").read_text(encoding="utf-8")
+    assert "does not model warehouse stock" in src
+    assert "never" in src and "engineering calculation result" in src
