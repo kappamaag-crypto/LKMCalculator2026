@@ -59,7 +59,6 @@ def _wide_row(number, cells, sheet="АКЗ"):
 
 
 def test_side_by_side_expands_present_layers_only():
-    # Columns aligned with SYSTEMS2_AKZ_SIDE_BY_SIDE (indices 0..15)
     cells = [None] * 16
     cells[1] = 8
     cells[2] = 'ООО "Колоридо"'
@@ -104,7 +103,7 @@ def test_side_by_side_non_numeric_thickness_becomes_unknown():
     cells[4] = 180
     cells[5] = "Эпоксидная"
     cells[12] = "Blank Finish"
-    cells[13] = "Полиуретановая эмаль"  # anomaly: text in thickness column
+    cells[13] = "Полиуретановая эмаль"
     cells[14] = 60
     cells[15] = "C2-C5"
     drafts = SystemBookSideBySideMapper.map_rows(
@@ -113,7 +112,7 @@ def test_side_by_side_non_numeric_thickness_becomes_unknown():
     assert len(drafts) == 1
     layer2 = drafts[0].layers[1]
     assert layer2.material_name == "Blank Finish"
-    assert layer2.dft_target is None  # UNKNOWN, not invented
+    assert layer2.dft_target is None
 
 
 def test_side_by_side_skips_row_with_no_materials():
@@ -196,7 +195,7 @@ def test_optional_number_rejects_composite_thickness_as_unknown():
     )
     assert len(drafts) == 1
     assert drafts[0].layers[1].material_name == "ЭФФА-КТЭ + ЭФФА ЭП-150"
-    assert drafts[0].layers[1].dft_target is None  # composite → UNKNOWN
+    assert drafts[0].layers[1].dft_target is None
 
 
 def test_systems3_akz_layout_expands_three_layer_row():
@@ -233,4 +232,87 @@ def test_reviewed_layout_registry_keys():
     assert ("Системы 2.XLSX", "АКЗ") in REVIEWED_SIDE_BY_SIDE_LAYOUTS
     assert ("Системы 2.XLSX", "ОГЗ") in REVIEWED_SIDE_BY_SIDE_LAYOUTS
     assert ("Системы 3.xlsx", "АКЗ") in REVIEWED_SIDE_BY_SIDE_LAYOUTS
-    assert len(REVIEWED_SIDE_BY_SIDE_LAYOUTS) == 3
+    assert len(REVIEWED_SIDE_BY_SIDE_LAYOUTS) >= 3
+
+
+from pathlib import Path
+from app.services.system_book_mapping import (
+    SYSTEMS3_OGZ_SIDE_BY_SIDE,
+    expand_reviewed_workbook,
+)
+
+
+def test_systems3_ogz_layout_expands_four_layer_groups():
+    cells = [None] * 14
+    cells[0] = 3
+    cells[1] = 'ООО "ЭФФА"'
+    cells[2] = 7.2
+    cells[3] = "Грунт-эмаль Blank Universal"
+    cells[4] = 80
+    cells[5] = "ЭФФА КТЭ"
+    cells[6] = 3200
+    cells[7] = "ЭФФА ЭП-150"
+    cells[8] = 2570
+    cells[9] = "Эмаль Blank Finish"
+    cells[10] = 50
+    cells[11] = "R90"
+    drafts = SystemBookSideBySideMapper.map_rows(
+        [_wide_row(10, cells, sheet="ОГЗ")], SYSTEMS3_OGZ_SIDE_BY_SIDE, name_prefix="Системы3"
+    )
+    assert len(drafts) == 1
+    draft = drafts[0]
+    assert draft.status == "DRAFT"
+    assert draft.metadata["tds_verified"] == "UNKNOWN"
+    assert [l.material_name for l in draft.layers] == [
+        "Грунт-эмаль Blank Universal",
+        "ЭФФА КТЭ",
+        "ЭФФА ЭП-150",
+        "Эмаль Blank Finish",
+    ]
+    assert [l.dft_target for l in draft.layers] == [80.0, 3200.0, 2570.0, 50.0]
+
+
+def test_systems3_ogz_skips_empty_heat_protect_layer():
+    cells = [None] * 14
+    cells[0] = 1
+    cells[1] = 'ООО "ЭФФА"'
+    cells[3] = "Грунт-эмаль Blank Universal"
+    cells[4] = 80
+    cells[5] = "-"
+    cells[6] = "-"
+    cells[7] = "ЭФФА ЭП-150"
+    cells[8] = 3700
+    cells[9] = "Эмаль Blank Finish"
+    cells[10] = 50
+    cells[11] = "R45"
+    drafts = SystemBookSideBySideMapper.map_rows(
+        [_wide_row(8, cells, sheet="ОГЗ")], SYSTEMS3_OGZ_SIDE_BY_SIDE
+    )
+    assert [l.material_name for l in drafts[0].layers] == [
+        "Грунт-эмаль Blank Universal",
+        "ЭФФА ЭП-150",
+        "Эмаль Blank Finish",
+    ]
+
+
+def test_reviewed_layout_registry_includes_systems3_ogz():
+    assert ("Системы 3.xlsx", "ОГЗ") in REVIEWED_SIDE_BY_SIDE_LAYOUTS
+    assert len(REVIEWED_SIDE_BY_SIDE_LAYOUTS) == 4
+
+
+def test_expand_reviewed_workbook_systems3_both_sheets():
+    candidates = [
+        Path(__file__).resolve().parents[2] / "books" / "Системы 3.xlsx",
+        Path.cwd().parent / "books" / "Системы 3.xlsx",
+        Path.cwd() / "books" / "Системы 3.xlsx",
+        Path("/home/workdir/LKMCalculator2026/books/Системы 3.xlsx"),
+    ]
+    path = next((c for c in candidates if c.exists()), None)
+    assert path is not None, "Системы 3.xlsx not found for integration smoke"
+    drafts = expand_reviewed_workbook(path, name_prefix="Системы3")
+    assert len(drafts) >= 10
+    assert all(d.status == "DRAFT" for d in drafts)
+    assert all(d.metadata.get("tds_verified") == "UNKNOWN" for d in drafts)
+    sheets = {d.source_sheet for d in drafts}
+    assert "АКЗ" in sheets
+    assert "ОГЗ" in sheets

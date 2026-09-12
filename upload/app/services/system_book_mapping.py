@@ -1,6 +1,7 @@
 """Explicit mapping boundary for reviewed Systems 1-4 workbook rows."""
 from __future__ import annotations
 from dataclasses import dataclass
+from pathlib import Path
 import re
 from typing import Optional, Sequence
 from app.domain.system_template import SystemTemplateDraft, TemplateLayer
@@ -164,11 +165,30 @@ SYSTEMS3_AKZ_SIDE_BY_SIDE = SideBySideLayout(
     ),
 )
 
+# Reviewed layout for books/Системы 3.xlsx sheet «ОГЗ» (staging only; §15 OGZ calc deferred).
+# Header rows 4–7; data from row 8. Columns 0-based:
+# A=№, B=manufacturer, C=metal thickness (not a coating layer),
+# D–E=primer, F–G=heat-protect, H–I=fire-protect, J–K=finish, L=R-group.
+SYSTEMS3_OGZ_SIDE_BY_SIDE = SideBySideLayout(
+    manufacturer=1,
+    row_number_col=0,
+    service_conditions=11,
+    layers=(
+        LayerColumnGroup(1, material_name=3, thickness=4, material_type=None),
+        LayerColumnGroup(2, material_name=5, thickness=6, material_type=None),
+        LayerColumnGroup(3, material_name=7, thickness=8, material_type=None),
+        LayerColumnGroup(4, material_name=9, thickness=10, material_type=None),
+    ),
+)
+
 # Registry of reviewed layouts keyed by (workbook file name, sheet title).
+# Системы 1.xls is empty/corrupt (not a real XLS) — no layout.
+# Системы 4.xlsx has no usable tabular data in the snapshot — no layout yet.
 REVIEWED_SIDE_BY_SIDE_LAYOUTS: dict[tuple[str, str], SideBySideLayout] = {
     ("Системы 2.XLSX", "АКЗ"): SYSTEMS2_AKZ_SIDE_BY_SIDE,
     ("Системы 2.XLSX", "ОГЗ"): SYSTEMS2_OGZ_SIDE_BY_SIDE,
     ("Системы 3.xlsx", "АКЗ"): SYSTEMS3_AKZ_SIDE_BY_SIDE,
+    ("Системы 3.xlsx", "ОГЗ"): SYSTEMS3_OGZ_SIDE_BY_SIDE,
 }
 
 
@@ -300,3 +320,33 @@ class SystemBookSideBySideMapper:
             draft.validate()
             result.append(draft)
         return tuple(result)
+
+
+def expand_reviewed_workbook(
+    path: str | Path,
+    *,
+    name_prefix: str | None = None,
+) -> tuple[SystemTemplateDraft, ...]:
+    """Read a Systems workbook and expand only sheets with a reviewed layout.
+
+    Sheets without an entry in ``REVIEWED_SIDE_BY_SIDE_LAYOUTS`` are skipped
+    (not guessed). Returns only DRAFT templates with tds_verified=UNKNOWN.
+    """
+    from app.services.system_book_importer import SystemBookImporter
+
+    source = Path(path)
+    rows = SystemBookImporter().read(source)
+    prefix = name_prefix if name_prefix is not None else source.stem
+    by_sheet: dict[str, list] = {}
+    for row in rows:
+        by_sheet.setdefault(row.sheet, []).append(row)
+
+    result: list[SystemTemplateDraft] = []
+    for sheet, sheet_rows in by_sheet.items():
+        layout = REVIEWED_SIDE_BY_SIDE_LAYOUTS.get((source.name, sheet))
+        if layout is None:
+            continue
+        result.extend(
+            SystemBookSideBySideMapper.map_rows(sheet_rows, layout, name_prefix=prefix)
+        )
+    return tuple(result)
