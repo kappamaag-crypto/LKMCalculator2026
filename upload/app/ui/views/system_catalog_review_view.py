@@ -37,6 +37,7 @@ class SystemCatalogReviewView(QWidget):
         self._materials = list(materials)
         self._rows: tuple[SystemRowCandidate, ...] = ()
         self._material_candidates = ()
+        self._reviewed_drafts: tuple = ()
         self._build_ui()
         self.set_materials(materials)
         self.reload()
@@ -104,6 +105,32 @@ class SystemCatalogReviewView(QWidget):
         materials_layout.addWidget(self.materials_table)
         root.addWidget(materials_box, 1)
 
+        reviewed_box = QGroupBox(
+            "Reviewed side-by-side DRAFT (явный layout, tds_verified=UNKNOWN)"
+        )
+        reviewed_layout = QVBoxLayout(reviewed_box)
+        self.reviewed_table = QTableWidget(0, 6)
+        self.reviewed_table.setHorizontalHeaderLabels([
+            "Имя DRAFT", "Лист", "Слои", "DFT known?", "tds_verified", "Источник",
+        ])
+        self.reviewed_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.reviewed_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.reviewed_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.reviewed_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        reviewed_layout.addWidget(self.reviewed_table)
+        reviewed_actions = QHBoxLayout()
+        self.btn_open_reviewed = QPushButton("Открыть reviewed DRAFT в редакторе")
+        self.btn_open_reviewed.clicked.connect(self._open_selected_reviewed_draft)
+        reviewed_actions.addWidget(self.btn_open_reviewed)
+        reviewed_actions.addStretch()
+        reviewed_layout.addLayout(reviewed_actions)
+        note_reviewed = QLabel(
+            "Только листы с reviewed layout. Без auto-CONFIRM и без записи в БД."
+        )
+        note_reviewed.setWordWrap(True)
+        reviewed_layout.addWidget(note_reviewed)
+        root.addWidget(reviewed_box, 1)
+
         details_box = QGroupBox("Детали выбранной строки")
         details_layout = QVBoxLayout(details_box)
         self.details = QTextEdit()
@@ -132,12 +159,15 @@ class SystemCatalogReviewView(QWidget):
             QMessageBox.warning(self, "Каталог систем", f"Не удалось прочитать Системы 1–4: {exc}")
             self._populate_rows()
             self._populate_material_candidates()
+            self._load_reviewed_drafts()
             return
         self._populate_rows()
         self._populate_material_candidates()
+        self._load_reviewed_drafts()
         self.details.setPlainText(
             f"Прочитано строк: {len(self._rows)}\n"
-            f"Уникальных кандидатов материалов: {len(self._material_candidates)}\n\n"
+            f"Уникальных кандидатов материалов: {len(self._material_candidates)}\n"
+            f"Reviewed side-by-side DRAFT: {len(self._reviewed_drafts)}\n\n"
             "Источник не является TDS/нормативным подтверждением применимости. "
             "Перед созданием полноценной системы требуется review и отдельная "
             "проверка TDS/НД."
@@ -154,137 +184,177 @@ class SystemCatalogReviewView(QWidget):
                 row.sheet,
                 str(row.row_number),
                 self._system_text(row),
-                "; ".join(c.name for c in row.material_candidates) or "—",
-                row.source_sha256,
+                ", ".join(c.name for c in row.material_candidates) or "—",
+                (row.source_sha256 or "")[:12],
             ]
             for col, value in enumerate(values):
-                self.rows_table.setItem(table_row, col, QTableWidgetItem(value))
+                self.rows_table.setItem(table_row, col, QTableWidgetItem(str(value)))
         self.rows_table.blockSignals(False)
-        if self.rows_table.rowCount():
-            self.rows_table.selectRow(0)
 
     def _populate_material_candidates(self) -> None:
+        known = {self._norm(m.material_name) for m in self._materials}
+        known |= {self._norm(m.display_name()) for m in self._materials}
+        self.materials_table.blockSignals(True)
         self.materials_table.setRowCount(0)
-        material_map: dict[str, list[Material]] = {}
-        for material in self._materials:
-            material_map.setdefault(self._norm(material.display_name()), []).append(material)
-            if material.material_name:
-                material_map.setdefault(self._norm(material.material_name), []).append(material)
-
         for candidate in self._material_candidates:
-            row = self.materials_table.rowCount()
-            self.materials_table.insertRow(row)
-            matches = material_map.get(self._norm(candidate.name), [])
-            if not matches:
-                status = "НЕ НАЙДЕНО — требует review"
-            elif len(matches) == 1:
-                status = f"Найден: {matches[0].display_name()} (ID {matches[0].id})"
-            else:
-                status = "НЕОДНОЗНАЧНО — несколько совпадений"
+            table_row = self.materials_table.rowCount()
+            self.materials_table.insertRow(table_row)
+            match = "есть в БД" if self._norm(candidate.name) in known else "нет в БД"
             values = [
                 candidate.name,
-                status,
-                f"{candidate.source_path} / {candidate.sheet} / строка {candidate.row_number}",
-                candidate.source_sha256,
+                match,
+                f"{candidate.source_path}:{candidate.sheet}:{candidate.row_number}",
+                (candidate.source_sha256 or "")[:12],
             ]
             for col, value in enumerate(values):
-                self.materials_table.setItem(row, col, QTableWidgetItem(value))
+                self.materials_table.setItem(table_row, col, QTableWidgetItem(str(value)))
+        self.materials_table.blockSignals(False)
 
     @staticmethod
     def _system_text(row: SystemRowCandidate) -> str:
-        pairs = []
         for key, value in row.values:
-            key_norm = re.sub(r"[^a-zа-я0-9]+", "", key.casefold().replace("ё", "е"))
+            key_norm = key.casefold().replace("ё", "е")
             if any(token in key_norm for token in ("система", "марка", "обозначение", "system")):
-                pairs.append(f"{key}: {value}")
-        return "; ".join(pairs) or "UNKNOWN"
+                return value or "UNKNOWN"
+        return "UNKNOWN"
 
     def _selected_row(self) -> SystemRowCandidate | None:
-        index = self.rows_table.currentRow()
-        return self._rows[index] if 0 <= index < len(self._rows) else None
+        rows = self.rows_table.selectionModel().selectedRows()
+        if not rows:
+            return None
+        index = rows[0].row()
+        if index < 0 or index >= len(self._rows):
+            return None
+        return self._rows[index]
+
+    def _load_reviewed_drafts(self) -> None:
+        try:
+            self._reviewed_drafts = SystemTemplateService.load_reviewed_side_by_side_drafts(
+                self._books_root
+            )
+        except Exception as exc:
+            self._reviewed_drafts = ()
+            QMessageBox.warning(
+                self,
+                "Reviewed DRAFT",
+                f"Не удалось загрузить side-by-side DRAFT:\n{exc}",
+            )
+        self._populate_reviewed_drafts()
+
+    def _populate_reviewed_drafts(self) -> None:
+        self.reviewed_table.blockSignals(True)
+        self.reviewed_table.setRowCount(0)
+        for draft in self._reviewed_drafts:
+            row = self.reviewed_table.rowCount()
+            self.reviewed_table.insertRow(row)
+            dft_known = sum(1 for layer in draft.layers if layer.dft_target is not None)
+            values = [
+                draft.name,
+                draft.source_sheet or "",
+                str(len(draft.layers)),
+                f"{dft_known}/{len(draft.layers)}",
+                draft.metadata.get("tds_verified", "UNKNOWN"),
+                Path(draft.source_path).name if draft.source_path else "",
+            ]
+            for col, value in enumerate(values):
+                self.reviewed_table.setItem(row, col, QTableWidgetItem(str(value)))
+        self.reviewed_table.blockSignals(False)
+
+    def _selected_reviewed_draft(self):
+        rows = self.reviewed_table.selectionModel().selectedRows()
+        if not rows:
+            return None
+        index = rows[0].row()
+        if index < 0 or index >= len(self._reviewed_drafts):
+            return None
+        return self._reviewed_drafts[index]
+
+    def _open_selected_reviewed_draft(self) -> None:
+        draft = self._selected_reviewed_draft()
+        if draft is None:
+            QMessageBox.information(self, "Reviewed DRAFT", "Выберите DRAFT в таблице.")
+            return
+        try:
+            # Keep status DRAFT; re-evaluate TDS without inventing KNOWN.
+            verified = SystemTemplateService.with_tds_verification(draft, self._materials)
+            self.editor.load_draft(verified)
+            self.editor.show()
+            self.editor.raise_()
+        except Exception as exc:
+            QMessageBox.warning(
+                self, "Reviewed DRAFT", f"Не удалось открыть DRAFT:\n{exc}"
+            )
 
     def _open_selected_draft(self) -> None:
         row = self._selected_row()
         if row is None:
-            QMessageBox.information(self, "Каталог систем", "Выберите строку каталога.")
+            QMessageBox.information(self, "System Template", "Выберите строку каталога.")
             return
         try:
             draft = SystemTemplateService.build_draft(row, self._materials)
             self.editor.load_draft(draft)
-            layout = self.layout()
-            if layout.indexOf(self.editor) < 0:
-                layout.addWidget(self.editor, 2)
             self.editor.show()
             self.editor.raise_()
         except Exception as exc:
             QMessageBox.warning(self, "System Template", f"Не удалось построить draft:\n{exc}")
 
     def _create_incomplete_material(self) -> None:
-        row = self._selected_row()
-        if row is None or not row.material_candidates:
-            QMessageBox.information(self, "Material", "Выберите строку с кандидатом материала.")
+        rows = self.materials_table.selectionModel().selectedRows()
+        if not rows:
+            QMessageBox.information(self, "Material", "Выберите кандидата материала.")
             return
-        names = [c.name for c in row.material_candidates]
-        name, ok = QInputDialog.getItem(self, "Неполный Material", "Кандидат:", names, 0, False)
-        if not ok or not name.strip():
+        index = rows[0].row()
+        if index < 0 or index >= len(self._material_candidates):
             return
-
-        matches = [m for m in self._materials if self._norm(m.material_name) == self._norm(name)]
-        if matches:
-            QMessageBox.information(self, "Material", "Материал с таким названием уже есть в текущей БД.")
-            return
-
-        candidate = next(c for c in row.material_candidates if c.name == name)
-        provenance = (
-            f"Catalogue source: {candidate.source_path}; sheet={candidate.sheet}; "
-            f"row={candidate.row_number}; SHA-256={candidate.source_sha256}"
+        candidate = self._material_candidates[index]
+        name, ok = QInputDialog.getText(
+            self, "Неполный Material", "Имя материала:", text=candidate.name
         )
+        if not ok or not str(name).strip():
+            return
         material = Material(
-            manufacturer="",
-            brand="",
-            material_name=name.strip(),
-            material_type=MaterialType.OTHER,
+            material_name=str(name).strip(),
+            material_type=MaterialType.UNKNOWN,
             binder_type=BinderType.UNKNOWN,
-            is_incomplete=True,
-            notes=f"Создано вручную из staging-кандидата. {provenance}",
+            notes=(
+                f"INCOMPLETE from catalogue {candidate.source_path}/"
+                f"{candidate.sheet}:{candidate.row_number}; "
+                f"sha256={candidate.source_sha256}"
+            ),
         )
-        answer = QMessageBox.question(
-            self,
-            "Подтвердить создание",
-            f"Создать неполную карточку Material «{name.strip()}»?\n"
-            "Неизвестные технические, коммерческие и TDS-поля останутся пустыми/UNKNOWN.",
-        )
-        if answer != QMessageBox.Yes:
-            return
         try:
             with get_session_factory()() as session:
-                saved = MaterialRepository(session).add(material)
+                repo = MaterialRepository(session)
+                saved = repo.add(material)
                 session.commit()
-            self._materials.append(saved)
+                material_id = saved.id
+            QMessageBox.information(
+                self, "Material", f"Создана неполная карточка id={material_id}"
+            )
+            # refresh materials list is caller's responsibility; keep local cache
+            self._materials.append(material)
             self.set_materials(self._materials)
-            self._populate_rows()
-            self._show_row_details()
-            QMessageBox.information(self, "Material", f"Неполная карточка создана: ID {saved.id}.")
         except Exception as exc:
-            QMessageBox.warning(self, "Material", f"Не удалось создать карточку:\n{exc}")
+            QMessageBox.warning(self, "Material", f"Не удалось сохранить:\n{exc}")
 
     def _persist_confirmed_template(self, draft) -> None:
         try:
             template_id = SystemTemplatePersistenceService().save_confirmed(draft)
+            QMessageBox.information(
+                self, "System Template", f"Сохранён CONFIRMED template id={template_id}"
+            )
         except Exception as exc:
             QMessageBox.warning(
                 self,
                 "System Template",
                 f"Подтверждённый draft не сохранён:\n{exc}\n\n"
-                "Для persistence требуется подтверждённая TDS applicability (KNOWN).",
+                "Требуются status=CONFIRMED и tds_verified=KNOWN.",
             )
-            return
-        QMessageBox.information(self, "System Template", f"Система сохранена. Template ID: {template_id}")
-        self.details.setPlainText(f"System Template сохранён: ID {template_id}")
 
     def _show_row_details(self) -> None:
         row = self._selected_row()
         if row is None:
+            self.details.clear()
             return
         lines = [
             f"Источник: {row.source_path}",
@@ -292,10 +362,12 @@ class SystemCatalogReviewView(QWidget):
             f"Строка: {row.row_number}",
             f"SHA-256: {row.source_sha256}",
             "",
-            "Поля строки:",
+            "Значения:",
         ]
-        lines.extend(f"{key}: {value}" for key, value in row.values)
+        for key, value in row.values:
+            lines.append(f"  {key}: {value}")
         lines.append("")
-        lines.append("Материалы:")
-        lines.extend(f"• {candidate.name}" for candidate in row.material_candidates)
+        lines.append("Кандидаты материалов:")
+        for candidate in row.material_candidates:
+            lines.append(f"  - {candidate.name}")
         self.details.setPlainText("\n".join(lines))
