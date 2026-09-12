@@ -20,25 +20,25 @@
 | § | Статус | Состояние / следующий шаг |
 |---|---|---|
 | 1 | ВЫПОЛНЕНО | Базовое ядро расчёта сохранено. |
-| 2 | ЧАСТИЧНО | Динамический редактор; headless smoke; полный UI smoke нужен PySide6. |
-| 3 | ВЫПОЛНЕНО | AdHocMaterialDialog, normalisation, duplicate reuse, persistence. |
+| 2 | ЧАСТИЧНО | UI smoke нужен PySide6. |
+| 3 | ВЫПОЛНЕНО | AdHocMaterialDialog + persistence. |
 | 4 | ЧАСТИЧНО | Comparison/2K/multilayer; smoke remains. |
 | 5 | ЧАСТИЧНО | Engineering Excel; visual/print remains. |
-| 6 | ЧАСТИЧНО | PDF из SystemCalculationResult; visual/print remains. |
+| 6 | ЧАСТИЧНО | PDF; visual/print remains. |
 | 7 | ВЫПОЛНЕНО | Precision/unit invariants. |
 | 8 | ВЫПОЛНЕНО | 2K — один смешанный слой. |
 | 9 | ВЫПОЛНЕНО | PackagingPlanner; склад не добавлен. |
-| 10 | ВЫПОЛНЕНО | Alembic head + SQLite backup/restore. `test_database_safety.py` (7). |
-| 11 | ВЫПОЛНЕНО | SHA-256 seal/verify; material restore из snapshot; None≠0. Evidence: `test_snapshot_integrity.py` (7) + `test_snapshot_restore.py`. |
-| 11.1 | ЧАСТИЧНО | Durable notification outbox; runtime/SMTP acceptance позже. |
+| 10 | ВЫПОЛНЕНО | Alembic + SQLite backup/restore. |
+| 11 | ВЫПОЛНЕНО | SHA-256 seal/verify + material restore. |
+| 11.1 | ВЫПОЛНЕНО | Durable outbox: idempotency, retry/FAILED, worker gate, без SMTP secrets в БД. Evidence: `test_notification_outbox.py` (6). Live SMTP optional. |
 | 12 | ЧАСТИЧНО | Engineering context + History TDS traces (v8). |
 | 13 | ЧАСТИЧНО | Surface preparation/profile/condition + UI. |
-| 14 | ЧАСТИЧНО | SPKEFFA KNOWN rules + wiring; E2E remains. |
+| 14 | ЧАСТИЧНО | SPKEFFA KNOWN rules; E2E remains. |
 | 15 | ОТЛОЖЕНО | OGZ ПТМ / section factor / R / critical temperature. |
 | 16 | ЧАСТИЧНО | Recommendations + ScoreBreakdown. |
 | 17 | ЧАСТИЧНО | Inspection DFT UI. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
-| 19 | ВЫПОЛНЕНО | Legacy parity matrix все строки VERIFIED. |
+| 19 | ВЫПОЛНЕНО | Legacy parity matrix VERIFIED. |
 | 20 | ЧАСТИЧНО | KB + Системы 1–4; UI/E2E remains. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LKM-Prof Table 1; empty=UNKNOWN. |
@@ -55,8 +55,8 @@
 
 ## Реализованные code stages
 
-- §9/§10/§19 closed.
-- §11 snapshots + integrity closed: `test_snapshot_integrity.py` (7) + `test_snapshot_restore.py`.
+- §9/§10/§11/§19 closed.
+- §11.1 outbox closed: `test_notification_outbox.py` (6 cases).
 
 ## TDS verification boundary — §12/§14/§25
 
