@@ -23,7 +23,7 @@
 | 2 | ЧАСТИЧНО | UI smoke нужен PySide6. |
 | 3 | ВЫПОЛНЕНО | AdHocMaterialDialog + persistence. |
 | 4 | ЧАСТИЧНО | Comparison/2K/multilayer; smoke remains. |
-| 5 | ЧАСТИЧНО | Engineering Excel; visual/print remains. |
+| 5 | ЧАСТИЧНО | Engineering Excel; added customer Excel print-layout regression; actual pytest/visual print remains. |
 | 6 | ЧАСТИЧНО | PDF; visual/print remains. |
 | 7 | ВЫПОЛНЕНО | Precision/unit invariants. |
 | 8 | ВЫПОЛНЕНО | 2K — один смешанный слой. |
@@ -58,6 +58,7 @@
 - §9/§10/§11/§19 closed.
 - §11.1 outbox closed: `test_notification_outbox.py` (6 cases).
 - §32 DFT multi-layer policy: calculation-backed inspection requires at least one measured point for every calculated layer by default; missing layer coverage remains `UNKNOWN` and is explicitly reported.
+- §5 customer Excel print-layout regression added: 2-layer and 5-layer cases assert dynamic print area, repeated header rows, fit-to-page, and totals row.
 
 ## TDS verification boundary — §12/§14/§25
 
