@@ -10,8 +10,8 @@ This matrix defines what must be compared before declaring legacy parity. It int
 | Material persistence | v2 repository/SQLite | v3 repositories + migrations | PENDING |
 | History | v2 history service/view | immutable snapshots + integrity | PENDING |
 | Recommendations | v2 recommendation engine | v3 recommendation engine + engineering limitations | VERIFIED — shared hard-filter→score; ScoreBreakdown retained; no hidden weights; unknown cost safe. Evidence: `upload/tests/test_legacy_recommendations_parity.py` |
-| Excel export | v2 exporter | v3 engineering/customer exporters | PENDING |
-| PDF export | v2 exporter | v3 exporter from calculation result | PENDING |
+| Excel export | v2 exporter | v3 engineering/customer exporters | VERIFIED — from SystemCalculationResult; missing price → «—»; engineering/customer split intentional. Evidence: `upload/tests/test_legacy_export_parity.py` |
+| PDF export | v2 exporter | v3 exporter from calculation result | VERIFIED — shared export_calculation(SystemCalculationResult); None cost → «—». Evidence: `upload/tests/test_legacy_export_parity.py` |
 | UI calculation workflow | v2 calculation view | v3 calculation view | PENDING |
 | Systems editor | legacy behavior | v3 systems view | PENDING |
 | Comparison | legacy comparison | v3 comparison engine/view | VERIFIED — extrema (DFT/layers/cost among known) match; intentional: no best_balance score; None costs excluded. Evidence: `upload/tests/test_legacy_comparison_parity.py` |
@@ -64,3 +64,10 @@ A row is not `PASS` merely because the v3 implementation exists. It requires a r
 - Transparent weights only (corrosion/durability/technology/cost); hidden condition/compatibility weights stay 0 in total.
 - Missing price does not invent a free-material cost advantage.
 - Regression: `upload/tests/test_legacy_recommendations_parity.py` (7 cases).
+
+### Excel / PDF export (2026-09-12)
+- Both v2 and v3 PDF exporters expose `export_calculation(result: SystemCalculationResult, path)` — single calculation source, not a second engine.
+- v3 PDF formats unknown costs as «—» via `_cost(None)` (aligned with UNKNOWN semantics).
+- v3 Excel missing price produces a file without inventing 0 cost (see also `test_excel_missing_price.py`).
+- Intentional: v3 splits engineering vs customer Excel exporters; v2 had a single excel_exporter.
+- Regression: `upload/tests/test_legacy_export_parity.py` (5 cases).
