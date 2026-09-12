@@ -92,6 +92,95 @@ class SystemTemplateService:
         return tuple(drafts)
 
     @staticmethod
+    def _material_index(materials: Sequence[Material] | None) -> dict[str, list[Material]]:
+        """Map casefolded names to materials; empty/missing names skipped."""
+        index: dict[str, list[Material]] = {}
+        if not materials:
+            return index
+        for material in materials:
+            for key in (
+                getattr(material, "material_name", None),
+                material.display_name() if hasattr(material, "display_name") else None,
+            ):
+                if not key:
+                    continue
+                norm = str(key).strip().casefold().replace("ё", "е")
+                if not norm:
+                    continue
+                index.setdefault(norm, []).append(material)
+        return index
+
+    @staticmethod
+    def bind_unique_materials(
+        draft: SystemTemplateDraft,
+        materials: Sequence[Material] | None,
+    ) -> SystemTemplateDraft:
+        """Attach material_id only when the layer name uniquely matches the catalogue.
+
+        Ambiguous or missing matches leave material_id=None (UNKNOWN binding).
+        Does not change status and does not invent TDS verification.
+        """
+        index = SystemTemplateService._material_index(materials)
+        layers: list[TemplateLayer] = []
+        for layer in draft.layers:
+            if layer.material_id is not None:
+                layers.append(layer)
+                continue
+            norm = (layer.material_name or "").strip().casefold().replace("ё", "е")
+            matches = index.get(norm, [])
+            # Unique by id among name hits
+            unique: dict[int, Material] = {}
+            for material in matches:
+                mid = getattr(material, "id", None)
+                if mid is None:
+                    continue
+                unique[mid] = material
+            if len(unique) == 1:
+                material = next(iter(unique.values()))
+                layers.append(
+                    TemplateLayer(
+                        layer_number=layer.layer_number,
+                        material_name=layer.material_name,
+                        material_id=material.id,
+                        dft_min=layer.dft_min,
+                        dft_target=layer.dft_target,
+                        dft_max=layer.dft_max,
+                        source_path=layer.source_path,
+                        source_sheet=layer.source_sheet,
+                        source_row=layer.source_row,
+                        source_sha256=layer.source_sha256,
+                    )
+                )
+            else:
+                layers.append(layer)
+        return SystemTemplateDraft(
+            name=draft.name,
+            manufacturer=draft.manufacturer,
+            description=draft.description,
+            substrate=draft.substrate,
+            source_path=draft.source_path,
+            source_sheet=draft.source_sheet,
+            source_row=draft.source_row,
+            source_sha256=draft.source_sha256,
+            layers=tuple(layers),
+            notes=draft.notes,
+            status=draft.status,
+            metadata=dict(draft.metadata),
+        )
+
+    @staticmethod
+    def prepare_reviewed_draft_for_review(
+        draft: SystemTemplateDraft,
+        materials: Sequence[Material] | None = None,
+    ) -> SystemTemplateDraft:
+        """TDS-gate preparation: unique material bind, then re-evaluate tds_verified.
+
+        Status stays DRAFT/REVIEW as provided — never auto-CONFIRMED.
+        """
+        bound = SystemTemplateService.bind_unique_materials(draft, materials)
+        return SystemTemplateService.with_tds_verification(bound, materials)
+
+    @staticmethod
     def can_confirm(draft):
         reasons = []
         if draft.has_unknown_materials: reasons.append("Есть материал без однозначного сопоставления с БД")
