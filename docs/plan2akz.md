@@ -51,12 +51,13 @@
 | 29 | ЧАСТИЧНО | confirm_draft service gate. |
 | 30 | ВЫПОЛНЕНО | Engineering Decision Log. |
 | 31 | ЧАСТИЧНО | Scenario service/UI. |
-| 32 | ЧАСТИЧНО | DFT inspection; multi-layer policy remains. |
+| 32 | ЧАСТИЧНО | DFT inspection; strict multi-layer coverage policy implemented; runtime/E2E acceptance remains. |
 
 ## Реализованные code stages
 
 - §9/§10/§11/§19 closed.
 - §11.1 outbox closed: `test_notification_outbox.py` (6 cases).
+- §32 DFT multi-layer policy: calculation-backed inspection requires at least one measured point for every calculated layer by default; missing layer coverage remains `UNKNOWN` and is explicitly reported.
 
 ## TDS verification boundary — §12/§14/§25
 
