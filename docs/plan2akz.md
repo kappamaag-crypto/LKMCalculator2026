@@ -74,15 +74,48 @@ Staging boundary (v3):
 
 ## Реализованные code stages
 
-- §19 formula / multilayer / unknown / 2K / comparison / recommendations / export / history / material persistence parity VERIFIED.
-- §19 material persistence parity: `test_legacy_persistence_parity.py` (5 cases); matrix row Material persistence → VERIFIED.
+- `tds_manifest.py` / SPKEFFA catalog / promote gate / known rules / technology+normative bridges.
+- Pre-Application, chemical resistance, explanation, inspection DFT, compatibility matrix, system book staging, CONFIRM gate.
+- §19 formula parity: `test_legacy_formula_parity.py` (19 cases).
+- §19 multilayer parity: `test_legacy_multilayer_parity.py` (3 cases).
+- §19 unknown-inputs parity: `test_legacy_unknown_inputs_parity.py` (6 cases).
+- §19 two-component parity: `test_legacy_two_component_parity.py` (5 cases).
+- §19 comparison parity: `test_legacy_comparison_parity.py` (4 cases).
+- §19 recommendations parity: `test_legacy_recommendations_parity.py` (7 cases).
+- §19 export parity: `test_legacy_export_parity.py` (5 cases); Excel + PDF → VERIFIED.
+- §19 history parity: `test_legacy_history_parity.py` (6 cases); History → VERIFIED.
+- §19 material persistence parity: `test_legacy_persistence_parity.py` (5 cases); Material persistence → VERIFIED.
 - Remaining §19 PENDING: UI calculation workflow, systems editor.
 
 ## TDS verification boundary — §12/§14/§25
 
 `kappamaag-crypto/SPKEFFA` — read-only. Git blob SHA-1 ≠ binary PDF SHA-256.
+Document KNOWN requires path + binary PDF SHA-256. Rule KNOWN requires explicit promote_tds_rule(...).
 
-Document KNOWN requires path + binary PDF SHA-256. Rule KNOWN requires explicit promote_tds_rule(document, rule, verified_by=...). Extracted text alone does not promote.
+## §14/§25 — progress
+
+Done: binary SHA-256 catalog (10 SPKEFFA TDS), promote gate, KNOWN rules, technology/normative bridges, History v8 TDS traces.
+Still open: broader UI/runtime E2E acceptance.
+
+## §23 — Pre-Application Check
+
+Done: domain READY/BLOCKED/INCOMPLETE; no invented dew-margin; service + UI dialog + smoke.
+Still open: full E2E acceptance.
+
+## §24 — Chemical resistance
+
+Done: source-backed only; empty registry ⇒ UNKNOWN; recommendation hard-filter opt-in.
+Still open: KNOWN agent catalog from TDS.
+
+## §26 — Explanation Engine
+
+Done: explain_system_calculation; losses provenance; UI dialog.
+Still open: full E2E acceptance.
+
+## §32 — Inspection / DFT
+
+Done: evaluate_dft_inspection; bind into InspectionRecord; UI points.
+Still open: multi-layer acceptance policy; full E2E.
 
 ## §28 / §30 — закрыты ранее
 
