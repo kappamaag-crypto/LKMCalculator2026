@@ -1,6 +1,7 @@
 """Build reviewed System Template drafts from catalogue staging records."""
 from __future__ import annotations
-from typing import Mapping
+from pathlib import Path
+from typing import Mapping, Sequence
 from app.domain.models import Material
 from app.domain.system_template import SystemTemplateDraft, TemplateLayer
 from app.services.system_catalog_importer import SystemRowCandidate
@@ -58,6 +59,37 @@ class SystemTemplateService:
             substrate=draft.substrate, source_path=draft.source_path, source_sheet=draft.source_sheet,
             source_row=draft.source_row, source_sha256=draft.source_sha256, layers=draft.layers,
             notes=draft.notes, status=draft.status, metadata=meta)
+
+    @staticmethod
+    def load_reviewed_side_by_side_drafts(
+        books_root: str | Path,
+        *,
+        file_names: Sequence[str] | None = None,
+    ) -> tuple[SystemTemplateDraft, ...]:
+        """Load DRAFT templates from workbooks that have reviewed side-by-side layouts.
+
+        Only files/sheets present in ``REVIEWED_SIDE_BY_SIDE_LAYOUTS`` are expanded.
+        Status remains DRAFT; ``tds_verified`` stays UNKNOWN until explicit review.
+        Does not persist and does not auto-CONFIRM.
+        """
+        from app.services.system_book_mapping import (
+            REVIEWED_SIDE_BY_SIDE_LAYOUTS,
+            expand_reviewed_workbook,
+        )
+
+        root = Path(books_root)
+        names = (
+            list(file_names)
+            if file_names is not None
+            else sorted({key[0] for key in REVIEWED_SIDE_BY_SIDE_LAYOUTS})
+        )
+        drafts: list[SystemTemplateDraft] = []
+        for name in names:
+            path = root / name
+            if not path.is_file():
+                continue
+            drafts.extend(expand_reviewed_workbook(path))
+        return tuple(drafts)
 
     @staticmethod
     def can_confirm(draft):

@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import openpyxl
-import xlrd
 
 
 SUPPORTED_BOOK_NAMES = (
@@ -82,6 +81,10 @@ class SystemBookImporter:
 
     @staticmethod
     def _read_xls(path: Path, source: SystemBookSource) -> tuple[SystemBookRow, ...]:
+        try:
+            import xlrd
+        except ImportError as exc:
+            raise RuntimeError("Legacy XLS import requires xlrd") from exc
         workbook = xlrd.open_workbook(path.as_posix(), on_demand=True)
         rows: list[SystemBookRow] = []
         try:
