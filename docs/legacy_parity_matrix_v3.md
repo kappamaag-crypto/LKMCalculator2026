@@ -6,7 +6,7 @@ This matrix defines what must be compared before declaring legacy parity. It int
 |---|---|---|---|
 | Calculation formulas | `v2/app/domain/calculator.py`, `formulas.py` | `upload/app/domain/calculator.py`, `formulas.py` | VERIFIED — algebraic identity; intentional: v3 no intermediate round3; invalid losses → ValueError (v2 returned 1.0). Evidence: `upload/tests/test_legacy_formula_parity.py` |
 | Multilayer calculation | v2 calculation flow | `SystemCalculationResult` / system calculator | VERIFIED — sum-of-layers aggregation; binary-friendly inputs match v2 numerically; invalid losses → validation error. Evidence: `upload/tests/test_legacy_multilayer_parity.py` |
-| Two-component materials | v2 material/calculation behavior | v3 2K domain/service | PENDING |
+| Two-component materials | v2 material/calculation behavior | v3 2K domain/service | VERIFIED — N/A in v2 (no 2K module); v3 informational-only + single mixed layer calc. Evidence: `upload/tests/test_legacy_two_component_parity.py` |
 | Material persistence | v2 repository/SQLite | v3 repositories + migrations | PENDING |
 | History | v2 history service/view | immutable snapshots + integrity | PENDING |
 | Recommendations | v2 recommendation engine | v3 recommendation engine + engineering limitations | PENDING |
@@ -41,3 +41,10 @@ A row is not `PASS` merely because the v3 implementation exists. It requires a r
 - Invalid density or solids_by_volume (≤0): v3 raises ValueError (no silent zero consumption).
 - Unspecified `losses_percent=None`: resolved via LossProfile DEFAULT with `losses_source=DEFAULT` (not an invented engineering margin).
 - Regression: `upload/tests/test_legacy_unknown_inputs_parity.py` (6 cases).
+
+### Two-component materials (2026-09-12)
+- v2 has no `two_component` domain module and no mix_ratio handling in calculator.
+- v3 `TwoComponentService.describe` is informational only (ratio text, pot life, components); no purchase/sets/remainder fields.
+- Calculation treats a 2K product as **one** mixed material layer (`is_two_component=True`); components are not separate consumption layers.
+- Invalid ratios / ratio_basis raise `TwoComponentCalculationError`.
+- Regression: `upload/tests/test_legacy_two_component_parity.py` (5 cases).
