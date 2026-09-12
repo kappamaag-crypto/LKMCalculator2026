@@ -9,7 +9,7 @@ This matrix defines what must be compared before declaring legacy parity. It int
 | Two-component materials | v2 material/calculation behavior | v3 2K domain/service | VERIFIED — N/A in v2 (no 2K module); v3 informational-only + single mixed layer calc. Evidence: `upload/tests/test_legacy_two_component_parity.py` |
 | Material persistence | v2 repository/SQLite | v3 repositories + migrations | PENDING |
 | History | v2 history service/view | immutable snapshots + integrity | PENDING |
-| Recommendations | v2 recommendation engine | v3 recommendation engine + engineering limitations | PENDING |
+| Recommendations | v2 recommendation engine | v3 recommendation engine + engineering limitations | VERIFIED — shared hard-filter→score; ScoreBreakdown retained; no hidden weights; unknown cost safe. Evidence: `upload/tests/test_legacy_recommendations_parity.py` |
 | Excel export | v2 exporter | v3 engineering/customer exporters | PENDING |
 | PDF export | v2 exporter | v3 exporter from calculation result | PENDING |
 | UI calculation workflow | v2 calculation view | v3 calculation view | PENDING |
@@ -56,3 +56,11 @@ A row is not `PASS` merely because the v3 implementation exists. It requires a r
 - Intentional: v3 cheapest/most_expensive only among systems with non-None `total_cost_per_m2` (UNKNOWN price excluded).
 - v3 also enforces max 10 systems and rejects mixed areas in `compare_results`.
 - Regression: `upload/tests/test_legacy_comparison_parity.py` (4 cases).
+
+### Recommendations (2026-09-12)
+- Shared two-stage architecture: `filter_systems` hard filter → `score_system` ranking; DISCLAIMER on result.
+- Wrong corrosion category rejected by hard filter (same intent as v2).
+- `RecommendationItem.breakdown` (ScoreBreakdown) retained; total matches score.
+- Transparent weights only (corrosion/durability/technology/cost); hidden condition/compatibility weights stay 0 in total.
+- Missing price does not invent a free-material cost advantage.
+- Regression: `upload/tests/test_legacy_recommendations_parity.py` (7 cases).
