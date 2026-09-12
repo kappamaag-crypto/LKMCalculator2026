@@ -52,7 +52,7 @@ def test_comparison_excel_matches_ui_and_preserves_all_layers(tmp_path: Path):
     ws = load_workbook(output, data_only=False)["Сравнение систем"]; values = [cell.value for row in ws.iter_rows() for cell in row]
     assert ws["A4"].value == "Показатель"; assert ws["B4"].value == "Система 4 слоя"; assert ws["C4"].value == "Система 5 слоёв"
     for layer_no in range(1, 6): assert f"Слой {layer_no}: материал" in values
-    assert "Слой 5: разбавитель, л/м²" in values; assert "Стоимость ЛКМ, руб/м²" in values; assert "Разбавитель, руб/м²" in values; assert "ЛКМ + разбавитель, руб/м²" in values; assert ws.print_area == "'Сравнение систем'!$A$1:$C$48"; assert ws.sheet_properties.pageSetUpPr.fitToPage is True
+    assert "Слой 5: разбавитель, л/м²" in values; assert "Стоимость ЛКМ, руб/м²" in values; assert "Разбавитель, руб/м²" in values; assert "ЛКМ + разбавитель, руб/м²" in values; assert ws.print_area == "'Сравнение систем'!$A$1:$C$56"; assert ws.sheet_properties.pageSetUpPr.fitToPage is True
 
 
 def test_engineering_excel_2k_is_one_layer_and_does_not_expose_components(tmp_path: Path):
