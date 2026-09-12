@@ -58,3 +58,25 @@ def test_individual_layer_snapshot_is_sealed_and_detects_changes():
     assert restored["material_name"] == "ЭП-150"
     assert restored["price_per_kg"] == 607.0
     assert restored["target_dft"] == 120.0
+
+
+def test_snapshot_number_preserves_none_and_rejects_garbage():
+    from app.services.snapshot_utils import snapshot_number
+
+    assert snapshot_number(None) is None
+    assert snapshot_number("") is None
+    assert snapshot_number("not-a-number") is None
+    assert snapshot_number(12.5) == 12.5
+    assert snapshot_number("3.0") == 3.0
+
+
+def test_malformed_json_payload_is_rejected():
+    with pytest.raises(ValueError, match="Некорректный"):
+        load_and_verify_snapshot("{not-json")
+
+
+def test_empty_hash_string_is_not_verified():
+    payload = {"snapshot_version": 4, "total_dft": 100.0, "snapshot_hash": ""}
+    assert not verify_snapshot(payload)
+    with pytest.raises(ValueError):
+        load_and_verify_snapshot(json.dumps(payload))
