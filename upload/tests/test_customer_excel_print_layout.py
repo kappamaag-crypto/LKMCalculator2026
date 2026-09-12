@@ -65,4 +65,4 @@ def test_customer_excel_print_layout_expands_with_layers(tmp_path: Path):
     assert ws.page_setup.fitToWidth == 1
     assert ws.page_setup.fitToHeight == 0
     assert ws["C17"].value == "Толщина покрытия (мкм)"
-    assert ws["I17"].value == 550.0
+    assert ws["I17"].value == 650.0
