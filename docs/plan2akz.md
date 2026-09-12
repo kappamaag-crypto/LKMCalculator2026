@@ -39,7 +39,7 @@
 | 17 | ЧАСТИЧНО | Inspection domain/service/UI; добавлен DFT UI workflow; acceptance позже. |
 | 18 | ЧАСТИЧНО | Release acceptance checklist; evidence PENDING. |
 | 19 | ЧАСТИЧНО | Legacy parity matrix; строки PENDING. |
-| 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + controlled incomplete Material. Side-by-side DRAFT layouts + expand + SystemTemplateService.load_reviewed_side_by_side_drafts + CatalogReview UI table (open DRAFT, no auto-CONFIRM). Системы 1/4 layout N/A. Остаются полный UI/E2E acceptance и TDS gate → CONFIRM. |
+| 20 | ЧАСТИЧНО | KB + Системы 1–4 + staging + Review + editor + incomplete Material. Side-by-side DRAFT + expand + load_reviewed + CatalogReview + bind_unique_materials / prepare_reviewed_draft_for_review (unique match only; no auto-CONFIRM). Системы 1/4 layout N/A. Остаются полный UI/E2E acceptance и явный TDS gate → CONFIRM при KNOWN. |
 | 21 | ЧАСТИЧНО | Source-backed compatibility matrix; каталог не заменяет TDS/НД. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | `LayerCompatibilityEngine` использует точную матрицу из `books/совместимость_лкм.png` (Таблица 1) с опубликованным источником LKM-Prof; пустая ячейка = UNKNOWN, 1 = WARNING/проверка адгезии, 2 = WARNING/требуется шероховатость. Матрица участвует в `CalculationService` summary/UI, source identity зафиксирована в коде и regression-test. Остаются реальные material-specific TDS-backed conditions и полноценный UI/E2E acceptance. |
 | 23 | ЧАСТИЧНО | Domain PreApplicationCheck (READY/BLOCKED/INCOMPLETE) + CalculationService.run_pre_application_check; surface/ambient/material limits; no invented dew-margin. Добавлен read-only UI диалог из последнего расчёта с повторной проверкой и headless smoke. Остаются фактический pytest-run и полный E2E с подтверждёнными шаблонами/источниками НД и inspection workflow (§32). |
@@ -48,7 +48,7 @@
 | 26 | ЧАСТИЧНО | Explanation + LayerResult losses provenance (EXPLICIT/PROFILE/DEFAULT) + bundle; 17 unit tests; ExplanationDialog + headless dialog smoke-test; MainWindow exposes «Пояснение расчёта…». Остаются фактический pytest-run и E2E acceptance. |
 | 27 | ЧАСТИЧНО | Staging, matching, provenance, System Template и controlled incomplete Material реализованы; TDS enrichment/acceptance остаются. |
 | 28 | ВЫПОЛНЕНО | Controlled LossProfile. |
-| 29 | ЧАСТИЧНО | Catalogue → draft → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules. |
+| 29 | ЧАСТИЧНО | Catalogue → draft → unique material bind → editor TDS gate → CONFIRM. Coverage = all catalogued SPKEFFA docs with KNOWN rules; reviewed side-by-side uses same gate. |
 | 30 | ВЫПОЛНЕНО | Engineering Decision Log. |
 | 31 | ЧАСТИЧНО | Scenario service/UI + confirmed-template bridge; acceptance remains. |
 | 32 | ЧАСТИЧНО | Domain DFT evaluate + bind into InspectionRecord + service + 15 tests; добавлен UI для ввода DFT-точек, проверки против последнего расчёта и формирования записи с DFT. Остаются фактический pytest-run, полный E2E, multi-layer acceptance policy. |
@@ -64,11 +64,12 @@ Staging boundary (v3):
 - `SystemBookMapper` принимает **явную** `SystemBookColumnMap` и строит только `DRAFT` `SystemTemplateDraft` с provenance; `tds_verified=UNKNOWN` до review/TDS gate.
 - `SystemBookSideBySideMapper` + reviewed layouts: SYSTEMS2_AKZ/OGZ, SYSTEMS3_AKZ/OGZ; registry `REVIEWED_SIDE_BY_SIDE_LAYOUTS` (4 entries).
 - `expand_reviewed_workbook(path)` — expand only sheets with explicit layout; others skipped (no guessing).
-- `SystemTemplateService.load_reviewed_side_by_side_drafts` — service entry; status DRAFT, tds_verified UNKNOWN; can_confirm rejects without TDS/material match.
-- CatalogReview UI: table of reviewed DRAFTs + open in editor; no auto-CONFIRM / no DB write on load.
+- `SystemTemplateService.load_reviewed_side_by_side_drafts` — service entry; status DRAFT, tds_verified UNKNOWN.
+- `bind_unique_materials` / `prepare_reviewed_draft_for_review` — unique name→material_id only; then TDS evaluate; never auto-CONFIRM.
+- CatalogReview UI: table + open via prepare path; no DB write on load.
 - Одна строка → один DRAFT; «-» skipped; unit-suffix OK; composite → DFT UNKNOWN.
 - Системы 1.xls empty/corrupt; Системы 4.xlsx empty — layout N/A (documented).
-- Остаются полный UI/E2E acceptance и TDS gate → CONFIRM.
+- Остаются полный UI/E2E acceptance и явный TDS gate → CONFIRM при KNOWN.
 
 ## Реализованные code stages
 
@@ -111,12 +112,13 @@ Staging boundary (v3):
 - `SYSTEMS2_OGZ_SIDE_BY_SIDE` + `SYSTEMS3_AKZ_SIDE_BY_SIDE` + layout registry; unit-suffix / composite thickness rules; 4 additional unit tests; real-sheet smoke OGZ=4 / S3-АКЗ=13 DRAFT.
 - `SYSTEMS3_OGZ_SIDE_BY_SIDE` + `expand_reviewed_workbook`; registry=4; Systems1/4 layout N/A; 4 additional unit tests (16 total mapping tests).
 - `SystemTemplateService.load_reviewed_side_by_side_drafts` + CatalogReview reviewed-DRAFT table; 4 service tests; lazy xlrd import.
+- `bind_unique_materials` + `prepare_reviewed_draft_for_review`; 6 unit tests; CatalogReview open uses prepare path.
 
 ## TDS verification boundary — §12/§14/§25
 
 `kappamaag-crypto/SPKEFFA` — read-only. Git blob SHA-1 ≠ binary PDF SHA-256.
 
-Document KNOWN requires path + binary SHA-256. Rule KNOWN requires explicit promote_tds_rule(document, rule, verified_by=...). Extracted text alone does not promote.
+Document KNOWN requires path + binary PDF SHA-256. Rule KNOWN requires explicit promote_tds_rule(document, rule, verified_by=...). Extracted text alone does not promote.
 
 ## §14/§25 — progress
 
