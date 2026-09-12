@@ -15,7 +15,7 @@ This matrix defines what must be compared before declaring legacy parity. It int
 | UI calculation workflow | v2 calculation view | v3 calculation view | PENDING |
 | Systems editor | legacy behavior | v3 systems view | PENDING |
 | Comparison | legacy comparison | v3 comparison engine/view | PENDING |
-| Unknown inputs | legacy fallback behavior | explicit UNKNOWN semantics | PENDING |
+| Unknown inputs | legacy fallback behavior | explicit UNKNOWN semantics | VERIFIED — missing price → None (v2→0.0); invalid density/SV → ValueError; losses None → DEFAULT provenance. Evidence: `upload/tests/test_legacy_unknown_inputs_parity.py` |
 
 ## Rule
 
@@ -35,3 +35,9 @@ A row is not `PASS` merely because the v3 implementation exists. It requires a r
 - v3 multilayer totals match independent no-intermediate-rounding algebra (aligned with §7).
 - Invalid losses_percent (≥100): v3 returns validation error `LAYER_LOSSES_INVALID` (no silent K=1 fallback).
 - Regression: `upload/tests/test_legacy_multilayer_parity.py` (3 cases).
+
+### Unknown inputs (2026-09-12)
+- Missing `price_per_kg`: v2 LayerCalculator used `0.0` (appears as free); v3 returns `cost_per_m2=None` / system `total_cost*=None`.
+- Invalid density or solids_by_volume (≤0): v3 raises ValueError (no silent zero consumption).
+- Unspecified `losses_percent=None`: resolved via LossProfile DEFAULT with `losses_source=DEFAULT` (not an invented engineering margin).
+- Regression: `upload/tests/test_legacy_unknown_inputs_parity.py` (6 cases).
