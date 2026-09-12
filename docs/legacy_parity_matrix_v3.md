@@ -14,7 +14,7 @@ This matrix defines what must be compared before declaring legacy parity. It int
 | PDF export | v2 exporter | v3 exporter from calculation result | PENDING |
 | UI calculation workflow | v2 calculation view | v3 calculation view | PENDING |
 | Systems editor | legacy behavior | v3 systems view | PENDING |
-| Comparison | legacy comparison | v3 comparison engine/view | PENDING |
+| Comparison | legacy comparison | v3 comparison engine/view | VERIFIED — extrema (DFT/layers/cost among known) match; intentional: no best_balance score; None costs excluded. Evidence: `upload/tests/test_legacy_comparison_parity.py` |
 | Unknown inputs | legacy fallback behavior | explicit UNKNOWN semantics | VERIFIED — missing price → None (v2→0.0); invalid density/SV → ValueError; losses None → DEFAULT provenance. Evidence: `upload/tests/test_legacy_unknown_inputs_parity.py` |
 
 ## Rule
@@ -48,3 +48,11 @@ A row is not `PASS` merely because the v3 implementation exists. It requires a r
 - Calculation treats a 2K product as **one** mixed material layer (`is_two_component=True`); components are not separate consumption layers.
 - Invalid ratios / ratio_basis raise `TwoComponentCalculationError`.
 - Regression: `upload/tests/test_legacy_two_component_parity.py` (5 cases).
+
+### Comparison (2026-09-12)
+- Shared: compare 2–N systems; annotate thinnest/thickest/fewest_layers; transparent indicator table.
+- DFT / layer-count extrema match v2 on binary-friendly inputs; cheapest among priced systems matches when all prices known.
+- Intentional: v3 sets `best_balance_index=None` (no derived price/DFT «smart» score); v2 computed a balance ranking.
+- Intentional: v3 cheapest/most_expensive only among systems with non-None `total_cost_per_m2` (UNKNOWN price excluded).
+- v3 also enforces max 10 systems and rejects mixed areas in `compare_results`.
+- Regression: `upload/tests/test_legacy_comparison_parity.py` (4 cases).
