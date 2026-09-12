@@ -7,7 +7,7 @@ This matrix defines what must be compared before declaring legacy parity. It int
 | Calculation formulas | `v2/app/domain/calculator.py`, `formulas.py` | `upload/app/domain/calculator.py`, `formulas.py` | VERIFIED — algebraic identity; intentional: v3 no intermediate round3; invalid losses → ValueError (v2 returned 1.0). Evidence: `upload/tests/test_legacy_formula_parity.py` |
 | Multilayer calculation | v2 calculation flow | `SystemCalculationResult` / system calculator | VERIFIED — sum-of-layers aggregation; binary-friendly inputs match v2 numerically; invalid losses → validation error. Evidence: `upload/tests/test_legacy_multilayer_parity.py` |
 | Two-component materials | v2 material/calculation behavior | v3 2K domain/service | VERIFIED — N/A in v2 (no 2K module); v3 informational-only + single mixed layer calc. Evidence: `upload/tests/test_legacy_two_component_parity.py` |
-| Material persistence | v2 repository/SQLite | v3 repositories + migrations | PENDING |
+| Material persistence | v2 repository/SQLite | v3 repositories + migrations | VERIFIED — shared MaterialRepository CRUD; None density/price preserved; SV persisted; soft delete. Evidence: `upload/tests/test_legacy_persistence_parity.py` |
 | History | v2 history service/view | immutable snapshots + integrity | VERIFIED — v3 seals SHA-256 snapshots; tamper rejected; v2 had no seal. Evidence: `upload/tests/test_legacy_history_parity.py` |
 | Recommendations | v2 recommendation engine | v3 recommendation engine + engineering limitations | VERIFIED — shared hard-filter→score; ScoreBreakdown retained; no hidden weights; unknown cost safe. Evidence: `upload/tests/test_legacy_recommendations_parity.py` |
 | Excel export | v2 exporter | v3 engineering/customer exporters | VERIFIED — from SystemCalculationResult; missing price → «—»; engineering/customer split intentional. Evidence: `upload/tests/test_legacy_export_parity.py` |
@@ -78,3 +78,10 @@ A row is not `PASS` merely because the v3 implementation exists. It requires a r
 - Tampered or unsealed payloads raise ValueError; `snapshot_number(None)` stays None (no invented zero).
 - `HistoryService.save_calculation` documents immutable material snapshot capture.
 - Regression: `upload/tests/test_legacy_history_parity.py` (6 cases).
+
+### Material persistence (2026-09-12)
+- Shared MaterialRepository API: get_by_id / get_by_name / list_all / add / update / delete.
+- v3 preserves None for density, solids, price (UNKNOWN ≠ 0) through ORM mapping.
+- solids_by_volume_percent persisted (engineering field).
+- Soft delete removes material from active_only lists.
+- Regression: `upload/tests/test_legacy_persistence_parity.py` (5 cases).
