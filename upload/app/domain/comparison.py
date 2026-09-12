@@ -96,8 +96,17 @@ class ComparisonEngine:
                 result["_max_idx"] = values.index(max(numeric))
             return result
 
-        thinner_m2 = [sum(layer.thinner_cost_per_m2 or 0 for layer in s.layers) if s.total_cost_per_m2 is not None else None for s in systems]
-        paint_m2 = [s.total_cost_per_m2 - t if s.total_cost_per_m2 is not None and t is not None else None for s, t in zip(systems, thinner_m2)]
+        thinner_m2 = []
+        paint_m2 = []
+        for system in systems:
+            thinner_costs = [layer.thinner_cost_per_m2 for layer in system.layers]
+            thinner_total = sum(thinner_costs) if all(value is not None for value in thinner_costs) else None
+            thinner_m2.append(thinner_total)
+            paint_m2.append(
+                system.total_cost_per_m2 - thinner_total
+                if system.total_cost_per_m2 is not None and thinner_total is not None
+                else None
+            )
         rows = [
             row("Название", names),
             row("Количество слоёв", [len(s.layers) for s in systems], True),
