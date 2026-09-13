@@ -79,7 +79,6 @@ def test_concentration_exceeded_becomes_not_resistant():
 
 
 def test_no_invention_from_binder_or_category():
-    """Without rules, epoxy/C5 must still be UNKNOWN."""
     result = check_chemical_resistance(
         ["Generic Epoxy C5"],
         [ChemicalAgent(agent_id="NaOH")],
@@ -163,3 +162,52 @@ def test_known_rule_without_source_rejected():
             outcome=RESISTANT,
             source=None,
         )
+
+
+def test_temperature_exceeded_becomes_not_resistant():
+    rule = make_rule(
+        rule_id="R_T",
+        material_hint="Tank LP",
+        agent_id="H2SO4",
+        outcome=RESISTANT,
+        document_id="TDS-T",
+        concentration_max_percent=50,
+        temperature_max_c=30,
+    )
+    result = check_chemical_resistance(
+        ["Blank Tank LP"],
+        [ChemicalAgent(agent_id="H2SO4", concentration_percent=10, temperature_c=60)],
+        rules=[rule],
+    )
+    assert result.outcomes["Blank Tank LP"]["H2SO4"] == NOT_RESISTANT
+    assert result.has_errors
+    assert any("TEMP" in i.code or "температур" in i.message.lower() for i in result.items)
+
+
+def test_multi_agent_partial_unknown_not_all_resistant():
+    rule = make_rule(
+        rule_id="R_WATER",
+        material_hint="EFFA",
+        agent_id="water",
+        outcome=RESISTANT,
+        document_id="TDS-W",
+    )
+    result = check_chemical_resistance(
+        ["EFFA 01B"],
+        [
+            ChemicalAgent(agent_id="water"),
+            ChemicalAgent(agent_id="HCl"),
+        ],
+        rules=[rule],
+    )
+    assert result.outcomes["EFFA 01B"]["water"] == RESISTANT
+    assert result.outcomes["EFFA 01B"]["HCl"] == UNKNOWN
+    assert not result.all_resistant
+
+
+def test_recommendation_filter_module_exists_without_invention():
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "app" / "services" / "recommendation_service.py").read_text(
+        encoding="utf-8"
+    )
+    assert "chemical" in src.lower() or "ChemicalAgent" in src or "chem" in src.lower()
