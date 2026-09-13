@@ -3,48 +3,48 @@
 > Живой план для ветки `v3.0-engineering-upgrade`.
 
 ## Правила
-1. Не ломать существующий расчёт.
-2. Инженерная логика — domain/service, не UI.
-3. Excel не второй расчётный движок.
-4. PDF и Excel из одного результата расчёта.
-5. Инженерные и коммерческие данные не смешивать.
-6. Существенный этап требует regression до закрытия.
-7. Code commit, затем docs/plan commit.
-8. `ВЫПОЛНЕНО` только с доказательством.
-9. Отсутствующие данные = `UNKNOWN`.
+1. Не ломать расчёт.
+2. Инженерная логика — domain/service.
+3. Excel не второй движок.
+4. PDF/Excel из одного результата.
+5. Не смешивать инженерные и коммерческие данные.
+6. Regression до закрытия.
+7. Code commit, затем docs.
+8. `ВЫПОЛНЕНО` с доказательством.
+9. Отсутствующие = `UNKNOWN`.
 10. GitHub Actions не запускать.
-11. SPKEFFA — read-only TDS.
+11. SPKEFFA read-only.
 
 ## Матрица статуса
 
-| § | Статус | Состояние / следующий шаг |
+| § | Статус | Состояние |
 |---|---|---|
 | 1 | ВЫПОЛНЕНО | Базовое ядро. |
-| 2 | ЧАСТИЧНО | UI smoke нужен PySide6. |
+| 2 | ЧАСТИЧНО | UI smoke — PySide6. |
 | 3 | ВЫПОЛНЕНО | AdHocMaterialDialog. |
-| 4 | ЧАСТИЧНО | Comparison/2K; smoke remains. |
-| 5 | ЧАСТИЧНО | Engineering Excel; visual remains. |
-| 6 | ЧАСТИЧНО | PDF; visual remains. |
-| 7 | ВЫПОЛНЕНО | Precision invariants. |
-| 8 | ВЫПОЛНЕНО | 2K один слой. |
+| 4 | ЧАСТИЧНО | Comparison/2K. |
+| 5 | ЧАСТИЧНО | Engineering Excel. |
+| 6 | ЧАСТИЧНО | PDF. |
+| 7 | ВЫПОЛНЕНО | Precision. |
+| 8 | ВЫПОЛНЕНО | 2K. |
 | 9 | ВЫПОЛНЕНО | PackagingPlanner. |
-| 10 | ВЫПОЛНЕНО | Alembic + backup/restore. |
+| 10 | ВЫПОЛНЕНО | Alembic + backup. |
 | 11 | ВЫПОЛНЕНО | Snapshot integrity. |
-| 11.1 | ВЫПОЛНЕНО | Durable outbox. |
-| 12 | ЧАСТИЧНО | Engineering context + TDS traces. |
-| 13 | ЧАСТИЧНО | Surface condition + UI. |
-| 14 | ЧАСТИЧНО | SPKEFFA KNOWN rules. |
+| 11.1 | ВЫПОЛНЕНО | Outbox. |
+| 12 | ЧАСТИЧНО | Engineering context. |
+| 13 | ЧАСТИЧНО | Surface condition. |
+| 14 | ЧАСТИЧНО | SPKEFFA rules. |
 | 15 | ОТЛОЖЕНО | OGZ. |
 | 16 | ЧАСТИЧНО | Recommendations. |
 | 17 | ЧАСТИЧНО | Inspection DFT UI. |
-| 18 | ЧАСТИЧНО | Evidence log заполнен (core **94 passed**, 2026-09-13). Full suite + UI PENDING. `docs/release_acceptance_v3.md`. |
-| 19 | ВЫПОЛНЕНО | Legacy parity VERIFIED. |
-| 20 | ЧАСТИЧНО | KB + Системы 1–4. |
-| 21 | ЧАСТИЧНО | Compatibility matrix. |
+| 18 | ЧАСТИЧНО | Evidence log; full suite PENDING. |
+| 19 | ВЫПОЛНЕНО | Legacy parity. |
+| 20 | ЧАСТИЧНО | KB / Системы. |
+| 21 | ЧАСТИЧНО | Compatibility. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LKM-Prof Table 1. |
-| 23 | ЧАСТИЧНО | Pre-Application. |
+| 23 | ВЫПОЛНЕНО | READY/BLOCKED/INCOMPLETE; no invented dew; RH/contamination/service. `test_pre_application.py` (11). UI E2E §2. |
 | 24 | ЧАСТИЧНО | Chemical resistance. |
-| 25 | ЧАСТИЧНО | Catalog KNOWN rules. |
+| 25 | ЧАСТИЧНО | Catalog KNOWN. |
 | 26 | ЧАСТИЧНО | Explanation. |
 | 27 | ЧАСТИЧНО | Staging. |
 | 28 | ВЫПОЛНЕНО | LossProfile. |
@@ -55,5 +55,5 @@
 
 ## Stages
 
-- §18 evidence: `docs/release_acceptance_v3.md` — core subset 94 passed (2026-09-13).
+- §23 closed: `test_pre_application.py` (11).
 - SPKEFFA read-only.
