@@ -51,7 +51,6 @@ def test_ready_when_ambient_and_limits_ok():
 
 
 def test_blocked_when_dew_point_margin_too_low():
-    # surface 15, dew 14 → margin 1 < required 3
     obj = make_object(surface_temperature=15, dew_point=14)
     result = check_pre_application(obj, [make_material()], actual_dfts=[120])
     assert result.status == BLOCKED
@@ -62,7 +61,7 @@ def test_blocked_when_dew_point_margin_too_low():
 
 
 def test_incomplete_when_ambient_missing():
-    obj = ObjectData()  # no ambient
+    obj = ObjectData()
     result = check_pre_application(obj, [make_material()])
     assert result.status == INCOMPLETE
     assert any(i.code == "PRE_AMBIENT_UNKNOWN" for i in result.items)
@@ -83,7 +82,6 @@ def test_incomplete_when_material_has_no_limits():
 def test_no_invented_dew_margin_when_material_limit_absent():
     """Missing min_dew_point_margin_c must not become 3 °C."""
     mat = make_material(min_dew_point_margin_c=None)
-    # margin = 1 °C — without material limit must not block as TECH_DEW_POINT_MARGIN
     obj = make_object(surface_temperature=15, dew_point=14)
     result = check_pre_application(obj, [mat], actual_dfts=[120])
     mat_codes = [iss.code for _, tech in result.material_results for iss in tech.issues]
@@ -118,3 +116,25 @@ def test_calculation_service_run_pre_application_check():
     assert result.status in {READY, INCOMPLETE, BLOCKED}
     assert isinstance(result.summary_lines(), list)
     assert result.summary_lines()[0].startswith("Pre-Application:")
+
+
+def test_blocked_when_relative_humidity_exceeds_material_limit():
+    mat = make_material(max_relative_humidity=70)
+    obj = make_object(relative_humidity=85)
+    result = check_pre_application(obj, [mat], actual_dfts=[120])
+    assert result.status == BLOCKED
+    mat_codes = [iss.code for _, tech in result.material_results for iss in tech.issues]
+    assert any("RH" in c or "HUMID" in c for c in mat_codes) or result.has_errors
+
+
+def test_blocked_when_surface_below_dew_point():
+    obj = make_object(surface_temperature=10, dew_point=12)
+    result = check_pre_application(obj, [make_material()], actual_dfts=[120])
+    assert result.status == BLOCKED
+    assert any(i.code == "PRE_DEW_POINT_NEGATIVE" for i in result.items)
+
+
+def test_incomplete_when_only_air_temperature_missing_rh_still_flagged():
+    obj = ObjectData(air_temperature=20, surface_temperature=20, dew_point=10)
+    result = check_pre_application(obj, [make_material()], actual_dfts=[120])
+    assert any(i.code == "PRE_AMBIENT_UNKNOWN" for i in result.items)
