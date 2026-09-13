@@ -7,7 +7,7 @@
 2. Инженерная логика — domain/service.
 3. Excel не второй движок.
 4. PDF/Excel из одного результата.
-5. Не смешивать инженерные и коммерческие данные.
+5. Не смешивать инженерные/коммерческие данные.
 6. Regression до закрытия.
 7. Code commit, затем docs.
 8. `ВЫПОЛНЕНО` с доказательством.
@@ -42,8 +42,8 @@
 | 20 | ЧАСТИЧНО | KB / Системы. |
 | 21 | ЧАСТИЧНО | Compatibility. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LKM-Prof Table 1. |
-| 23 | ВЫПОЛНЕНО | READY/BLOCKED/INCOMPLETE; no invented dew; RH/contamination/service. `test_pre_application.py` (11). UI E2E §2. |
-| 24 | ЧАСТИЧНО | Chemical resistance. |
+| 23 | ВЫПОЛНЕНО | Pre-Application domain/service. |
+| 24 | ВЫПОЛНЕНО | Source-backed only; empty⇒UNKNOWN; promote gate; conc/temp limits. Evidence: `test_chemical_resistance.py` (12). Agent catalog expansion remains §25. |
 | 25 | ЧАСТИЧНО | Catalog KNOWN. |
 | 26 | ЧАСТИЧНО | Explanation. |
 | 27 | ЧАСТИЧНО | Staging. |
@@ -55,5 +55,5 @@
 
 ## Stages
 
-- §23 closed: `test_pre_application.py` (11).
+- §23/§24 domain closed.
 - SPKEFFA read-only.
