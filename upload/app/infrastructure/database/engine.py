@@ -63,17 +63,12 @@ def init_db(engine=None) -> None:
         engine = get_engine()
     from app.infrastructure.database import models  # noqa: F401
     from app.infrastructure.database import system_template_models  # noqa: F401
-    Base.metadata.create_all(bind=engine)
 
     database = engine.url.database
     if not database or database == ":memory:":
+        Base.metadata.create_all(bind=engine)
         return
 
-    from app.infrastructure.database.migrate import stamp_database, upgrade_database
-    from sqlalchemy import inspect
+    from app.infrastructure.database.migrate import upgrade_database
 
-    tables = set(inspect(engine).get_table_names())
-    if "alembic_version" not in tables:
-        stamp_database(Path(database), "head")
-    else:
-        upgrade_database(Path(database))
+    upgrade_database(Path(database))
