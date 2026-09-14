@@ -44,7 +44,7 @@ def material_orm_to_domain(orm: MaterialORM) -> Material:
         recommended_dft_max=orm.recommended_dft_max,
         max_single_layer_dft=orm.max_single_layer_dft,
         thinner_required=orm.thinner_required,
-        thinner_name=orm.thinner_name or "",
+        thinner_name=orm.thinner_name,
         thinner_percent_min=orm.thinner_percent_min,
         thinner_percent_max=orm.thinner_percent_max,
         thinner_basis=orm.thinner_basis,
