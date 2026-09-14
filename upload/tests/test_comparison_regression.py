@@ -6,6 +6,7 @@ import pytest
 from app.domain.calculator import LayerInput
 from app.domain.comparison import ComparisonEngine
 from app.domain.enums import BinderType, MaterialType
+from app.domain.formulas import DILUTION_BASIS_BY_PAINT_VOLUME
 from app.domain.models import Material, ObjectData
 
 
@@ -39,6 +40,7 @@ def _layers(count: int, thinner: bool = False) -> list[LayerInput]:
             losses_percent=5.0,
             thinner_percent=5.0 if thinner and i % 2 else 0.0,
             thinner=thinner_material if thinner and i % 2 else None,
+            thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME if thinner and i % 2 else None,
         )
         for i in range(1, count + 1)
     ]
