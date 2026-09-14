@@ -51,7 +51,7 @@ class MaterialORM(Base):
     recommended_dft_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     max_single_layer_dft: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     thinner_required: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
-    thinner_name: Mapped[str] = mapped_column(String(200), default="")
+    thinner_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     thinner_percent_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     thinner_percent_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     thinner_basis: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
@@ -178,39 +178,3 @@ class DictionaryORM(Base):
 
 class MaterialComponentORM(Base):
     __tablename__ = "material_components"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    material_id: Mapped[int] = mapped_column(ForeignKey("materials.id", ondelete="CASCADE"), nullable=False, index=True)
-    component_code: Mapped[str] = mapped_column(String(10), nullable=False)
-    name: Mapped[str] = mapped_column(String(200), default="")
-    density_kg_l: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    price_per_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    price_per_liter: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    packaging_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    packaging_l: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
-    __table_args__ = (UniqueConstraint("material_id", "component_code", name="uq_material_component_code"),)
-
-class MaterialMixORM(Base):
-    __tablename__ = "material_mixes"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    material_id: Mapped[int] = mapped_column(ForeignKey("materials.id", ondelete="CASCADE"), nullable=False, unique=True)
-    mix_ratio_a: Mapped[float] = mapped_column(Float, nullable=False)
-    mix_ratio_b: Mapped[float] = mapped_column(Float, nullable=False)
-    ratio_basis: Mapped[str] = mapped_column(String(20), default="mass")
-    working_time_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    induction_time_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    temperature_reference: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    notes: Mapped[str] = mapped_column(Text, default="")
-
-class PackageORM(Base):
-    __tablename__ = "packages"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    material_id: Mapped[Optional[int]] = mapped_column(ForeignKey("materials.id", ondelete="CASCADE"), nullable=True)
-    component_id: Mapped[Optional[int]] = mapped_column(ForeignKey("material_components.id", ondelete="CASCADE"), nullable=True)
-    package_name: Mapped[str] = mapped_column(String(200), default="")
-    net_weight_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    net_volume_l: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    units_per_set: Mapped[int] = mapped_column(Integer, default=1)
-    package_type: Mapped[str] = mapped_column(String(30), default="single")
-    is_component_package: Mapped[bool] = mapped_column(Boolean, default=False)
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
