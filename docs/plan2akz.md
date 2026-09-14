@@ -41,7 +41,7 @@
 | 19 | ВЫПОЛНЕНО | Legacy parity. |
 | 20 | ЧАСТИЧНО | KB / Системы. |
 | 21 | ЧАСТИЧНО | Compatibility. |
-| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LKM-Prof Table 1. Материал: полная инженерная карточка и полный scalar ORM↔domain mapping реализованы; regression round-trip добавлен. Скрытый ORM default для `thinner_basis` устранён; добавлен regression guard на `nullable=True`, отсутствие Python/server default. TDS URL не является обязательным: инженерные параметры вводятся вручную, отсутствующие остаются `UNKNOWN`. Осталось execution-proof + полный аудит Table 1 на скрытые значения. |
+| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LKM-Prof Table 1. Материал: полная инженерная карточка и полный scalar ORM↔domain mapping реализованы; regression round-trip добавлен. Скрытые ORM defaults для `thinner_basis` и `thinner_required` устранены; добавлены regression guards на `nullable=True` и отсутствие Python/server default. TDS URL не является обязательным: инженерные параметры вводятся вручную, отсутствующие остаются `UNKNOWN`. Осталось execution-proof + полный аудит Table 1 на скрытые значения. |
 | 23 | ВЫПОЛНЕНО | Pre-Application domain/service. |
 | 24 | ВЫПОЛНЕНО | Source-backed only; empty⇒UNKNOWN; promote gate; conc/temp limits. Evidence: `test_chemical_resistance.py` (12). Agent catalog expansion remains §25. |
 | 25 | ЧАСТИЧНО | Catalog KNOWN. |
@@ -55,7 +55,7 @@
 
 ## Stages
 
-- §22 remains open: engineering material card and repository mapping are implemented; the ORM hidden default for `MaterialORM.thinner_basis` is removed and guarded by regression. §22 is not marked complete until local regression execution and the LKM-Prof Table 1 hidden-value audit are proven.
+- §22 remains open: engineering material card and repository mapping are implemented; ORM hidden defaults for `MaterialORM.thinner_basis` and `MaterialORM.thinner_required` are removed and guarded by regression. §22 is not marked complete until local regression execution and the LKM-Prof Table 1 hidden-value audit are proven.
 - §23/§24 domain closed.
 - §26 closed: domain/service + regression + dialog smoke + main-window acceptance test are implemented and execution-proven by the green local full suite.
 - §32 closed: DFT domain/service workflow and headless UI smoke are implemented; regression coverage for missing acceptance bands ⇒ `UNKNOWN`, missing measured value ⇒ `UNKNOWN`, out-of-range evaluation, and the invariant that DFT binding does not auto-set inspection acceptance is execution-proven by the green local full suite.
