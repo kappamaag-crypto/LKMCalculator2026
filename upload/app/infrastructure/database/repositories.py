@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional, Sequence
 from datetime import datetime
 
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, null
 from sqlalchemy.orm import Session
 
 from app.infrastructure.database.models import (
@@ -97,7 +97,7 @@ def material_domain_to_orm(domain: Material, orm: Optional[MaterialORM] = None) 
     orm.thinner_name = domain.thinner_name
     orm.thinner_percent_min = domain.thinner_percent_min
     orm.thinner_percent_max = domain.thinner_percent_max
-    orm.thinner_basis = domain.thinner_basis
+    orm.thinner_basis = domain.thinner_basis if domain.thinner_basis is not None else null()
     orm.packaging_kg = domain.packaging_kg
     orm.packaging_l = domain.packaging_l
     orm.is_two_component = domain.is_two_component
