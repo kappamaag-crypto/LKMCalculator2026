@@ -45,7 +45,7 @@
 | 23 | ВЫПОЛНЕНО | Pre-Application domain/service. |
 | 24 | ВЫПОЛНЕНО | Source-backed only; empty⇒UNKNOWN; promote gate; conc/temp limits. Evidence: `test_chemical_resistance.py` (12). Agent catalog expansion remains §25. |
 | 25 | ЧАСТИЧНО | Catalog KNOWN. |
-| 26 | ЧАСТИЧНО | Explanation. |
+| 26 | ЧАСТИЧНО | Explanation Engine domain/service already wired; regression coverage added in `test_explanation_engine.py`; local pytest execution pending, UI/E2E acceptance remains open. |
 | 27 | ЧАСТИЧНО | Staging. |
 | 28 | ВЫПОЛНЕНО | LossProfile. |
 | 29 | ЧАСТИЧНО | confirm_draft. |
@@ -56,4 +56,5 @@
 ## Stages
 
 - §23/§24 domain closed.
+- §26: regression test stage added; not closed because pytest execution and UI/E2E acceptance are still pending.
 - SPKEFFA read-only.
