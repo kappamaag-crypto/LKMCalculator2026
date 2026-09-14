@@ -21,7 +21,7 @@ def test_dilution_by_paint_volume_changes_wft_but_not_paint_consumption():
 
 
 def test_dilution_by_mix_volume():
-    wft = calculate_wft_with_dilution(100.0, 70.0, 20.0, basis=DILUTION_BASIS_BY_MIX_VOLUME)
+    wft = calculate_wft_with_dilution(100.0, 70.0, 20.0, 0.9, 1.4, DILUTION_BASIS_BY_MIX_VOLUME)
     assert wft == pytest.approx((100.0 / 0.70) / 0.80)
 
 
@@ -35,9 +35,9 @@ def test_dilution_by_mass_uses_both_densities_without_intermediate_rounding():
 @pytest.mark.parametrize("percent", [-0.01, 100.0, 100.01])
 def test_invalid_dilution_percent_is_rejected(percent):
     with pytest.raises(ValueError):
-        calculate_wft_with_dilution(100.0, 70.0, percent)
+        calculate_wft_with_dilution(100.0, 70.0, percent, 0.9, 1.4, DILUTION_BASIS_BY_PAINT_VOLUME)
 
 
 def test_invalid_dilution_percent_is_rejected_even_when_dft_zero():
     with pytest.raises(ValueError):
-        calculate_wft_with_dilution(0.0, 70.0, 100.0)
+        calculate_wft_with_dilution(0.0, 70.0, 100.0, 0.9, 1.4, DILUTION_BASIS_BY_PAINT_VOLUME)
