@@ -438,6 +438,7 @@ class SystemsView(QWidget):
                 orm.number_of_layers = self.table.rowCount()
                 orm.is_active = True
                 orm.layers.clear()
+                session.flush()
 
                 for row in range(self.table.rowCount()):
                     material = self.table.item(row, 1).data(32)
