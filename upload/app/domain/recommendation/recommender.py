@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Optional, Sequence, Callable
 
 from app.domain.models import CoatingSystem, ObjectData, Material, RecommendationItem, RecommendationResult, SystemCalculationResult
 from app.domain.calculator import SystemCalculator
+from app.domain.layer_compatibility import LayerCompatibilityEngine
 from app.domain.recommendation.rules import filter_systems, FilterResult
 from app.domain.recommendation.scorer import score_system, ScoreWeights, ScoreBreakdown
 
@@ -21,10 +21,11 @@ class RecommendationEngine:
         "требованиями и применимыми нормативными документами."
     )
 
-    def __init__(self, calculator: Optional[SystemCalculator] = None, weights: Optional[ScoreWeights] = None, materials_provider: Optional[Callable[[], dict[int, Material]]] = None):
+    def __init__(self, calculator: Optional[SystemCalculator] = None, weights: Optional[ScoreWeights] = None, materials_provider: Optional[Callable[[], dict[int, Material]]] = None, compatibility_engine: Optional[LayerCompatibilityEngine] = None):
         self.calculator = calculator or SystemCalculator()
         self.weights = weights or ScoreWeights()
         self.materials_provider = materials_provider
+        self.compatibility = compatibility_engine or LayerCompatibilityEngine()
 
     def recommend(self, obj: ObjectData, systems: Sequence[CoatingSystem], calculate_costs: bool = True, top_n: int = 10, require_corrosion: bool = True, require_durability: bool = True) -> RecommendationResult:
         if not systems:
@@ -52,8 +53,6 @@ class RecommendationEngine:
                     calc_result, validation = self.calculator.calculate_from_system(obj, fr.system, materials_by_id, skip_validation=True)
                     if not validation.has_errors and calc_result.layers:
                         calc_map[id(fr.system)] = calc_result
-                        # Неизвестная стоимость не является нулевой стоимостью и
-                        # не должна попадать в min/max нормализацию рейтинга.
                         if calc_result.total_cost_per_m2 is not None:
                             costs.append(calc_result.total_cost_per_m2)
                     else:
@@ -65,14 +64,58 @@ class RecommendationEngine:
         for fr in passed:
             calc = calc_map.get(id(fr.system))
             breakdown = score_system(filter_result=fr, obj=obj, calc_result=calc, all_costs=costs, weights=self.weights, compatibility_ok=True)
+            compatibility_report = self._compatibility_for_system(fr.system, calc)
+            if compatibility_report is not None:
+                breakdown.warnings.extend(
+                    transition.message for transition in compatibility_report.warning_transitions
+                )
+                breakdown.warnings.extend(
+                    transition.message for transition in compatibility_report.forbidden_transitions
+                )
+                if compatibility_report.unknown_transitions:
+                    breakdown.limitations.append(
+                        f"Совместимость UNKNOWN: не подтверждено переходов — {len(compatibility_report.unknown_transitions)}."
+                    )
+                if compatibility_report.forbidden_transitions:
+                    breakdown.limitations.append(
+                        f"Источник содержит явно запрещённых переходов: {len(compatibility_report.forbidden_transitions)}."
+                    )
+            else:
+                breakdown.limitations.append(
+                    "Совместимость слоёв не проверена: материалы системы не разрешены."
+                )
             scored.append((fr, breakdown, calc))
         scored.sort(key=lambda x: x[1].total, reverse=True)
 
         items: list[RecommendationItem] = []
         for rank, (fr, breakdown, calc) in enumerate(scored[:top_n], start=1):
-            items.append(RecommendationItem(system=fr.system, score=breakdown.total, rank=rank, status=getattr(breakdown, "status", "Подходит"), reasons=breakdown.reasons, warnings=breakdown.warnings, limitations=breakdown.limitations))
+            items.append(RecommendationItem(system=fr.system, score=breakdown.total, breakdown=breakdown, rank=rank, status=getattr(breakdown, "status", "Подходит"), reasons=breakdown.reasons, warnings=breakdown.warnings, limitations=breakdown.limitations))
 
         return RecommendationResult(object_data=obj, items=items, insufficient_data=False, message=f"Найдено подходящих систем: {len(passed)} из {len(systems)}", disclaimer=self.DISCLAIMER)
+
+    def _compatibility_for_system(self, system: CoatingSystem, calc: Optional[SystemCalculationResult]):
+        """Return compatibility only when layer materials are resolved.
+
+        Recommendation ranking is not silently changed by an UNKNOWN result.
+        Source-backed warnings are surfaced as explanation/limitation instead.
+        """
+        if calc is not None and calc.layers:
+            return self.compatibility.check_result(calc)
+        layers = getattr(system, "layers", None) or ()
+        materials = [getattr(layer, "material", None) for layer in layers]
+        if len(materials) < 2 or any(material is None for material in materials):
+            return None
+        return self.compatibility.check_material_sequence(materials)
+
+    @staticmethod
+    def _breakdown_report_lines(breakdown: ScoreBreakdown) -> list[str]:
+        return [
+            f"   Коррозионная категория: {breakdown.corrosion:.1f}/100",
+            f"   Долговечность: {breakdown.durability:.1f}/100",
+            f"   Технологичность: {breakdown.technology:.1f}/100",
+            f"   Стоимость: {breakdown.cost:.1f}/100",
+            f"   Итоговый Score: {breakdown.total:.1f}/100",
+        ]
 
     def format_report(self, result: RecommendationResult) -> str:
         lines = [
@@ -90,6 +133,9 @@ class RecommendationEngine:
         else:
             for item in result.items:
                 lines.append(f"{item.rank}. {item.system.system_name} — {item.score:.0f}/100")
+                if item.breakdown is not None:
+                    lines.append("   Разбивка оценки:")
+                    lines.extend(self._breakdown_report_lines(item.breakdown))
                 for reason in item.reasons[:4]:
                     lines.append(f"   ✓ {reason}")
                 for warning in item.warnings[:3]:

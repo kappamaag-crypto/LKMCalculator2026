@@ -3,6 +3,7 @@
 Сервис не изменяет расчёт расхода и не зависит от UI/ORM. Он оценивает
 условия нанесения и фактическую DFT относительно требований материала.
 Запас до точки росы ниже требуемого является блокирующей ошибкой.
+Отсутствующий требуемый запас до точки росы = UNKNOWN (не подставляется 3 °C).
 """
 
 from __future__ import annotations
@@ -34,6 +35,14 @@ class TechnologyCheckResult:
         return any(issue.level == "warning" for issue in self.issues)
 
     @property
+    def errors(self) -> list[TechnologyIssue]:
+        return [issue for issue in self.issues if issue.level == "error"]
+
+    @property
+    def warnings(self) -> list[TechnologyIssue]:
+        return [issue for issue in self.issues if issue.level == "warning"]
+
+    @property
     def blocking(self) -> bool:
         return self.has_errors
 
@@ -49,12 +58,23 @@ class TechnologyCheckResult:
     def add_info(self, code: str, message: str, field: str | None = None) -> None:
         self.add("info", code, message, field)
 
+    def merge(self, other: "TechnologyCheckResult") -> None:
+        self.issues.extend(other.issues)
 
-def check_target_dft(material: Material, target_dft: Optional[float]) -> TechnologyCheckResult:
+
+def check_target_dft(
+    material: Material,
+    target_dft: Optional[float],
+    *,
+    tds_dft_min: float | None = None,
+    tds_dft_max: float | None = None,
+    tds_rule_id: str | None = None,
+    tds_locator: str | None = None,
+) -> TechnologyCheckResult:
     """Проверить заданную для расчёта толщину слоя.
 
-    Это отдельная проверка: target DFT нельзя выдавать за фактическую толщину
-    при входном контроле. Отсутствующая DFT остаётся UNKNOWN.
+    material.recommended_dft_* — поле карточки материала (не автоматически TDS).
+    tds_dft_min/max — только из явно KNOWN TDS-правил (передаёт service-layer).
     """
     result = TechnologyCheckResult()
     if target_dft is None:
@@ -82,6 +102,30 @@ def check_target_dft(material: Material, target_dft: Optional[float]) -> Technol
             f"Целевая DFT {target_dft:g} мкм выше абсолютного максимума {material.max_single_layer_dft:g} мкм.",
             "target_dft",
         )
+
+    if tds_dft_min is not None and tds_dft_max is not None:
+        rule_ref = tds_rule_id or "TDS"
+        locator_ref = f"; {tds_locator}" if tds_locator else ""
+        if target_dft < tds_dft_min:
+            result.add_error(
+                "TECH_TDS_DFT_BELOW_MIN",
+                f"Целевая DFT {target_dft:g} мкм ниже TDS-минимума {tds_dft_min:g} мкм ({rule_ref}{locator_ref}).",
+                "target_dft",
+            )
+        elif target_dft > tds_dft_max:
+            result.add_error(
+                "TECH_TDS_DFT_ABOVE_MAX",
+                f"Целевая DFT {target_dft:g} мкм выше TDS-максимума {tds_dft_max:g} мкм ({rule_ref}{locator_ref}).",
+                "target_dft",
+            )
+        else:
+            result.add_info(
+                "TECH_TDS_DFT_OK",
+                f"Целевая DFT {target_dft:g} мкм соответствует TDS-диапазону "
+                f"{tds_dft_min:g}–{tds_dft_max:g} мкм ({rule_ref}).",
+                "target_dft",
+            )
+
     return result
 
 
@@ -136,19 +180,26 @@ def check_application_technology(
 
     if obj.surface_temperature is not None and obj.dew_point is not None:
         margin = obj.surface_temperature - obj.dew_point
-        required = material.min_dew_point_margin_c if material.min_dew_point_margin_c is not None else 3.0
-        if margin < required:
-            result.add_error(
-                "TECH_DEW_POINT_MARGIN",
-                f"Запас до точки росы {margin:.1f} °C меньше требуемого {required:.1f} °C — нанесение блокируется.",
+        if material.min_dew_point_margin_c is None:
+            result.add_info(
+                "TECH_DEW_POINT_MARGIN_UNKNOWN",
+                f"Запас до точки росы {margin:.1f} °C измерен, но требуемый минимум для материала не задан (UNKNOWN) — блокировка по умолчанию не применяется.",
                 "dew_point_margin_c",
             )
         else:
-            result.add_info(
-                "TECH_DEW_POINT_OK",
-                f"Запас до точки росы {margin:.1f} °C соответствует требованию {required:.1f} °C.",
-                "dew_point_margin_c",
-            )
+            required = material.min_dew_point_margin_c
+            if margin < required:
+                result.add_error(
+                    "TECH_DEW_POINT_MARGIN",
+                    f"Запас до точки росы {margin:.1f} °C меньше требуемого {required:.1f} °C — нанесение блокируется.",
+                    "dew_point_margin_c",
+                )
+            else:
+                result.add_info(
+                    "TECH_DEW_POINT_OK",
+                    f"Запас до точки росы {margin:.1f} °C соответствует требованию {required:.1f} °C.",
+                    "dew_point_margin_c",
+                )
     elif obj.surface_temperature is not None or obj.dew_point is not None:
         result.add_warning(
             "TECH_DEW_POINT_INCOMPLETE",

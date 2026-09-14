@@ -26,7 +26,7 @@ class LayerTableWidget(QTableWidget):
             if i!=1:self.setColumnWidth(i,width)
         self.setColumnWidth(1,220)
         header.setMinimumSectionSize(40)
-        self.setAlternatingRowColors(True);self.setSelectionBehavior(QAbstractItemView.SelectRows);self.setSelectionMode(QAbstractItemView.SingleSelection);self.verticalHeader().setVisible(False);self._layer_inputs=[];self._updating=False;self._last_valid={};self.itemChanged.connect(self._changed)
+        self.setAlternatingRowColors(True);self.setSelectionBehavior(QAbstractItemView.SelectRows);self.setSelectionMode(QAbstractItemView.SingleSelection);self.setDragDropMode(QAbstractItemView.InternalMove);self.setDragEnabled(True);self.setAcceptDrops(True);self.verticalHeader().setVisible(False);self._layer_inputs=[];self._updating=False;self._last_valid={};self.itemChanged.connect(self._changed)
     def _item(self,text,align=Qt.AlignCenter,edit=False,tooltip=None):
         item=QTableWidgetItem(str(text));item.setTextAlignment(align)
         if not edit:item.setFlags(item.flags() & ~Qt.ItemIsEditable)
@@ -57,12 +57,29 @@ class LayerTableWidget(QTableWidget):
         try:self._layer_inputs=list(layers);self.setRowCount(len(layers));self._last_valid.clear();[self._fill(row,layer,results[row] if results and row<len(results) else None) for row,layer in enumerate(layers)]
         finally:self._updating=False
     def _fill(self,row,layer,result):
-        material=layer.material;name=material.display_name() if hasattr(material,"display_name") else material.material_name;self.setItem(row,0,self._item(row+1));self.setItem(row,1,self._item(name,Qt.AlignLeft|Qt.AlignVCenter,tooltip=name));binder=material.binder_type.value if hasattr(material.binder_type,"value") else str(material.binder_type);self.setItem(row,2,self._item(binder,Qt.AlignCenter|Qt.AlignVCenter,tooltip=binder));self.setItem(row,3,self._item("Да" if material.is_two_component else "Нет"));price="" if material.price_per_kg is None else f"{material.price_per_kg:.2f}";self.setItem(row,4,self._item(price,Qt.AlignCenter|Qt.AlignVCenter,edit=True));dft_item=self._item(self._dft_text(layer.target_dft),Qt.AlignCenter|Qt.AlignVCenter,edit=True);state,hint=self._dft_state(material,layer.target_dft);dft_item.setToolTip(hint);dft_item.setData(Qt.UserRole,state);self.setItem(row,5,dft_item);self.setItem(row,6,self._item(self._percent_text(layer.losses_percent),Qt.AlignCenter|Qt.AlignVCenter,edit=True));self.setItem(row,7,self._item(self._percent_text(layer.thinner_percent),Qt.AlignCenter|Qt.AlignVCenter,edit=True))
+        material=layer.material;name=material.display_name() if hasattr(material,"display_name") else material.material_name;self.setItem(row,0,self._item(row+1));self.item(row,0).setData(Qt.UserRole,layer);self.setItem(row,1,self._item(name,Qt.AlignLeft|Qt.AlignVCenter,tooltip=name));binder=material.binder_type.value if hasattr(material.binder_type,"value") else str(material.binder_type);self.setItem(row,2,self._item(binder,Qt.AlignCenter|Qt.AlignVCenter,tooltip=binder));self.setItem(row,3,self._item("Да" if material.is_two_component else "Нет"));price="" if material.price_per_kg is None else f"{material.price_per_kg:.2f}";self.setItem(row,4,self._item(price,Qt.AlignCenter|Qt.AlignVCenter,edit=True));dft_item=self._item(self._dft_text(layer.target_dft),Qt.AlignCenter|Qt.AlignVCenter,edit=True);state,hint=self._dft_state(material,layer.target_dft);dft_item.setToolTip(hint);dft_item.setData(Qt.UserRole,state);self.setItem(row,5,dft_item);self.setItem(row,6,self._item(self._percent_text(layer.losses_percent),Qt.AlignCenter|Qt.AlignVCenter,edit=True));self.setItem(row,7,self._item(self._percent_text(layer.thinner_percent),Qt.AlignCenter|Qt.AlignVCenter,edit=True))
         for column in EDITABLE_COLUMNS:self._last_valid[(row,column)]=self.item(row,column).text()
         if result:
             cost=f"{result.cost_per_m2+result.thinner_cost_per_m2:.2f}" if result.cost_per_m2 is not None and result.thinner_cost_per_m2 is not None else "—";values=(f"{result.wft:.1f}",f"{result.practical_consumption_l:.4f}",f"{result.practical_consumption_kg:.4f}",cost)
         else:values=("—","—","—","—")
         for column,value in zip((8,9,10,11),values):self.setItem(row,column,self._item(value,Qt.AlignCenter|Qt.AlignVCenter))
+    def dropEvent(self,event):
+        """После drag&drop переносит тот же порядок в список LayerInput."""
+        self._updating=True
+        try:
+            super().dropEvent(event)
+            ordered=[]
+            for row in range(self.rowCount()):
+                item=self.item(row,0)
+                layer=item.data(Qt.UserRole) if item else None
+                if layer is not None:ordered.append(layer)
+            if len(ordered)==len(self._layer_inputs):
+                self._layer_inputs=ordered
+                for row in range(self.rowCount()):self.item(row,0).setText(str(row+1))
+            event.accept()
+        finally:
+            self._updating=False
+        self.layer_changed.emit()
     def _error(self,item,message):
         item.setToolTip(message);item.setData(Qt.UserRole,"invalid");item.setBackground(self.palette().brush(self.palette().ColorRole.BrightText));QToolTip.showText(self.viewport().mapToGlobal(self.visualItemRect(item).center()),message,self)
     def _clear_error(self,item):item.setToolTip("");item.setData(Qt.UserRole,None);item.setBackground(self.palette().base())
@@ -109,4 +126,10 @@ class LayerTableWidget(QTableWidget):
         for index in range(self.rowCount()):
             for column in EDITABLE_COLUMNS:self._last_valid[(index,column)]=self.item(index,column).text()
         self.layer_changed.emit()
+    def move_selected(self,direction:int):
+        """Перемещает выбранный слой на одну позицию и сохраняет модель синхронной с таблицей."""
+        row=self.currentRow();target=row+direction
+        if row<0 or row>=len(self._layer_inputs) or target<0 or target>=len(self._layer_inputs):return False
+        layers=list(self._layer_inputs);layers[row],layers[target]=layers[target],layers[row]
+        self.set_layers(layers);self.selectRow(target);self.layer_changed.emit();return True
     def clear_layers(self):self._layer_inputs.clear();self.setRowCount(0);self._last_valid.clear();self.layer_changed.emit()

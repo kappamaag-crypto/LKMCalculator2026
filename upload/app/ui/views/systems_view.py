@@ -4,14 +4,16 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel,
     QLineEdit, QComboBox, QPushButton, QMessageBox, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView,
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QTextEdit,
 )
 from PySide6.QtCore import Signal
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.domain.models import Material
-from app.domain.enums import MaterialType
+from app.domain.enums import MaterialType, CompatibilityStatus
+from app.domain.layer_compatibility import LayerCompatibilityEngine
+from app.domain.models import LayerDefinition
 from app.infrastructure.database.engine import get_session_factory
 from app.infrastructure.database.models import CoatingSystemORM, CoatingSystemLayerORM
 from app.infrastructure.database.repositories import CoatingSystemRepository
@@ -25,6 +27,8 @@ class SystemsView(QWidget):
         self._materials = list(materials)
         self._systems = []
         self._current_id = None
+        self._calculation_result = None
+        self._compatibility = LayerCompatibilityEngine()
         self._build_ui()
         self.set_materials(materials)
         self.reload()
@@ -42,12 +46,20 @@ class SystemsView(QWidget):
         self.list_systems.currentIndexChanged.connect(self._load_selected)
         self.btn_new = QPushButton("Новая система")
         self.btn_new.clicked.connect(self._new)
+        self.btn_copy = QPushButton("Копировать")
+        self.btn_copy.setToolTip("Создать новый несохранённый черновик из выбранной системы")
+        self.btn_copy.clicked.connect(self._copy_selected)
+        self.btn_from_calculation = QPushButton("Из текущего расчёта")
+        self.btn_from_calculation.setToolTip("Создать несохранённый черновик системы из последнего расчёта")
+        self.btn_from_calculation.clicked.connect(self._from_calculation)
         self.btn_reload = QPushButton("Обновить")
         self.btn_reload.setProperty("secondary", True)
         self.btn_reload.clicked.connect(self.reload)
         top.addWidget(QLabel("Система:"))
         top.addWidget(self.list_systems, 1)
         top.addWidget(self.btn_new)
+        top.addWidget(self.btn_copy)
+        top.addWidget(self.btn_from_calculation)
         top.addWidget(self.btn_reload)
         root.addLayout(top)
 
@@ -77,10 +89,18 @@ class SystemsView(QWidget):
         self.btn_del_layer = QPushButton("Удалить слой")
         self.btn_del_layer.setProperty("secondary", True)
         self.btn_del_layer.clicked.connect(self._delete_layer)
+        self.btn_up_layer = QPushButton("↑")
+        self.btn_up_layer.setToolTip("Переместить слой вверх")
+        self.btn_up_layer.clicked.connect(lambda: self._move_layer(-1))
+        self.btn_down_layer = QPushButton("↓")
+        self.btn_down_layer.setToolTip("Переместить слой вниз")
+        self.btn_down_layer.clicked.connect(lambda: self._move_layer(1))
         buttons.addWidget(QLabel("Материал:"))
         buttons.addWidget(self.cmb_material)
         buttons.addWidget(self.btn_add_layer)
         buttons.addWidget(self.btn_del_layer)
+        buttons.addWidget(self.btn_up_layer)
+        buttons.addWidget(self.btn_down_layer)
         buttons.addStretch()
         lv.addLayout(buttons)
 
@@ -93,8 +113,27 @@ class SystemsView(QWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.itemChanged.connect(self._renumber)
+        self.table.itemChanged.connect(self._refresh_compatibility)
         lv.addWidget(self.table)
         root.addWidget(layerbox, 1)
+
+        compatibility_box = QGroupBox("Совместимость соседних слоёв")
+        compatibility_layout = QVBoxLayout(compatibility_box)
+        self.lbl_compatibility_status = QLabel("UNKNOWN — добавьте минимум два слоя")
+        self.lbl_compatibility_status.setWordWrap(True)
+        compatibility_layout.addWidget(self.lbl_compatibility_status)
+        self.txt_compatibility = QTextEdit()
+        self.txt_compatibility.setReadOnly(True)
+        self.txt_compatibility.setMinimumHeight(80)
+        compatibility_layout.addWidget(self.txt_compatibility)
+        note = QLabel(
+            "Проверка использует только source-backed матрицу совместимости. "
+            "UNKNOWN не является запретом; условия отверждения/окна перекрытия "
+            "по TDS здесь не выводятся."
+        )
+        note.setWordWrap(True)
+        compatibility_layout.addWidget(note)
+        root.addWidget(compatibility_box)
 
         bottom = QHBoxLayout()
         self.btn_save = QPushButton("Сохранить систему")
@@ -115,9 +154,87 @@ class SystemsView(QWidget):
             if self._material_type_value(material) != MaterialType.THINNER.value:
                 self.cmb_material.addItem(material.display_name(), material)
 
+    def set_calculation_result(self, result):
+        self._calculation_result = result
+        self.btn_from_calculation.setEnabled(result is not None and bool(getattr(result, "layers", None)))
+
+    def _copy_selected(self):
+        sid = self.list_systems.currentData()
+        orm = next((item for item in self._systems if item.id == sid), None)
+        if orm is None:
+            QMessageBox.warning(self, "Система", "Выберите сохранённую систему для копирования")
+            return
+
+        self._current_id = None
+        self.list_systems.blockSignals(True)
+        self.list_systems.setCurrentIndex(0)
+        self.list_systems.blockSignals(False)
+        self.ed_name.setText(f"{orm.system_name or 'Пользовательская система'} — копия")
+        self.ed_manufacturer.setText(orm.manufacturer or "")
+        self.ed_description.setText(orm.description or "")
+        self.ed_substrate.setText(orm.substrate or "")
+        self.ed_standards.setText(orm.standards or "")
+        self.ed_certificate.setText(orm.certificate or "")
+
+        self.table.blockSignals(True)
+        self.table.setRowCount(0)
+        for layer in sorted(orm.layers, key=lambda item: item.layer_number):
+            material = next((m for m in self._materials if m.id == layer.material_id), None)
+            self._append_row(
+                layer.layer_number,
+                material,
+                layer.dft_min,
+                layer.target_dft,
+                layer.dft_max,
+                layer.thinner_percent,
+            )
+        self.table.blockSignals(False)
+        if self.table.rowCount():
+            self.table.selectRow(0)
+        self._refresh_compatibility()
+        self.status_message(f"Создан черновик копии системы: {self.table.rowCount()} слоёв. Проверьте и сохраните его.")
+
+    def _from_calculation(self):
+        result = self._calculation_result
+        if result is None or not result.layers:
+            QMessageBox.warning(self, "Система", "Сначала выполните расчёт с хотя бы одним слоем")
+            return
+
+        system = getattr(result, "system", None)
+        self._current_id = None
+        self.list_systems.blockSignals(True)
+        self.list_systems.setCurrentIndex(0)
+        self.list_systems.blockSignals(False)
+        self.ed_name.setText((getattr(system, "system_name", "") or "Пользовательская система") + " — из расчёта")
+        self.ed_manufacturer.setText(getattr(system, "manufacturer", "") or "")
+        self.ed_description.setText(getattr(system, "description", "") or "Создано из расчёта")
+        self.ed_substrate.setText(getattr(system, "substrate", "") or "")
+        self.ed_standards.setText(getattr(system, "standards", "") or "")
+        self.ed_certificate.setText(getattr(system, "certificate", "") or "")
+
+        self.table.blockSignals(True)
+        self.table.setRowCount(0)
+        for number, layer in enumerate(result.layers, start=1):
+            self._append_row(
+                number,
+                layer.material,
+                None,
+                layer.target_dft,
+                None,
+                layer.thinner_percent,
+            )
+        self.table.blockSignals(False)
+        self.table.selectRow(0)
+        self._refresh_compatibility()
+        self.status_message(f"Создан черновик системы из расчёта: {len(result.layers)} слоёв. Проверьте и сохраните его.")
+
+    def status_message(self, text):
+        parent = self.window()
+        if hasattr(parent, "statusBar"):
+            parent.statusBar().showMessage(text, 10000)
+
     def reload(self):
         try:
-            # Eager-load layers: _systems must remain usable after the DB session closes.
             with get_session_factory()() as session:
                 stmt = (
                     select(CoatingSystemORM)
@@ -156,6 +273,7 @@ class SystemsView(QWidget):
         self.ed_standards.clear()
         self.ed_certificate.clear()
         self.table.setRowCount(0)
+        self._refresh_compatibility()
 
     def _load_selected(self, index):
         sid = self.list_systems.itemData(index)
@@ -177,7 +295,7 @@ class SystemsView(QWidget):
         self.ed_certificate.setText(orm.certificate or "")
         self.table.blockSignals(True)
         self.table.setRowCount(0)
-        for layer in orm.layers:
+        for layer in sorted(orm.layers, key=lambda item: item.layer_number):
             material = next((m for m in self._materials if m.id == layer.material_id), None)
             self._append_row(
                 layer.layer_number,
@@ -188,6 +306,7 @@ class SystemsView(QWidget):
                 layer.thinner_percent,
             )
         self.table.blockSignals(False)
+        self._refresh_compatibility()
 
     def _append_row(self, num, material, dmin, target, dmax, thinner):
         row = self.table.rowCount()
@@ -221,12 +340,35 @@ class SystemsView(QWidget):
             0,
         )
         self.table.selectRow(self.table.rowCount() - 1)
+        self._refresh_compatibility()
 
     def _delete_layer(self):
         row = self.table.currentRow()
         if row >= 0:
             self.table.removeRow(row)
             self._renumber()
+            self._refresh_compatibility()
+
+    def _move_layer(self, direction: int):
+        row = self.table.currentRow()
+        target = row + direction
+        if row < 0 or target < 0 or target >= self.table.rowCount():
+            return
+        self.table.blockSignals(True)
+        try:
+            cells = []
+            for col in range(self.table.columnCount()):
+                item = self.table.takeItem(row, col)
+                cells.append(item)
+            self.table.removeRow(row)
+            self.table.insertRow(target)
+            for col, item in enumerate(cells):
+                self.table.setItem(target, col, item)
+            self._renumber()
+            self.table.selectRow(target)
+        finally:
+            self.table.blockSignals(False)
+        self._refresh_compatibility()
 
     def _renumber(self, *args):
         self.table.blockSignals(True)
@@ -237,6 +379,29 @@ class SystemsView(QWidget):
                 self.table.setItem(row, 0, item)
             item.setText(str(row + 1))
         self.table.blockSignals(False)
+
+    def _materials_from_table(self):
+        materials = []
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 1)
+            materials.append(item.data(32) if item is not None else None)
+        return materials
+
+    def _refresh_compatibility(self, *args):
+        materials = self._materials_from_table()
+        report = self._compatibility.check_material_sequence(materials)
+        self.lbl_compatibility_status.setText(f"Статус: {report.status.value}")
+        if not report.transitions:
+            self.txt_compatibility.setPlainText(
+                "Недостаточно слоёв для проверки. Для проверки соседних переходов нужны минимум два слоя."
+            )
+            return
+        self.txt_compatibility.setPlainText(
+            "\n".join(
+                f"{index}. {transition.message}"
+                for index, transition in enumerate(report.transitions, start=1)
+            )
+        )
 
     @staticmethod
     def _float(table, row, col):

@@ -46,6 +46,32 @@ class TestBasicFormulas:
     def test_scale_to_area(self): assert scale_to_area(.5,100)==50 and scale_to_area(.5,0)==0
     def test_total_area_legacy_compatibility(self): assert total_area(1250,5)==6250 and total_area(0,5)==0
 
+    def test_precision_is_not_truncated_between_formula_steps(self):
+        r=calculate_layer(LayerCalcInput(density=1.37,solids_by_volume_percent=67.3,dry_thickness=137.5,losses_percent=7.25))
+        expected_l=(137.5 / 67.3 * 100.0) / 1000.0 * (100.0 / (100.0 - 7.25))
+        expected_kg=expected_l * 1.37
+        assert r.practical_consumption_l==pytest.approx(expected_l,rel=1e-12,abs=1e-15)
+        assert r.practical_consumption_kg==pytest.approx(expected_kg,rel=1e-12,abs=1e-15)
+        assert r.practical_consumption_l != pytest.approx(round(r.practical_consumption_l,3),rel=0,abs=1e-15)
+
+    def test_kg_l_unit_invariant(self):
+        r=calculate_layer(LayerCalcInput(density=1.63,solids_by_volume_percent=64.7,dry_thickness=250.0,losses_percent=11.0))
+        assert r.theoretical_consumption_kg==pytest.approx(r.theoretical_consumption_l*1.63,rel=1e-12)
+        assert r.practical_consumption_kg==pytest.approx(r.practical_consumption_l*1.63,rel=1e-12)
+
+    def test_area_scaling_preserves_per_m2_result(self):
+        r=calculate_layer(LayerCalcInput(density=1.45,solids_by_volume_percent=72.0,dry_thickness=180.0,losses_percent=5.0))
+        area=1234.567
+        assert scale_to_area(r.practical_consumption_l,area)/area==pytest.approx(r.practical_consumption_l,rel=1e-12)
+        assert scale_to_area(r.practical_consumption_kg,area)/area==pytest.approx(r.practical_consumption_kg,rel=1e-12)
+
+    @pytest.mark.parametrize("basis,expected_factor",[("BY_PAINT_VOLUME",1.125),(DILUTION_BASIS_BY_MIX_VOLUME,1.0/(1.0-0.125)),(DILUTION_BASIS_BY_MASS,1.5*0.125/0.75+1.0)])
+    def test_dilution_basis_unit_consistency(self,basis,expected_factor):
+        dft=100.0
+        base=calculate_wft(dft,80.0)
+        wft=calculate_layer(LayerCalcInput(density=1.5,solids_by_volume_percent=80.0,dry_thickness=dft,thinner_percent=12.5,thinner_density=.75,thinner_basis=basis)).wft
+        assert wft==pytest.approx(base*expected_factor)
+
 class TestExcelConsistency:
     def test_primer_excel_row7(self):
         r=calculate_layer(LayerCalcInput(density=1.4,solids_by_volume_percent=73,dry_thickness=200,price_per_kg=552)); assert r.wft==pytest.approx(200*100/73); assert r.theoretical_coverage==pytest.approx(10*73/200); assert r.theoretical_consumption_l==pytest.approx(200/10/73); assert r.theoretical_consumption_kg==pytest.approx(200/10/73*1.4)

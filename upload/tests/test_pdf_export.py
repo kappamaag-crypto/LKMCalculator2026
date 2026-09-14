@@ -36,17 +36,26 @@ def test_pdf_contains_thinner_labels(sample_result):
 
 def test_pdf_contains_formula_version_and_date_marker(sample_result):
     with tempfile.TemporaryDirectory() as tmp:
-        path=Path(tmp)/"metadata.pdf"; PDFExporter().export_calculation(sample_result,path); data=path.read_bytes()
-        # PDF content is compressed/encoded, so verify stable metadata at the document level.
-        assert b"/Title" in data
-        assert str(FORMULA_VERSION).encode("ascii") in data
+        path=Path(tmp)/"metadata.pdf"; PDFExporter().export_calculation(sample_result,path); data=path.read_bytes(); assert b"/Title" in data; assert str(FORMULA_VERSION).encode("ascii") in data
 
 def test_pdf_unknown_total_cost_does_not_crash(sample_result):
-    sample_result.total_cost_per_m2 = None
-    sample_result.total_cost = None
-    sample_result.total_thinner_cost = None
-    for layer in sample_result.layers:
-        layer.cost_per_m2 = None
-        layer.thinner_cost_per_m2 = None
+    sample_result.total_cost_per_m2 = None; sample_result.total_cost = None; sample_result.total_thinner_cost = None
+    for layer in sample_result.layers: layer.cost_per_m2 = None; layer.thinner_cost_per_m2 = None
     with tempfile.TemporaryDirectory() as tmp:
         path=Path(tmp)/"unknown-cost.pdf"; PDFExporter().export_calculation(sample_result,path); assert path.exists() and path.stat().st_size>1000
+
+def test_pdf_supports_four_layers_and_long_material_name():
+    materials = [Material(material_name=("Сверхдлинное наименование антикоррозионного материала для проверки PDF без усечения" if i == 1 else f"Слой PDF {i}"), material_type=MaterialType.PRIMER_ENAMEL, binder_type=BinderType.EPOXY, density=1.4, solids_percent=70.0, solids_by_volume_percent=70.0, price_per_kg=100.0 + i, manufacturer="Blank") for i in range(1, 5)]
+    obj = ObjectData(object_name="PDF 4 слоя", customer="Заказчик", area_m2=100.0)
+    result, validation = CalculationService().calculate_system(obj, [LayerInput(material=m, target_dft=100 + i * 10) for i, m in enumerate(materials, 1)])
+    assert not validation.has_errors; assert len(result.layers) == 4
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "four-layers.pdf"; PDFExporter().export_calculation(result, path); assert path.exists() and path.stat().st_size > 1000 and path.read_bytes()[:4] == b"%PDF"
+
+def test_pdf_2k_is_one_layer_and_does_not_expose_components():
+    two_k = Material(material_name="2К PDF материал", material_type=MaterialType.PRIMER_ENAMEL, binder_type=BinderType.EPOXY, density=1.45, solids_by_volume_percent=72.0, price_per_kg=500.0, manufacturer="Blank", is_two_component=True)
+    finish = Material(material_name="PDF финиш", material_type=MaterialType.FINISH, binder_type=BinderType.POLYURETHANE, density=1.3, solids_by_volume_percent=60.0, price_per_kg=700.0, manufacturer="Blank")
+    result, validation = CalculationService().calculate_system(ObjectData(object_name="PDF 2К", customer="Заказчик", area_m2=100.0), [LayerInput(material=two_k, target_dft=120.0), LayerInput(material=finish, target_dft=80.0)])
+    assert not validation.has_errors; assert len(result.layers) == 2; assert sum(layer.material.is_two_component for layer in result.layers) == 1
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "two-k.pdf"; PDFExporter().export_calculation(result, path); data = path.read_bytes(); assert path.exists() and len(data) > 1000 and data[:4] == b"%PDF"; assert b"2" in data

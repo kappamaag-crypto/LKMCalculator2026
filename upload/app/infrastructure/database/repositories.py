@@ -11,8 +11,9 @@ from sqlalchemy.orm import Session
 from app.infrastructure.database.models import (
     MaterialORM, CoatingSystemORM, CoatingSystemLayerORM, CalculationORM,
     CalculationLayerORM, ComparisonORM, LayerCompatibilityORM, DictionaryORM,
+    MaterialComponentORM, MaterialMixORM,
 )
-from app.domain.models import Material, CoatingSystem, LayerDefinition
+from app.domain.models import Material, CoatingSystem, LayerDefinition, MaterialComponent, MaterialMix
 from app.domain.enums import MaterialType, BinderType
 
 
@@ -32,7 +33,8 @@ def material_orm_to_domain(orm: MaterialORM) -> Material:
         max_single_layer_dft=orm.max_single_layer_dft, thinner_required=orm.thinner_required,
         thinner_name=orm.thinner_name or "", thinner_percent_min=orm.thinner_percent_min,
         thinner_percent_max=orm.thinner_percent_max, packaging_kg=orm.packaging_kg,
-        packaging_l=orm.packaging_l, is_active=orm.is_active, is_incomplete=orm.is_incomplete,
+        packaging_l=orm.packaging_l, is_two_component=orm.is_two_component,
+        is_active=orm.is_active, is_incomplete=orm.is_incomplete,
         notes=orm.notes or "", datasheet=orm.datasheet or "", certificate=orm.certificate or "",
         created_at=orm.created_at, updated_at=orm.updated_at,
     )
@@ -50,8 +52,27 @@ def material_domain_to_orm(domain: Material, orm: Optional[MaterialORM] = None) 
     orm.theoretical_coverage=domain.theoretical_coverage; orm.recommended_dft_min=domain.recommended_dft_min; orm.recommended_dft_max=domain.recommended_dft_max
     orm.max_single_layer_dft=domain.max_single_layer_dft; orm.thinner_required=domain.thinner_required; orm.thinner_name=domain.thinner_name
     orm.thinner_percent_min=domain.thinner_percent_min; orm.thinner_percent_max=domain.thinner_percent_max; orm.packaging_kg=domain.packaging_kg; orm.packaging_l=domain.packaging_l
+    orm.is_two_component=domain.is_two_component
     orm.is_active=domain.is_active; orm.is_incomplete=domain.is_incomplete; orm.notes=domain.notes; orm.datasheet=domain.datasheet; orm.certificate=domain.certificate; orm.updated_at=datetime.utcnow()
     return orm
+
+
+def material_component_orm_to_domain(orm: MaterialComponentORM) -> MaterialComponent:
+    return MaterialComponent(
+        id=orm.id, material_id=orm.material_id, component_code=orm.component_code,
+        name=orm.name or "", density_kg_l=orm.density_kg_l,
+        price_per_kg=orm.price_per_kg, price_per_liter=orm.price_per_liter,
+        packaging_kg=orm.packaging_kg, packaging_l=orm.packaging_l, active=orm.active,
+    )
+
+
+def material_mix_orm_to_domain(orm: MaterialMixORM) -> MaterialMix:
+    return MaterialMix(
+        material_id=orm.material_id, mix_ratio_a=orm.mix_ratio_a, mix_ratio_b=orm.mix_ratio_b,
+        ratio_basis=orm.ratio_basis or "mass", working_time_minutes=orm.working_time_minutes,
+        induction_time_minutes=orm.induction_time_minutes,
+        temperature_reference=orm.temperature_reference, notes=orm.notes or "",
+    )
 
 
 class MaterialRepository:
@@ -93,6 +114,29 @@ class MaterialRepository:
         stmt=select(func.count(MaterialORM.id))
         if active_only:stmt=stmt.where(MaterialORM.is_active.is_(True))
         return self.session.scalar(stmt) or 0
+
+
+class MaterialComponentRepository:
+    """Информационные компоненты 2К; не выполняет закупочные расчёты."""
+    def __init__(self, session: Session): self.session = session
+    def list_for_material(self, material_id: int, active_only: bool = True) -> list[MaterialComponent]:
+        stmt = select(MaterialComponentORM).where(MaterialComponentORM.material_id == material_id).order_by(MaterialComponentORM.component_code)
+        if active_only: stmt = stmt.where(MaterialComponentORM.active.is_(True))
+        return [material_component_orm_to_domain(o) for o in self.session.scalars(stmt)]
+    def get(self, material_id: int, component_code: str) -> Optional[MaterialComponent]:
+        orm = self.session.scalar(select(MaterialComponentORM).where(
+            MaterialComponentORM.material_id == material_id,
+            MaterialComponentORM.component_code == component_code,
+        ))
+        return material_component_orm_to_domain(orm) if orm else None
+
+
+class MaterialMixRepository:
+    """Справочные параметры смешения 2К без расчёта комплектов A/B."""
+    def __init__(self, session: Session): self.session = session
+    def get_for_material(self, material_id: int) -> Optional[MaterialMix]:
+        orm = self.session.scalar(select(MaterialMixORM).where(MaterialMixORM.material_id == material_id))
+        return material_mix_orm_to_domain(orm) if orm else None
 
 
 class CoatingSystemRepository:

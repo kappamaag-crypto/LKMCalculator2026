@@ -48,6 +48,12 @@ class TestRecommender:
         result=RecommendationEngine().recommend(ObjectData(),[],calculate_costs=False); assert result.insufficient_data and len(result.items)==0
     def test_report_format(self):
         obj=ObjectData(object_name="Резервуар",corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.HIGH); result=RecommendationEngine().recommend(obj,[make_system("C4 High",[CorrosionCategory.C4],"High")],calculate_costs=False); report=RecommendationEngine().format_report(result); assert "Подбор систем АКЗ" in report
+    def test_result_preserves_score_breakdown(self):
+        obj=ObjectData(corrosion_category=CorrosionCategory.C4,durability=DurabilityLevel.HIGH)
+        result=RecommendationEngine().recommend(obj,[make_system("C4 High",[CorrosionCategory.C4],"High")],calculate_costs=False)
+        assert len(result.items) == 1
+        assert result.items[0].breakdown is not None
+        assert result.items[0].breakdown.total == result.items[0].score
 
 def test_score_has_no_hidden_condition_or_compatibility_weight():
     """P1: scoring остаётся прозрачным и не зависит от скрытых факторов."""

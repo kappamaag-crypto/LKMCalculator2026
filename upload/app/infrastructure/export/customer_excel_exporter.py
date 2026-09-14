@@ -1,183 +1,290 @@
-"""Экспорт расчёта в пользовательский Excel-шаблон.
-
-Шаблон сохраняется, но инженерные данные расчёта всегда записываются
-в отдельный лист «Расчёт» и, если возможно, также в найденные поля шаблона.
-"""
+"""Экспорт расчёта в рабочий пользовательский Excel-шаблон."""
 from __future__ import annotations
 
-from datetime import datetime
+from copy import copy
 from pathlib import Path
 from typing import Optional
 
 from openpyxl import load_workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
+from openpyxl.cell.cell import MergedCell
+from openpyxl.utils.cell import range_boundaries
 
 from app.config import AppSettings
-from app.domain.formulas import FORMULA_VERSION
-from app.domain.models import SystemCalculationResult, RecommendationResult
+from app.domain.models import RecommendationResult, SystemCalculationResult
+from app.infrastructure.export.engineering_excel_exporter import EngineeringExcelExporter
 from app.infrastructure.export.excel_exporter import ExcelExporter
 
 
 class CustomerExcelExporter(ExcelExporter):
-    LABELS = {
-        "object": ("объект", "название объекта"),
-        "customer": ("заказчик",),
-        "area": ("площадь", "площадь, м²", "площадь м2"),
-        "system": ("система", "система покрытия"),
-        "corrosion": ("категория коррозии", "категория"),
-        "durability": ("долговечность",),
-        "total_dft": ("общая толщина", "суммарная толщина", "толщина dft"),
-        "cost_m2": ("стоимость, руб/м²", "стоимость руб/м2", "стоимость м²"),
-        "total_cost": ("стоимость объекта", "итого стоимость"),
-        "calculation_date": ("дата расчёта",),
-        "formula_version": ("версия формул", "версия расчёта"),
-    }
+    """Заполняет одну таблицу customer-facing ``База``; инженерный режим использует отдельный формат."""
+
+    _SECTION = {"layer_start": 7, "thinner_start": 9, "total_row": 11}
 
     def __init__(self, settings: Optional[AppSettings] = None):
         super().__init__(settings)
 
-    @staticmethod
-    def _text(value) -> str:
-        return "" if value is None else " ".join(str(value).strip().lower().replace("ё", "е").split())
-
-    def _find_label_cell(self, wb, aliases):
-        aliases = tuple(self._text(a) for a in aliases)
-        for ws in wb.worksheets:
-            for row in ws.iter_rows():
-                for cell in row:
-                    text = self._text(cell.value)
-                    if text and any(alias in text for alias in aliases):
-                        return ws, cell
-        return None, None
-
-    def _put_next_to_label(self, wb, aliases, value) -> bool:
-        ws, cell = self._find_label_cell(wb, aliases)
-        if cell is None:
-            return False
-        for offset in (1, 2, 3):
-            target = ws.cell(cell.row, cell.column + offset)
-            if target.value in (None, ""):
-                target.value = value
-                return True
-        return False
+    @property
+    def report_mode(self) -> str:
+        mode = self.settings.report_mode
+        return mode if mode in {"engineering", "commercial", "full"} else "engineering"
 
     @staticmethod
-    def _cost_add(*values):
-        if any(value is None for value in values):
+    def _binder(value) -> str:
+        return value.value if hasattr(value, "value") else str(value or "")
+
+    @staticmethod
+    def _copy_row_style(
+        ws, source_row: int, target_row: int, min_col: int = 2, max_col: int = 18
+    ) -> None:
+        ws.row_dimensions[target_row].height = ws.row_dimensions[source_row].height
+        ws.row_dimensions[target_row].hidden = ws.row_dimensions[source_row].hidden
+        for col in range(min_col, max_col + 1):
+            src, dst = ws.cell(source_row, col), ws.cell(target_row, col)
+            if src.has_style:
+                dst._style = copy(src._style)
+            dst.number_format = src.number_format
+            dst.protection = copy(src.protection)
+            dst.alignment = copy(src.alignment)
+            dst.font = copy(src.font)
+            dst.fill = copy(src.fill)
+            dst.border = copy(src.border)
+
+    @staticmethod
+    def _restore_merged_fills(ws) -> None:
+        """Restore fills for merged ranges where the source template uses a fill inside the range.
+
+        openpyxl does not persist fills assigned to non-anchor ``MergedCell`` objects.  The
+        anchor therefore receives the fill explicitly before the workbook is saved.
+        """
+        for merged in ws.merged_cells.ranges:
+            min_col, min_row, max_col, max_row = range_boundaries(str(merged))
+            anchor = ws.cell(min_row, min_col)
+            if anchor.fill.fill_type:
+                continue
+            for row in range(min_row, max_row + 1):
+                for col in range(min_col, max_col + 1):
+                    cell = ws.cell(row, col)
+                    if cell.fill.fill_type:
+                        anchor.fill = copy(cell.fill)
+                        break
+                else:
+                    continue
+                break
+
+    def _expand_section(
+        self,
+        ws,
+        layer_start: int,
+        thinner_start: int,
+        total_row: int,
+        layer_count: int,
+    ) -> int:
+        extra = max(layer_count - 2, 0)
+        if not extra:
+            return 0
+
+        original_merges = list(ws.merged_cells.ranges)
+        thinner_styles = {
+            row: [copy(ws.cell(row, col)._style) for col in range(2, 19)]
+            for row in range(thinner_start, thinner_start + 2)
+        }
+        # The fill of a merged row belongs to its top-left anchor.  Reading C9/C10
+        # would silently return the default fill because those cells are MergedCell
+        # instances after loading a valid XLSX template.
+        thinner_fills = {
+            row: copy(ws.cell(row, 2).fill)
+            for row in range(thinner_start, thinner_start + 2)
+        }
+        thinner_heights = {
+            row: ws.row_dimensions[row].height
+            for row in range(thinner_start, thinner_start + 2)
+        }
+
+        for merged in original_merges:
+            ws.unmerge_cells(str(merged))
+
+        ws.insert_rows(thinner_start, extra)
+        shifted_total = total_row + extra
+        ws.insert_rows(shifted_total, extra)
+
+        for merged in original_merges:
+            min_col, min_row, max_col, max_row = range_boundaries(str(merged))
+            for idx, amount in ((thinner_start, extra), (shifted_total, extra)):
+                if min_row >= idx:
+                    min_row += amount
+                    max_row += amount
+                elif max_row >= idx:
+                    max_row += amount
+            ws.merge_cells(
+                start_row=min_row,
+                start_column=min_col,
+                end_row=max_row,
+                end_column=max_col,
+            )
+
+        for row in range(layer_start + 2, layer_start + 2 + extra):
+            self._copy_row_style(ws, layer_start + 1, row)
+
+        for offset in range(extra):
+            target = thinner_start + extra + offset
+            source_index = offset % 2
+            source_row = thinner_start + source_index
+            for col, style in enumerate(thinner_styles[source_row], 2):
+                ws.cell(target, col)._style = copy(style)
+            ws.row_dimensions[target].height = thinner_heights[source_row]
+
+            # The source fill is captured from the persisted anchor above.  After
+            # recreating the merged ranges, restore it explicitly on every target
+            # merged row anchor so XLSX round-trip keeps the customer formatting.
+            fill = thinner_fills[source_row]
+            for merged in list(ws.merged_cells.ranges):
+                min_col, min_row, max_col, max_row = range_boundaries(str(merged))
+                if min_row == target:
+                    ws.cell(min_row, min_col).fill = copy(fill)
+
+        self._restore_merged_fills(ws)
+        return 2 * extra
+
+    def _prepare_base_sheet(self, wb, layer_count: int):
+        if "База" not in wb.sheetnames:
             return None
-        return sum(values)
+        ws = wb["База"]
+        if ws.max_row > 11:
+            ws.delete_rows(12, ws.max_row - 11)
+        if layer_count > 2:
+            self._expand_section(
+                ws,
+                self._SECTION["layer_start"],
+                self._SECTION["thinner_start"],
+                self._SECTION["total_row"],
+                layer_count,
+            )
+        return ws
 
     @staticmethod
-    def _area(result) -> float:
-        return max(float(result.object_data.area_m2 or 0.0), 0.0)
+    def _clear_row(ws, row: int) -> None:
+        for col in range(2, 19):
+            cell = ws.cell(row, col)
+            if not isinstance(cell, MergedCell):
+                cell.value = None
 
-    def _write_engineering_sheet(self, wb, result: SystemCalculationResult) -> None:
-        """Гарантированно выгружает именно выбранные пользователем слои."""
-        name = "Расчёт"
-        if name in wb.sheetnames:
-            del wb[name]
-        ws = wb.create_sheet(name)
-        ws.freeze_panes = "A5"
+    @staticmethod
+    def _layer_total_cost(layer) -> Optional[float]:
+        if layer.cost_per_m2 is None and layer.thinner_cost_per_m2 is None:
+            return None
+        return (layer.cost_per_m2 or 0.0) + (layer.thinner_cost_per_m2 or 0.0)
 
-        title_font = Font(name="Arial", bold=True, size=15)
-        header_font = Font(name="Arial", bold=True, size=10, color="FFFFFF")
-        normal_font = Font(name="Arial", size=10)
-        fill = PatternFill("solid", fgColor="1A56DB")
-        border = Border(left=Side(style="thin", color="D0D4DC"), right=Side(style="thin", color="D0D4DC"), top=Side(style="thin", color="D0D4DC"), bottom=Side(style="thin", color="D0D4DC"))
-
-        obj = result.object_data
-        ws.cell(1, 1, f"Расчёт системы покрытия: {result.system.system_name or 'Пользовательская система'}").font = title_font
-        ws.cell(2, 1, f"Объект: {obj.object_name or '—'}")
-        ws.cell(2, 4, f"Заказчик: {obj.customer or '—'}")
-        ws.cell(3, 1, f"Площадь: {obj.area_m2:.2f} м²" if obj.area_m2 else "Площадь: —")
-        ws.cell(3, 4, f"Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
-        ws.cell(4, 1, f"Формула: {FORMULA_VERSION}")
-
-        headers = [
-            "№", "Материал", "Связующее", "DFT, мкм", "WFT, мкм",
-            "Потери, %", "Разбавитель, %", "Расход, кг/м²", "Расход, л/м²",
-            "Разбавитель, кг/м²", "Разбавитель, л/м²", "Стоимость, руб/м²",
-            "Стоимость на объект, руб"
+    def _write_layer_row(self, ws, row: int, layer, area: float) -> None:
+        material = layer.material
+        values = [
+            area,
+            material.display_name(),
+            self._binder(material.binder_type),
+            material.ral or material.color or "-",
+            material.density,
+            material.solids_by_volume_percent,
+            layer.wft,
+            layer.target_dft,
+            layer.theoretical_coverage,
+            layer.losses_percent,
+            layer.practical_coverage,
+            material.price_per_kg if self.report_mode != "engineering" else None,
+            material.price_per_liter if self.report_mode != "engineering" else None,
+            layer.theoretical_consumption_l,
+            layer.theoretical_consumption_kg,
+            layer.practical_consumption_kg,
+            self._layer_total_cost(layer),
         ]
-        header_row = 6
-        for col, value in enumerate(headers, 1):
-            c = ws.cell(header_row, col, value)
-            c.font = header_font
-            c.fill = fill
-            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            c.border = border
+        for col, value in enumerate(values, 2):
+            ws.cell(row, col).value = value
 
-        area = self._area(result)
-        for i, layer in enumerate(result.layers, 1):
-            binder = getattr(layer.material.binder_type, "value", layer.material.binder_type)
-            total_cost_m2 = self._cost_add(layer.cost_per_m2, layer.thinner_cost_per_m2)
-            values = [
-                i,
-                layer.material.material_name,
-                binder,
-                layer.target_dft,
-                layer.wft,
-                layer.losses_percent,
-                layer.thinner_percent,
-                layer.practical_consumption_kg,
-                layer.practical_consumption_l,
-                layer.thinner_consumption_kg,
-                layer.thinner_consumption_l,
-                total_cost_m2,
-                layer.total_cost,
-            ]
-            row = header_row + i
-            for col, value in enumerate(values, 1):
-                c = ws.cell(row, col, value)
-                c.font = normal_font
-                c.border = border
-                c.alignment = Alignment(horizontal="left" if col == 2 else "center", vertical="center", wrap_text=True)
+    def _write_thinner_row(self, ws, row: int, layer) -> None:
+        self._clear_row(ws, row)
+        if layer.thinner is None and not layer.thinner_percent:
+            return
+        thinner = layer.thinner
+        ws.cell(row, 2).value = f"Разбавитель для {layer.material.display_name()}"
+        ws.cell(row, 6).value = thinner.density if thinner is not None else None
+        ws.cell(row, 7).value = layer.thinner_percent
+        ws.cell(row, 13).value = (
+            thinner.price_per_kg
+            if self.report_mode != "engineering" and thinner
+            else None
+        )
+        ws.cell(row, 14).value = (
+            thinner.price_per_liter
+            if self.report_mode != "engineering" and thinner
+            else None
+        )
+        ws.cell(row, 15).value = layer.thinner_consumption_l
+        ws.cell(row, 16).value = layer.thinner_consumption_kg
+        ws.cell(row, 17).value = layer.thinner_consumption_kg
+        ws.cell(row, 18).value = layer.thinner_cost_per_m2
 
-        total_row = header_row + len(result.layers) + 1
-        ws.cell(total_row, 2, "ИТОГО").font = Font(name="Arial", bold=True, size=10)
-        ws.cell(total_row, 4, result.total_dft)
-        ws.cell(total_row, 8, result.total_practical_consumption_kg)
-        ws.cell(total_row, 9, result.total_practical_consumption_l)
-        ws.cell(total_row, 12, result.total_cost_per_m2)
-        ws.cell(total_row, 13, result.total_cost)
-        for col in (2, 4, 8, 9, 12, 13):
-            ws.cell(total_row, col).border = border
-            ws.cell(total_row, col).font = Font(name="Arial", bold=True, size=10)
+    def _write_totals(self, ws, row: int, result) -> None:
+        self._clear_row(ws, row)
+        ws.cell(row, 3).value = "Толщина покрытия (мкм)"
+        ws.cell(row, 9).value = result.total_dft
+        ws.cell(row, 10).value = "Общее количество ЛКМ"
+        ws.cell(row, 15).value = result.total_theoretical_consumption_l
+        ws.cell(row, 16).value = result.total_theoretical_consumption_kg
+        ws.cell(row, 17).value = result.total_practical_consumption_kg
+        ws.cell(row, 18).value = result.total_cost_per_m2
 
-        for col in range(1, len(headers) + 1):
-            max_len = max(len(str(ws.cell(r, col).value or "")) for r in range(1, total_row + 1))
-            ws.column_dimensions[get_column_letter(col)].width = min(max(max_len + 2, 10), 32)
+    def _write_block(self, ws, result, layer_start: int, thinner_start: int, total_row: int) -> None:
+        area = max(float(result.object_data.area_m2 or 0.0), 0.0)
+        for i, layer in enumerate(result.layers):
+            self._clear_row(ws, layer_start + i)
+            self._write_layer_row(ws, layer_start + i, layer, area)
+        for i, layer in enumerate(result.layers):
+            self._write_thinner_row(ws, thinner_start + i, layer)
+        self._write_totals(ws, total_row, result)
 
-    def export_calculation(self, result: SystemCalculationResult, path: str | Path, recommendation: Optional[RecommendationResult] = None) -> Path:
+    @staticmethod
+    def _configure_print_layout(ws, total_row: int) -> None:
+        """Make the dynamic customer table deterministic for printing/PDF conversion."""
+        ws.print_area = f"B1:R{total_row}"
+        ws.print_title_rows = "1:6"
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.page_margins.left = 0.25
+        ws.page_margins.right = 0.25
+        ws.page_margins.top = 0.4
+        ws.page_margins.bottom = 0.4
+
+    def _write_metadata(self, ws, result) -> None:
+        obj = result.object_data
+        ws.cell(1, 2).value = "Расчёт системы АКЗ"
+        ws.cell(2, 2).value = f"Объект: {obj.object_name}" if obj.object_name else None
+        ws.cell(2, 5).value = f"Заказчик: {obj.customer}" if obj.customer else None
+        ws.cell(2, 13).value = (
+            f"Площадь: {float(obj.area_m2 or 0):.2f} м²" if obj.area_m2 else None
+        )
+
+    def export_calculation(
+        self,
+        result: SystemCalculationResult,
+        path: str | Path,
+        recommendation: Optional[RecommendationResult] = None,
+    ) -> Path:
+        if self.report_mode == "engineering":
+            return EngineeringExcelExporter().export_system(result, path)
+
         path = Path(path)
         template = Path(self.settings.excel_template_path)
-
-        # Если шаблон недоступен — используем штатный профессиональный экспорт.
         if not template.exists() or template.resolve() == path.resolve():
             return super().export_calculation(result, path, recommendation)
 
         wb = load_workbook(template)
-        obj = result.object_data
-        values = {
-            "object": obj.object_name or None,
-            "customer": obj.customer or None,
-            "area": obj.area_m2 if obj.area_m2 > 0 else None,
-            "system": result.system.system_name or None,
-            "corrosion": obj.corrosion_category.value if obj.corrosion_category else None,
-            "durability": obj.durability.value if obj.durability else None,
-            "total_dft": result.total_dft,
-            "cost_m2": result.total_cost_per_m2,
-            "total_cost": result.total_cost,
-            "calculation_date": datetime.now().strftime("%d.%m.%Y %H:%M"),
-            "formula_version": FORMULA_VERSION,
-        }
-        for key, value in values.items():
-            if value is not None:
-                self._put_next_to_label(wb, self.LABELS[key], value)
+        ws = self._prepare_base_sheet(wb, len(result.layers))
+        if ws is None:
+            return super().export_calculation(result, path, recommendation)
 
-        # Ключевое исправление: выбранные слои больше не зависят от структуры шаблона.
-        # Они всегда попадают в отдельный лист «Расчёт».
-        self._write_engineering_sheet(wb, result)
+        extra = max(len(result.layers) - 2, 0)
+        total_row = 11 + 2 * extra
+        self._write_metadata(ws, result)
+        self._write_block(ws, result, 7, 9 + extra, total_row)
+        self._configure_print_layout(ws, total_row)
         wb.save(path)
         return path

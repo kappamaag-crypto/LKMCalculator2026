@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json
+import os
 from typing import Optional
 
 from PySide6.QtWidgets import (
@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt, Signal
 
 from app.infrastructure.database.engine import get_session_factory, session_scope, init_db, get_engine
 from app.services.history_service import HistoryService
+from app.services.notification_service import enqueue_event
 from app.config import DB_PATH
 
 
@@ -67,8 +68,8 @@ class HistoryView(QWidget):
         root.addLayout(btn_row)
 
         splitter = QSplitter(Qt.Vertical)
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(["ID", "Дата", "№", "Объект", "Система", "DFT, мкм", "Стоимость, руб"])
+        self.table = QTableWidget(0, 8)
+        self.table.setHorizontalHeaderLabels(["ID", "Дата", "№", "Объект", "Система", "DFT, мкм", "Стоимость, руб", "TDS"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.verticalHeader().setVisible(False)
@@ -94,10 +95,16 @@ class HistoryView(QWidget):
                 self.table.setRowCount(len(rows))
                 for r, calc in enumerate(rows):
                     date_str = calc.created_at.strftime("%d.%m.%Y %H:%M") if calc.created_at else "—"
+                    tds_status = "—"
+                    try:
+                        tds_status = HistoryService(session).get_calculation_tds_verified(calc.id)
+                    except Exception:
+                        tds_status = "—"
                     values = [
                         str(calc.id), date_str, calc.calculation_number or "—",
                         calc.object_name or "—", calc.system_name or "—",
                         self._money(calc.total_dft, 0), self._money(calc.total_cost, 0),
+                        tds_status,
                     ]
                     for c, v in enumerate(values):
                         item = QTableWidgetItem(v)
@@ -143,6 +150,21 @@ class HistoryView(QWidget):
                     )
                 if calc.notes:
                     lines.append(f"\nЗаметки: {calc.notes}")
+                try:
+                    svc = HistoryService(session)
+                    tds_status = svc.get_calculation_tds_verified(calc_id)
+                    traces = svc.get_calculation_tds_traces(calc_id)
+                    lines.append("")
+                    lines.append(f"TDS verified: {tds_status}")
+                    for tr in traces:
+                        lines.append(
+                            f"  слой {tr.get('layer_number', '?')}: "
+                            f"{tr.get('material_name') or '—'} → {tr.get('tds_verified', 'UNKNOWN')}"
+                            + (f" [{tr.get('document_id')}]" if tr.get('document_id') else "")
+                            + (f" DFT={tr.get('dft_value')}" if tr.get('dft_value') else "")
+                        )
+                except Exception as tds_exc:
+                    lines.append(f"\nTDS: недоступно ({tds_exc})")
                 self.txt_detail.setPlainText("\n".join(lines))
         except Exception as e:
             self.txt_detail.setPlainText(str(e))
@@ -171,23 +193,33 @@ class HistoryView(QWidget):
         try:
             sf = self._get_session_factory()
             with session_scope(sf) as session:
-                calc = HistoryService(session).get_calculation(calc_id)
-                if not calc or not calc.snapshot_json:
-                    QMessageBox.warning(self, "История", "Снимок отсутствует")
-                    return
-                snapshot = json.loads(calc.snapshot_json)
+                service = HistoryService(session)
+                snapshot = service.get_calculation_snapshot(calc_id)
                 self.load_requested.emit(snapshot)
-                QMessageBox.information(self, "История", "Снимок загружен в форму расчёта.")
-        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            QMessageBox.information(self, "История", "Проверенный снимок загружен в форму расчёта.")
+        except (KeyError, ValueError) as e:
             QMessageBox.critical(self, "Ошибка снимка", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", str(e))
 
-    def save_result(self, result) -> None:
+    def save_result(self, result) -> Optional[int]:
         try:
             sf = self._get_session_factory()
             with session_scope(sf) as session:
                 calc_id = HistoryService(session).save_calculation(result)
+                recipient = os.getenv("LKM_NOTIFICATION_RECIPIENT", "").strip()
+                if recipient:
+                    enqueue_event(
+                        session,
+                        "calculation_saved",
+                        calc_id,
+                        recipient,
+                        f"LKM Calculator: сохранён расчёт №{result.object_data.calculation_number or calc_id}",
+                        "Сохранён расчёт в истории LKM Calculator.\n"
+                        f"ID: {calc_id}\n"
+                        f"Объект: {result.object_data.object_name or '—'}\n"
+                        f"Система: {result.system.system_name or '—'}",
+                    )
             self.refresh()
             return calc_id
         except Exception as e:

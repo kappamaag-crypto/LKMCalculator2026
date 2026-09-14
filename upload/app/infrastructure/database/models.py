@@ -129,7 +129,7 @@ class CalculationORM(Base):
     object_name: Mapped[str] = mapped_column(String(300), default="")
     customer: Mapped[str] = mapped_column(String(300), default="")
     project: Mapped[str] = mapped_column(String(300), default="")
-    area_m2: Mapped[float] = mapped_column(Float, default=0.0)
+    area_m2: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     system_id: Mapped[Optional[int]] = mapped_column(ForeignKey("coating_systems.id", ondelete="SET NULL"), nullable=True)
     system_name: Mapped[str] = mapped_column(String(300), default="")
     total_dft: Mapped[float] = mapped_column(Float, default=0.0)
@@ -160,7 +160,7 @@ class ComparisonORM(Base):
     __tablename__ = "comparisons"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     object_name: Mapped[str] = mapped_column(String(300), default="")
-    area_m2: Mapped[float] = mapped_column(Float, default=0.0)
+    area_m2: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     systems_count: Mapped[int] = mapped_column(Integer, default=0)
     snapshot_json: Mapped[str] = mapped_column(Text, default="{}")
     notes: Mapped[str] = mapped_column(Text, default="")
