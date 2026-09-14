@@ -32,6 +32,16 @@ def test_main_window_explanation_action_uses_latest_system_calculation(monkeypat
             return 0
 
     monkeypatch.setattr(main_window_module, "ExplanationDialog", StubDialog)
+    # MainWindow eagerly constructs the catalogue review tab. Its constructor may
+    # surface unrelated catalogue-import errors through a modal QMessageBox,
+    # which blocks a headless/offscreen acceptance test before the target menu
+    # path is exercised. The catalogue workflow has its own tests; keep this
+    # smoke focused on the Explanation Engine integration.
+    monkeypatch.setattr(
+        main_window_module.SystemCatalogReviewView,
+        "reload",
+        lambda self: None,
+    )
 
     window = MainWindow()
     material = Material(
