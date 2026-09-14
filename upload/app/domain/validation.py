@@ -116,7 +116,6 @@ def validate_object_data(obj: ObjectData) -> ValidationResult:
     elif obj.area_m2 == 0: r.add_error("OBJ_AREA_ZERO", "Площадь должна быть больше нуля", "area_m2")
     if obj.temperature_min is not None and obj.temperature_max is not None and obj.temperature_min > obj.temperature_max: r.add_error("OBJ_TEMP_RANGE", "Минимальная температура объекта больше максимальной", "temperature_range")
     if obj.relative_humidity is not None and not 0 <= obj.relative_humidity <= 100: r.add_error("OBJ_RH_RANGE", "Относительная влажность должна быть в диапазоне 0–100 %", "relative_humidity")
-    if obj.roughness is not None and obj.roughness < 0: r.add_error("OBJ_ROUGHNESS_NEG", "Шероховатость не может быть отрицательной", "roughness")
     if obj.surface_temperature is not None and obj.dew_point is not None and obj.surface_temperature < obj.dew_point: r.add_error("OBJ_DEW_POINT", "Температура поверхности ниже точки росы", "dew_point")
     if obj.dew_point_margin_c is not None and obj.dew_point_margin_c < 0: r.add_error("OBJ_DEW_MARGIN_NEG", "Запас до точки росы не может быть отрицательным", "dew_point_margin_c")
     return r
@@ -154,8 +153,16 @@ def validate_system_layers(layers: Sequence[LayerDefinition | LayerResult], comp
             if message: r.add_error("LAYER_COMPATIBILITY", message, "compatibility")
     return r
 
-def validate_before_calculation(obj: ObjectData, layers: Sequence[tuple[Material, float | None, float | None, float | None]], compatibility_checker=None, system=None) -> ValidationResult:
+def validate_before_calculation(obj: ObjectData, layers: Sequence[tuple], compatibility_checker=None, system=None) -> ValidationResult:
     r = validate_object_data(obj)
-    for idx, (material, dft, losses, thinner) in enumerate(layers, 1): r.merge(validate_layer_input(material, dft, losses, thinner, idx))
+    for idx, layer in enumerate(layers, 1):
+        if len(layer) == 4:
+            material, dft, losses, thinner = layer
+            basis = None
+        elif len(layer) == 5:
+            material, dft, losses, thinner, basis = layer
+        else:
+            raise ValueError("validate_before_calculation ожидает 4 или 5 значений для слоя")
+        r.merge(validate_layer_input(material, dft, losses, thinner, idx, basis))
     if system is not None: r.merge(validate_system_layers(system.layers, compatibility_checker, system))
     return r
