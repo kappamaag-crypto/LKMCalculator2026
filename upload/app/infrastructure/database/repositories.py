@@ -47,7 +47,7 @@ def material_orm_to_domain(orm: MaterialORM) -> Material:
         thinner_name=orm.thinner_name or "",
         thinner_percent_min=orm.thinner_percent_min,
         thinner_percent_max=orm.thinner_percent_max,
-        thinner_basis=orm.thinner_basis or "BY_PAINT_VOLUME",
+        thinner_basis=orm.thinner_basis,
         packaging_kg=orm.packaging_kg, packaging_l=orm.packaging_l,
         is_two_component=orm.is_two_component,
         is_active=orm.is_active, is_incomplete=orm.is_incomplete,
@@ -134,43 +134,52 @@ def material_mix_orm_to_domain(orm: MaterialMixORM) -> MaterialMix:
 
 
 class MaterialRepository:
-    def __init__(self, session:Session): self.session=session
-    def get_by_id(self,material_id:int)->Optional[Material]:
-        orm=self.session.get(MaterialORM,material_id); return material_orm_to_domain(orm) if orm else None
-    def get_by_name(self,name:str)->Optional[Material]:
-        orm=self.session.scalar(select(MaterialORM).where(MaterialORM.material_name==name)); return material_orm_to_domain(orm) if orm else None
-    def list_all(self,active_only:bool=True)->list[Material]:
-        stmt=select(MaterialORM).order_by(MaterialORM.material_name)
-        if active_only:stmt=stmt.where(MaterialORM.is_active.is_(True))
+    def __init__(self, session: Session): self.session = session
+    def get_by_id(self, material_id: int) -> Optional[Material]:
+        orm = self.session.get(MaterialORM, material_id)
+        return material_orm_to_domain(orm) if orm else None
+    def get_by_name(self, name: str) -> Optional[Material]:
+        orm = self.session.scalar(select(MaterialORM).where(MaterialORM.material_name == name))
+        return material_orm_to_domain(orm) if orm else None
+    def list_all(self, active_only: bool = True) -> list[Material]:
+        stmt = select(MaterialORM).order_by(MaterialORM.material_name)
+        if active_only: stmt = stmt.where(MaterialORM.is_active.is_(True))
         return [material_orm_to_domain(o) for o in self.session.scalars(stmt)]
-    def list_materials(self,active_only:bool=True)->list[Material]:
-        stmt=select(MaterialORM).where(MaterialORM.material_type!=MaterialType.THINNER.value).order_by(MaterialORM.material_name)
-        if active_only:stmt=stmt.where(MaterialORM.is_active.is_(True))
+    def list_materials(self, active_only: bool = True) -> list[Material]:
+        stmt = select(MaterialORM).where(MaterialORM.material_type != MaterialType.THINNER.value).order_by(MaterialORM.material_name)
+        if active_only: stmt = stmt.where(MaterialORM.is_active.is_(True))
         return [material_orm_to_domain(o) for o in self.session.scalars(stmt)]
-    def list_thinners(self,active_only:bool=True)->list[Material]:
-        stmt=select(MaterialORM).where(MaterialORM.material_type==MaterialType.THINNER.value).order_by(MaterialORM.material_name)
-        if active_only:stmt=stmt.where(MaterialORM.is_active.is_(True))
+    def list_thinners(self, active_only: bool = True) -> list[Material]:
+        stmt = select(MaterialORM).where(MaterialORM.material_type == MaterialType.THINNER.value).order_by(MaterialORM.material_name)
+        if active_only: stmt = stmt.where(MaterialORM.is_active.is_(True))
         return [material_orm_to_domain(o) for o in self.session.scalars(stmt)]
-    def search(self,query:str,active_only:bool=True)->list[Material]:
-        q=f"%{query.strip()}%";stmt=select(MaterialORM).where(or_(MaterialORM.material_name.ilike(q),MaterialORM.manufacturer.ilike(q),MaterialORM.brand.ilike(q),MaterialORM.binder_type.ilike(q),MaterialORM.ral.ilike(q))).order_by(MaterialORM.material_name)
-        if active_only:stmt=stmt.where(MaterialORM.is_active.is_(True))
+    def search(self, query: str, active_only: bool = True) -> list[Material]:
+        q = f"%{query.strip()}%"
+        stmt = select(MaterialORM).where(or_(MaterialORM.material_name.ilike(q), MaterialORM.manufacturer.ilike(q), MaterialORM.brand.ilike(q), MaterialORM.binder_type.ilike(q), MaterialORM.ral.ilike(q))).order_by(MaterialORM.material_name)
+        if active_only: stmt = stmt.where(MaterialORM.is_active.is_(True))
         return [material_orm_to_domain(o) for o in self.session.scalars(stmt)]
-    def add(self,material:Material)->Material:
-        orm=material_domain_to_orm(material);self.session.add(orm);self.session.flush();material.id=orm.id;return material
-    def update(self,material:Material)->Material:
-        if material.id is None:raise ValueError("Material.id is required for update")
-        orm=self.session.get(MaterialORM,material.id)
-        if orm is None:raise ValueError(f"Material id={material.id} not found")
-        material_domain_to_orm(material,orm);self.session.flush();return material
-    def delete(self,material_id:int,soft:bool=True)->None:
-        orm=self.session.get(MaterialORM,material_id)
-        if orm is None:return
-        if soft:orm.is_active=False;orm.updated_at=datetime.utcnow()
-        else:self.session.delete(orm)
+    def add(self, material: Material) -> Material:
+        orm = material_domain_to_orm(material)
+        self.session.add(orm)
         self.session.flush()
-    def count(self,active_only:bool=True)->int:
-        stmt=select(func.count(MaterialORM.id))
-        if active_only:stmt=stmt.where(MaterialORM.is_active.is_(True))
+        material.id = orm.id
+        return material
+    def update(self, material: Material) -> Material:
+        if material.id is None: raise ValueError("Material.id is required for update")
+        orm = self.session.get(MaterialORM, material.id)
+        if orm is None: raise ValueError(f"Material id={material.id} not found")
+        material_domain_to_orm(material, orm)
+        self.session.flush()
+        return material
+    def delete(self, material_id: int, soft: bool = True) -> None:
+        orm = self.session.get(MaterialORM, material_id)
+        if orm is None: return
+        if soft: orm.is_active = False; orm.updated_at = datetime.utcnow()
+        else: self.session.delete(orm)
+        self.session.flush()
+    def count(self, active_only: bool = True) -> int:
+        stmt = select(func.count(MaterialORM.id))
+        if active_only: stmt = stmt.where(MaterialORM.is_active.is_(True))
         return self.session.scalar(stmt) or 0
 
 
@@ -182,10 +191,7 @@ class MaterialComponentRepository:
         if active_only: stmt = stmt.where(MaterialComponentORM.active.is_(True))
         return [material_component_orm_to_domain(o) for o in self.session.scalars(stmt)]
     def get(self, material_id: int, component_code: str) -> Optional[MaterialComponent]:
-        orm = self.session.scalar(select(MaterialComponentORM).where(
-            MaterialComponentORM.material_id == material_id,
-            MaterialComponentORM.component_code == component_code,
-        ))
+        orm = self.session.scalar(select(MaterialComponentORM).where(MaterialComponentORM.material_id == material_id, MaterialComponentORM.component_code == component_code))
         return material_component_orm_to_domain(orm) if orm else None
 
 
@@ -198,42 +204,44 @@ class MaterialMixRepository:
 
 
 class CoatingSystemRepository:
-    def __init__(self,session:Session):self.session=session
-    def get_by_id(self,system_id:int)->Optional[CoatingSystemORM]:return self.session.get(CoatingSystemORM,system_id)
-    def list_all(self,active_only:bool=True)->Sequence[CoatingSystemORM]:
-        stmt=select(CoatingSystemORM).order_by(CoatingSystemORM.system_name)
-        if active_only:stmt=stmt.where(CoatingSystemORM.is_active.is_(True))
+    def __init__(self, session: Session): self.session = session
+    def get_by_id(self, system_id: int) -> Optional[CoatingSystemORM]: return self.session.get(CoatingSystemORM, system_id)
+    def list_all(self, active_only: bool = True) -> Sequence[CoatingSystemORM]:
+        stmt = select(CoatingSystemORM).order_by(CoatingSystemORM.system_name)
+        if active_only: stmt = stmt.where(CoatingSystemORM.is_active.is_(True))
         return self.session.scalars(stmt).all()
-    def search(self,query:str,active_only:bool=True)->Sequence[CoatingSystemORM]:
-        q=f"%{query.strip()}%";stmt=select(CoatingSystemORM).where(or_(CoatingSystemORM.system_name.ilike(q),CoatingSystemORM.manufacturer.ilike(q),CoatingSystemORM.description.ilike(q))).order_by(CoatingSystemORM.system_name)
-        if active_only:stmt=stmt.where(CoatingSystemORM.is_active.is_(True))
+    def search(self, query: str, active_only: bool = True) -> Sequence[CoatingSystemORM]:
+        q = f"%{query.strip()}%"
+        stmt = select(CoatingSystemORM).where(or_(CoatingSystemORM.system_name.ilike(q), CoatingSystemORM.manufacturer.ilike(q), CoatingSystemORM.description.ilike(q))).order_by(CoatingSystemORM.system_name)
+        if active_only: stmt = stmt.where(CoatingSystemORM.is_active.is_(True))
         return self.session.scalars(stmt).all()
-    def add(self,system:CoatingSystemORM)->CoatingSystemORM:self.session.add(system);self.session.flush();return system
-    def delete(self,system_id:int,soft:bool=True)->None:
-        orm=self.session.get(CoatingSystemORM,system_id)
-        if orm is None:return
-        if soft:orm.is_active=False
-        else:self.session.delete(orm)
+    def add(self, system: CoatingSystemORM) -> CoatingSystemORM: self.session.add(system); self.session.flush(); return system
+    def delete(self, system_id: int, soft: bool = True) -> None:
+        orm = self.session.get(CoatingSystemORM, system_id)
+        if orm is None: return
+        if soft: orm.is_active = False
+        else: self.session.delete(orm)
         self.session.flush()
 
 
 class CalculationRepository:
-    def __init__(self,session:Session):self.session=session
-    def list_recent(self,limit:int=50)->Sequence[CalculationORM]:return self.session.scalars(select(CalculationORM).order_by(CalculationORM.created_at.desc()).limit(limit)).all()
-    def get_by_id(self,calc_id:int)->Optional[CalculationORM]:return self.session.get(CalculationORM,calc_id)
-    def add(self,calc:CalculationORM)->CalculationORM:self.session.add(calc);self.session.flush();return calc
-    def delete(self,calc_id:int)->None:
-        orm=self.session.get(CalculationORM,calc_id)
-        if orm:self.session.delete(orm);self.session.flush()
+    def __init__(self, session: Session): self.session = session
+    def list_recent(self, limit: int = 50) -> Sequence[CalculationORM]: return self.session.scalars(select(CalculationORM).order_by(CalculationORM.created_at.desc()).limit(limit)).all()
+    def get_by_id(self, calc_id: int) -> Optional[CalculationORM]: return self.session.get(CalculationORM, calc_id)
+    def add(self, calc: CalculationORM) -> CalculationORM: self.session.add(calc); self.session.flush(); return calc
+    def delete(self, calc_id: int) -> None:
+        orm = self.session.get(CalculationORM, calc_id)
+        if orm: self.session.delete(orm); self.session.flush()
 
 
 class CompatibilityRepository:
-    def __init__(self,session:Session):self.session=session
-    def get_status(self,from_binder:str,to_binder:str)->str:
-        orm=self.session.scalar(select(LayerCompatibilityORM).where(LayerCompatibilityORM.from_binder==from_binder,LayerCompatibilityORM.to_binder==to_binder));return orm.status if orm else "нет подтвержденных данных"
-    def list_all(self)->Sequence[LayerCompatibilityORM]:return self.session.scalars(select(LayerCompatibilityORM)).all()
-    def set_status(self,from_binder:str,to_binder:str,status:str,notes:str="")->None:
-        orm=self.session.scalar(select(LayerCompatibilityORM).where(LayerCompatibilityORM.from_binder==from_binder,LayerCompatibilityORM.to_binder==to_binder))
-        if orm is None:self.session.add(LayerCompatibilityORM(from_binder=from_binder,to_binder=to_binder,status=status,notes=notes))
-        else:orm.status=status;orm.notes=notes
+    def __init__(self, session: Session): self.session = session
+    def get_status(self, from_binder: str, to_binder: str) -> str:
+        orm = self.session.scalar(select(LayerCompatibilityORM).where(LayerCompatibilityORM.from_binder == from_binder, LayerCompatibilityORM.to_binder == to_binder))
+        return orm.status if orm else "нет подтвержденных данных"
+    def list_all(self) -> Sequence[LayerCompatibilityORM]: return self.session.scalars(select(LayerCompatibilityORM)).all()
+    def set_status(self, from_binder: str, to_binder: str, status: str, notes: str = "") -> None:
+        orm = self.session.scalar(select(LayerCompatibilityORM).where(LayerCompatibilityORM.from_binder == from_binder, LayerCompatibilityORM.to_binder == to_binder))
+        if orm is None: self.session.add(LayerCompatibilityORM(from_binder=from_binder, to_binder=to_binder, status=status, notes=notes))
+        else: orm.status = status; orm.notes = notes
         self.session.flush()
