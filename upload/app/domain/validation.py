@@ -65,7 +65,7 @@ def validate_material(material: Material) -> ValidationResult:
     if material.thinner_percent_min is not None and material.thinner_percent_min < 0: r.add_error("MAT_THINNER_MIN_NEG", "Минимальный процент разбавителя не может быть отрицательным", "thinner_percent_min")
     if material.thinner_percent_max is not None and material.thinner_percent_max < 0: r.add_error("MAT_THINNER_MAX_NEG", "Максимальный процент разбавителя не может быть отрицательным", "thinner_percent_max")
     if material.thinner_percent_min is not None and material.thinner_percent_max is not None and material.thinner_percent_min > material.thinner_percent_max: r.add_error("MAT_THINNER_RANGE", "Минимальный процент разбавителя больше максимального", "thinner_percent")
-    if material.thinner_basis not in VALID_THINNER_BASES: r.add_error("MAT_THINNER_BASIS", f"Неизвестная база расчёта разбавления: «{material.thinner_basis}»", "thinner_basis")
+    if material.thinner_basis is not None and material.thinner_basis not in VALID_THINNER_BASES: r.add_error("MAT_THINNER_BASIS", f"Неизвестная база расчёта разбавления: «{material.thinner_basis}»", "thinner_basis")
     return r
 
 def validate_layer_input(material: Material, target_dft: float | None, losses_percent: float | None = 0.0, thinner_percent: float | None = 0.0, layer_index: int | None = None, thinner_basis: str | None = None) -> ValidationResult:
@@ -83,8 +83,9 @@ def validate_layer_input(material: Material, target_dft: float | None, losses_pe
     else:
         if thinner_percent < 0: r.add_error("LAYER_THINNER_NEG", "Процент разбавителя не может быть отрицательным", "thinner_percent", layer_index)
         if thinner_percent >= 100: r.add_error("LAYER_THINNER_GE100", "Процент разбавителя должен быть меньше 100 %", "thinner_percent", layer_index)
-    basis = thinner_basis or material.thinner_basis
-    if basis not in VALID_THINNER_BASES: r.add_error("LAYER_THINNER_BASIS", f"Неизвестная база разбавления: «{basis}»", "thinner_basis", layer_index)
+    basis = thinner_basis if thinner_basis is not None else material.thinner_basis
+    if thinner_percent is not None and thinner_percent > 0:
+        if basis not in VALID_THINNER_BASES: r.add_error("LAYER_THINNER_BASIS", f"Для активного разбавления нужно явно указать допустимую базу: «{basis}»", "thinner_basis", layer_index)
     if thinner_percent is not None:
         if material.thinner_required and thinner_percent <= 0: r.add_warning("LAYER_THINNER_REQUIRED", f"Для «{material.material_name}» указан обязательный разбавитель, но процент разбавления не задан", "thinner_percent", layer_index)
         if material.thinner_percent_min is not None and thinner_percent < material.thinner_percent_min: r.add_warning("LAYER_THINNER_BELOW_MIN", f"Разбавление {thinner_percent:g} % ниже рекомендованного минимума {material.thinner_percent_min:g} %", "thinner_percent", layer_index)
