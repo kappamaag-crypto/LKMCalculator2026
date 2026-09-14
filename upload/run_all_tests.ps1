@@ -6,7 +6,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Запускать из корня репозитория или из upload/. Все пути нормализуются к upload/.
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $uploadDir = (Resolve-Path $scriptDir).Path
 $repoDir = Split-Path -Parent $uploadDir
@@ -20,7 +19,6 @@ if (-not $python) {
 Write-Host "=== LKMCalculator2026 :: полный regression run ===" -ForegroundColor Cyan
 Write-Host "Repo:   $repoDir"
 Write-Host "Upload: $uploadDir"
-Write-Host "Branch/HEAD проверяются отдельно через git; этот скрипт не делает push и не запускает GitHub Actions."
 Write-Host ""
 
 if (-not $NoInstall) {
@@ -56,17 +54,13 @@ if (-not $SkipCollect) {
     & $python.Source -m pytest --collect-only -q *> $collectFile
     $collectExit = $LASTEXITCODE
     if ($collectExit -ne 0) {
-        Write-Warning "pytest --collect-only завершился с кодом $collectExit; per-section test coverage будет UNKNOWN."
+        Write-Warning "pytest --collect-only завершился с кодом $collectExit; привязка тестов будет UNKNOWN."
     }
     elseif (Test-Path $collectFile) {
-        $collected = Get-Content $collectFile | Where-Object {
-            $_ -match '^(upload[\\/])?tests[\\/].*::test_'
-        }
+        $collected = Get-Content $collectFile | Where-Object { $_ -match "::test_" }
     }
 }
 
-# Это карта доказательств, а не карта статусов плана. Наличие теста не закрывает § автоматически.
-# Для UI/E2E/визуальной приёмки намеренно используется MANUAL.
 $sectionTests = [ordered]@{
     "1" = @("test_calculator", "test_formulas", "test_calculation")
     "2" = @("calculation_view_smoke", "view_smoke", "ui_smoke")
@@ -126,7 +120,7 @@ function Get-SectionEvidence([string]$section) {
     $hits = @()
     foreach ($nodeid in $collected) {
         foreach ($pattern in $patterns) {
-            if ($nodeid -match [regex]::Escape($pattern)) {
+            if ($nodeid -like "*$pattern*") {
                 $hits += $nodeid
                 break
             }
@@ -137,25 +131,22 @@ function Get-SectionEvidence([string]$section) {
 
 function Get-JunitSectionStatus([string]$section) {
     if (-not (Test-Path $junit)) { return "UNKNOWN" }
-    $patterns = $sectionTests[$section]
-    if ($null -eq $patterns -or $patterns.Count -eq 0) { return "NO_DIRECT_TEST" }
+    $evidence = @(Get-SectionEvidence $section)
+    if ($evidence.Count -eq 0) { return "NO_DIRECT_TEST" }
 
     try {
         [xml]$xml = Get-Content $junit
         $cases = @($xml.testsuites.testsuite.testcase)
         $matched = @()
         foreach ($case in $cases) {
-            $identity = "$($case.classname)::$($case.name)"
-            $isMatch = $false
-            foreach ($pattern in $patterns) {
-                if ($identity -match [regex]::Escape($pattern)) {
-                    $isMatch = $true
+            foreach ($nodeid in $evidence) {
+                if ($nodeid -like "*::$($case.name)") {
+                    $matched += $case
                     break
                 }
             }
-            if ($isMatch) { $matched += $case }
         }
-        if ($matched.Count -eq 0) { return "NO_DIRECT_TEST" }
+        if ($matched.Count -eq 0) { return "UNKNOWN" }
         if ($matched | Where-Object { $_.failure -or $_.error -or $_.skipped }) { return "FAIL_OR_SKIPPED" }
         return "PASS"
     }
@@ -166,7 +157,7 @@ function Get-JunitSectionStatus([string]$section) {
 
 Write-Host ""
 Write-Host "[4/4] Сводка по §1–§32" -ForegroundColor Yellow
-Write-Host "Legend: PASS = связанные тесты прошли; FAIL_OR_SKIPPED = есть failure/error/skip; NO_DIRECT_TEST = нет автоматического доказательства; MANUAL = требуется ручная/E2E проверка; PLAN_ONLY = статус определяется планом, не тестом."
+Write-Host "PASS = связанные тесты прошли; FAIL_OR_SKIPPED = есть failure/error/skip; NO_DIRECT_TEST = прямого теста не найдено; UNKNOWN = доказательство нельзя определить автоматически; MANUAL = нужна ручная/E2E проверка."
 Write-Host ""
 
 $planPath = Join-Path $repoDir "docs\plan2akz.md"
@@ -182,10 +173,10 @@ foreach ($line in ($planText -split "`r?`n")) {
 foreach ($section in $sectionTests.Keys) {
     $p = if ($planStatus.ContainsKey($section)) { $planStatus[$section] } else { "UNKNOWN" }
     $t = Get-JunitSectionStatus $section
-    $evidence = Get-SectionEvidence $section
+    $evidence = @(Get-SectionEvidence $section)
     $manual = if ($manualSections.ContainsKey($section)) { $manualSections[$section] } else { "" }
 
-    $detail = if ($evidence.Count -gt 0) { "tests=$($evidence.Count)" } else { "tests=0" }
+    $detail = "tests=$($evidence.Count)"
     if ($manual) { $detail += "; manual=$manual" }
     Write-Host ("§{0,-4} plan={1,-18} tests={2,-16} {3}" -f $section, $p, $t, $detail)
 }
@@ -195,9 +186,8 @@ Write-Host "Pytest exit code: $pytestExit" -ForegroundColor $(if ($pytestExit -e
 Write-Host "JUnit: $junit"
 if (-not $SkipCollect) { Write-Host "Collection: $collectFile" }
 Write-Host ""
-Write-Host "ВАЖНО: PASS тестов не переводит пункт plan2akz.md в ВЫПОЛНЕНО автоматически. Для закрытия требуется код + проверочное доказательство + отдельная фиксация в плане по правилам проекта."
+Write-Host "ВАЖНО: PASS тестов не переводит пункт plan2akz.md в ВЫПОЛНЕНО автоматически. Для закрытия требуется код + проверочное доказательство + отдельная фиксация в плане."
 Write-Host ""
 
-# Не создаём и не изменяем marker-файлы. .test-results можно удалить после анализа.
 if ($pytestExit -ne 0) { exit $pytestExit }
 exit 0
