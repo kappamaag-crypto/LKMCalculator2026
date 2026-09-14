@@ -46,7 +46,7 @@ class Material:
     recommended_dft_min: Optional[float] = None
     recommended_dft_max: Optional[float] = None
     max_single_layer_dft: Optional[float] = None
-    thinner_required: bool = False
+    thinner_required: Optional[bool] = None
     thinner_name: str = ""
     thinner_percent_min: Optional[float] = None
     thinner_percent_max: Optional[float] = None
