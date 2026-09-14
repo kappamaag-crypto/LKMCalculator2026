@@ -28,14 +28,14 @@ class TestLayerCalculator:
     def test_with_area(self):
         r=LayerCalculator.calculate(make_primer(),200,area_m2=100); assert r.total_consumption_kg==pytest.approx(r.practical_consumption_kg*100); assert r.total_cost==pytest.approx(r.cost_per_m2*100)
     def test_with_area_scales_thinner_separately(self):
-        r=LayerCalculator.calculate(make_primer(),200,thinner_percent=5,thinner=make_thinner(),area_m2=100); assert r.thinner_consumption_l==pytest.approx(r.practical_consumption_l*.05); assert r.total_cost==pytest.approx((r.cost_per_m2+r.thinner_cost_per_m2)*100)
+        r=LayerCalculator.calculate(make_primer(),200,thinner_percent=5,thinner=make_thinner(),area_m2=100,thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME); assert r.thinner_consumption_l==pytest.approx(r.practical_consumption_l*.05); assert r.total_cost==pytest.approx((r.cost_per_m2+r.thinner_cost_per_m2)*100)
     def test_consumption_only_no_procurement_fields(self):
         r=LayerCalculator.calculate(make_primer(),200,area_m2=1000); assert r.total_consumption_kg>0; assert not hasattr(r,"packages_count") and not hasattr(r,"purchase_kg") and not hasattr(r,"remainder_kg")
-    def test_with_thinner(self): assert LayerCalculator.calculate(make_primer(),200,thinner_percent=5,thinner=make_thinner()).thinner_consumption_l>0
+    def test_with_thinner(self): assert LayerCalculator.calculate(make_primer(),200,thinner_percent=5,thinner=make_thinner(),thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME).thinner_consumption_l>0
     def test_dilution_does_not_change_paint_volume_consumption(self):
-        base=LayerCalculator.calculate(make_primer(),200); diluted=LayerCalculator.calculate(make_primer(),200,thinner_percent=10,thinner=make_thinner()); assert diluted.practical_consumption_l==pytest.approx(base.practical_consumption_l); assert diluted.wft>base.wft
+        base=LayerCalculator.calculate(make_primer(),200); diluted=LayerCalculator.calculate(make_primer(),200,thinner_percent=10,thinner=make_thinner(),thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME); assert diluted.practical_consumption_l==pytest.approx(base.practical_consumption_l); assert diluted.wft>base.wft
     def test_thinner_without_price_keeps_physical_consumption(self):
-        t=make_thinner(); t.price_per_kg=None; r=LayerCalculator.calculate(make_primer(),200,thinner_percent=5,thinner=t,area_m2=1); assert r.thinner_consumption_l>0 and r.thinner_cost_per_m2 is None and r.total_cost is None
+        t=make_thinner(); t.price_per_kg=None; r=LayerCalculator.calculate(make_primer(),200,thinner_percent=5,thinner=t,area_m2=1,thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME); assert r.thinner_consumption_l>0 and r.thinner_cost_per_m2 is None and r.total_cost is None
     def test_price_per_liter_has_priority_when_consistent(self):
         m=make_primer(); m.price_per_liter=m.price_per_kg*m.density; r=LayerCalculator.calculate(m,200); assert r.cost_per_m2==pytest.approx(r.practical_consumption_l*m.price_per_liter)
     def test_inconsistent_kg_and_liter_prices_are_rejected(self):
