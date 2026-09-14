@@ -7,6 +7,7 @@ import pytest
 from app.domain.models import Material, ObjectData
 from app.domain.enums import MaterialType, BinderType
 from app.domain.calculator import LayerInput
+from app.domain.formulas import DILUTION_BASIS_BY_PAINT_VOLUME
 from app.services.calculation_service import CalculationService
 sqlalchemy = pytest.importorskip("sqlalchemy")
 from app.services.history_service import HistoryService
@@ -38,7 +39,7 @@ def test_unknown_cost_is_preserved_as_null(sample_result):
 def test_snapshot_contains_thinner_information():
     primer=Material(material_name="Грунт 2K", material_type=MaterialType.PRIMER_ENAMEL, binder_type=BinderType.EPOXY, density=1.4, solids_percent=73.0, solids_by_volume_percent=73.0, price_per_kg=500.0)
     thinner=Material(material_name="Разбавитель Test", material_type=MaterialType.THINNER, binder_type=BinderType.OTHER, density=0.9, price_per_kg=None)
-    result,val=CalculationService().calculate_system(ObjectData(object_name="Тест разбавителя", area_m2=10.0), [LayerInput(material=primer,target_dft=100,thinner_percent=10,thinner=thinner)])
+    result,val=CalculationService().calculate_system(ObjectData(object_name="Тест разбавителя", area_m2=10.0), [LayerInput(material=primer,target_dft=100,thinner_percent=10,thinner=thinner,thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME)])
     assert not val.has_errors
     with tempfile.TemporaryDirectory() as tmp:
         db=Path(tmp)/"thinner.sqlite"; engine=get_engine(db); init_db(engine); sf=get_session_factory(engine)
