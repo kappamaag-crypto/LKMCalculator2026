@@ -12,7 +12,7 @@ def make_primer()->Material:
 def make_finish()->Material:
     return Material(id=2,manufacturer="Blank",brand="Blank",material_name="Эмаль Blank Finish",material_type=MaterialType.FINISH,binder_type=BinderType.POLYURETHANE,density=1.3,solids_percent=58.0,solids_by_volume_percent=58.0,price_per_kg=892.0,recommended_dft_min=60,recommended_dft_max=100,packaging_kg=20.0)
 def make_thinner()->Material:
-    return Material(id=3,material_name="Разбавитель для грунта",material_type=MaterialType.THINNER,density=0.9,solids_percent=0.0,price_per_kg=100.0)
+    return Material(id=3,material_name="Разбавитель для грунта",material_type=MaterialType.THINNER,density=0.9,solids_percent=0.0,price_per_kg=100.0,thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME)
 class TestLayerCalculator:
     def test_primer_basic(self):
         r=LayerCalculator.calculate(make_primer(),200,area_m2=1); assert r.wft==pytest.approx(200*100/73); assert r.practical_consumption_kg==pytest.approx(200/10/73*1.4); assert r.cost_per_m2==pytest.approx(r.practical_consumption_kg*552)
