@@ -7,6 +7,9 @@ from app.infrastructure.database.backup import backup_database, restore_database
 from app.infrastructure.database.migrate import upgrade_database
 
 
+EXPECTED_HEAD = "009_nullable_material_thinner_required"
+
+
 def test_sqlite_backup_and_restore_preserve_snapshot(tmp_path: Path) -> None:
     source = tmp_path / "source.sqlite3"
     backup = tmp_path / "backup.sqlite3"
@@ -58,7 +61,7 @@ def test_alembic_upgrade_is_idempotent_and_reaches_head(tmp_path: Path) -> None:
             )
         }
 
-    assert revision == ("007_system_templates",)
+    assert revision == (EXPECTED_HEAD,)
     assert "calculations" in tables
     assert "coating_system_layers" in tables
 
@@ -105,7 +108,7 @@ def test_backup_then_restore_roundtrip_with_multiple_tables(tmp_path: Path) -> N
         assert conn.execute("SELECT v FROM b ORDER BY id").fetchall() == [("B1",)]
 
 
-def test_alembic_head_revision_id_is_007_system_templates() -> None:
+def test_alembic_head_revision_id_matches_current_head() -> None:
     """Lock the current migration head identity used by upgrade tests."""
     versions = Path(__file__).resolve().parents[1] / "alembic" / "versions"
     revs = {}
@@ -126,4 +129,4 @@ def test_alembic_head_revision_id_is_007_system_templates() -> None:
             if down:
                 downs.add(down)
     head_ids = [r for r in revs if r not in downs]
-    assert head_ids == ["007_system_templates"]
+    assert head_ids == [EXPECTED_HEAD]
