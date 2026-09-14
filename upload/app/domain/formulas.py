@@ -31,9 +31,9 @@ class LayerCalcInput:
     price_per_kg: Optional[float] = None
     price_per_liter: Optional[float] = None
     thinner_percent: float = 0.0
-    thinner_density: float = 1.0
+    thinner_density: Optional[float] = None
     thinner_price_per_kg: Optional[float] = None
-    thinner_basis: str = DILUTION_BASIS_BY_PAINT_VOLUME
+    thinner_basis: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -58,22 +58,33 @@ def calculate_wft(dft: float, solids_percent: float) -> float:
     return dft * 100.0 / solids_percent
 
 
-def calculate_wft_with_dilution(dft: float, solids_percent: float, thinner_percent: float = 0.0,
-                                thinner_density: float = 1.0, paint_density: float = 1.0,
-                                basis: str = DILUTION_BASIS_BY_PAINT_VOLUME) -> float:
+def calculate_wft_with_dilution(
+    dft: float,
+    solids_percent: float,
+    thinner_percent: float,
+    thinner_density: Optional[float],
+    paint_density: Optional[float],
+    basis: Optional[str],
+) -> float:
+    if thinner_percent is None:
+        raise ValueError("Процент разбавления не задан.")
     if thinner_percent < 0 or thinner_percent >= 100:
         raise ValueError("Процент разбавления должен быть от 0 до менее 100%.")
     base_wft = calculate_wft(dft, solids_percent)
-    if base_wft <= 0 or thinner_percent <= 0:
+    if base_wft <= 0 or thinner_percent == 0:
         return base_wft
+    if thinner_density is None or thinner_density <= 0:
+        raise ValueError("Для разбавления нужна положительная плотность разбавителя.")
+    if basis is None:
+        raise ValueError("Для разбавления нужно явно указать основание дозирования.")
     p = thinner_percent / 100.0
     if basis in (DILUTION_BASIS_BY_PAINT_VOLUME, DILUTION_BASIS_BY_COMPONENT_VOLUME):
         added_volume_ratio = p
     elif basis == DILUTION_BASIS_BY_MIX_VOLUME:
         added_volume_ratio = p / (1.0 - p)
     elif basis == DILUTION_BASIS_BY_MASS:
-        if paint_density <= 0 or thinner_density <= 0:
-            raise ValueError("Для разбавления по массе нужны положительные плотности.")
+        if paint_density is None or paint_density <= 0:
+            raise ValueError("Для разбавления по массе нужна положительная плотность ЛКМ.")
         added_volume_ratio = paint_density * p / thinner_density
     else:
         raise ValueError(f"Неизвестное основание разбавления: {basis}")
@@ -116,8 +127,12 @@ def calculate_cost(consumption_kg: float, price_per_kg: Optional[float]) -> Opti
     return consumption_kg * price_per_kg
 
 
-def validate_price_consistency(density: float, price_per_kg: Optional[float], price_per_liter: Optional[float],
-                               tolerance: float = PRICE_DENSITY_TOLERANCE) -> None:
+def validate_price_consistency(
+    density: float,
+    price_per_kg: Optional[float],
+    price_per_liter: Optional[float],
+    tolerance: float = PRICE_DENSITY_TOLERANCE,
+) -> None:
     if price_per_kg is None or price_per_liter is None:
         return
     if density <= 0:
@@ -138,9 +153,13 @@ def validate_price_consistency(density: float, price_per_kg: Optional[float], pr
         )
 
 
-def calculate_cost_by_price(consumption_l: float, consumption_kg: float,
-                            price_per_kg: Optional[float], price_per_liter: Optional[float],
-                            density: Optional[float] = None) -> Optional[float]:
+def calculate_cost_by_price(
+    consumption_l: float,
+    consumption_kg: float,
+    price_per_kg: Optional[float],
+    price_per_liter: Optional[float],
+    density: Optional[float] = None,
+) -> Optional[float]:
     if consumption_l <= 0 and consumption_kg <= 0:
         return 0.0
     if price_per_liter is not None:
@@ -158,22 +177,31 @@ def calculate_cost_by_price(consumption_l: float, consumption_kg: float,
     return None
 
 
-def calculate_thinner(parent_consumption_l: float, thinner_percent: float, thinner_density: float,
-                      thinner_price_per_kg: Optional[float], basis: str = DILUTION_BASIS_BY_PAINT_VOLUME,
-                      parent_density: float = 1.0) -> tuple[float, float, Optional[float]]:
+def calculate_thinner(
+    parent_consumption_l: float,
+    thinner_percent: float,
+    thinner_density: Optional[float],
+    thinner_price_per_kg: Optional[float],
+    basis: Optional[str],
+    parent_density: Optional[float],
+) -> tuple[float, float, Optional[float]]:
+    if thinner_percent is None:
+        raise ValueError("Процент разбавления не задан.")
     if thinner_percent < 0 or thinner_percent >= 100:
         raise ValueError("Процент разбавления должен быть от 0 до менее 100%.")
-    if parent_consumption_l <= 0 or thinner_percent <= 0:
+    if parent_consumption_l <= 0 or thinner_percent == 0:
         return 0.0, 0.0, 0.0
-    if thinner_density <= 0:
+    if thinner_density is None or thinner_density <= 0:
         raise ValueError("Плотность разбавителя должна быть положительной.")
+    if basis is None:
+        raise ValueError("Для разбавления нужно явно указать основание дозирования.")
     p = thinner_percent / 100.0
     if basis in (DILUTION_BASIS_BY_PAINT_VOLUME, DILUTION_BASIS_BY_COMPONENT_VOLUME):
         thinner_l = parent_consumption_l * p
     elif basis == DILUTION_BASIS_BY_MIX_VOLUME:
         thinner_l = parent_consumption_l * p / (1.0 - p)
     elif basis == DILUTION_BASIS_BY_MASS:
-        if parent_density <= 0:
+        if parent_density is None or parent_density <= 0:
             raise ValueError("Плотность ЛКМ должна быть положительной для дозирования по массе.")
         thinner_l = parent_consumption_l * parent_density * p / thinner_density
     else:
@@ -192,8 +220,19 @@ def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
         raise ValueError("Толщина сухого слоя не может быть отрицательной.")
     if inp.losses_percent < 0 or inp.losses_percent >= 100:
         raise ValueError("Потери должны быть от 0 до менее 100%.")
-    wft = calculate_wft_with_dilution(inp.dry_thickness, inp.solids_by_volume_percent, inp.thinner_percent,
-                                      inp.thinner_density, inp.density, inp.thinner_basis)
+    if inp.thinner_percent > 0:
+        if inp.thinner_density is None:
+            raise ValueError("Для разбавления нужна положительная плотность разбавителя.")
+        if inp.thinner_basis is None:
+            raise ValueError("Для разбавления нужно явно указать основание дозирования.")
+    wft = calculate_wft_with_dilution(
+        inp.dry_thickness,
+        inp.solids_by_volume_percent,
+        inp.thinner_percent,
+        inp.thinner_density,
+        inp.density,
+        inp.thinner_basis,
+    )
     base_wft = calculate_wft(inp.dry_thickness, inp.solids_by_volume_percent)
     theor_paint_l = 0.0 if base_wft <= 0 else base_wft / 1000.0
     k_loss = calculate_loss_coefficient(inp.losses_percent)
@@ -202,17 +241,33 @@ def calculate_layer(inp: LayerCalcInput) -> LayerCalcResult:
     pract_cov = 0.0 if pract_paint_l <= 0 else 1.0 / pract_paint_l
     theor_kg = calculate_consumption_kg(theor_paint_l, inp.density)
     pract_kg = calculate_consumption_kg(pract_paint_l, inp.density)
-    cost = calculate_cost_by_price(pract_paint_l, pract_kg, inp.price_per_kg, inp.price_per_liter, density=inp.density)
+    cost = calculate_cost_by_price(
+        pract_paint_l,
+        pract_kg,
+        inp.price_per_kg,
+        inp.price_per_liter,
+        density=inp.density,
+    )
     thinner_l, thinner_kg, thinner_cost = calculate_thinner(
-        pract_paint_l, inp.thinner_percent, inp.thinner_density, inp.thinner_price_per_kg,
-        inp.thinner_basis, inp.density,
+        pract_paint_l,
+        inp.thinner_percent,
+        inp.thinner_density,
+        inp.thinner_price_per_kg,
+        inp.thinner_basis,
+        inp.density,
     )
     return LayerCalcResult(
-        wft=wft, theoretical_coverage=theor_cov, practical_coverage=pract_cov,
-        theoretical_consumption_l=theor_paint_l, practical_consumption_l=pract_paint_l,
-        theoretical_consumption_kg=theor_kg, practical_consumption_kg=pract_kg,
-        cost_per_m2=cost, loss_coefficient=k_loss,
-        thinner_consumption_l=thinner_l, thinner_consumption_kg=thinner_kg,
+        wft=wft,
+        theoretical_coverage=theor_cov,
+        practical_coverage=pract_cov,
+        theoretical_consumption_l=theor_paint_l,
+        practical_consumption_l=pract_paint_l,
+        theoretical_consumption_kg=theor_kg,
+        practical_consumption_kg=pract_kg,
+        cost_per_m2=cost,
+        loss_coefficient=k_loss,
+        thinner_consumption_l=thinner_l,
+        thinner_consumption_kg=thinner_kg,
         thinner_cost_per_m2=thinner_cost,
     )
 
