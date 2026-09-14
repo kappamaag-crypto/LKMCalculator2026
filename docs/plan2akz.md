@@ -39,7 +39,7 @@
 | 17 | ЧАСТИЧНО | Inspection DFT UI. |
 | 18 | ЧАСТИЧНО | Evidence log; full suite green: 513 passed, 3 skipped. |
 | 19 | ВЫПОЛНЕНО | Legacy parity. |
-| 20 | ЧАСТИЧНО | KB / Системы. |
+| 20 | ЧАСТИЧНО | KB / Системы. Системы 1–4 не удалось прочитать; причина/обходной путь пока не подтверждены. |
 | 21 | ЧАСТИЧНО | Compatibility. |
 | 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LKM-Prof Table 1. Материал: полная инженерная карточка и полный scalar ORM↔domain mapping реализованы; regression round-trip добавлен. Скрытые ORM defaults для `thinner_basis` и `thinner_required` устранены; добавлены regression guards на `nullable=True` и отсутствие Python/server default. TDS URL не является обязательным: инженерные параметры вводятся вручную, отсутствующие остаются `UNKNOWN`. Осталось execution-proof + полный аудит Table 1 на скрытые значения. |
 | 23 | ВЫПОЛНЕНО | Pre-Application domain/service. |
@@ -56,6 +56,7 @@
 ## Stages
 
 - §22 remains open: engineering material card and repository mapping are implemented; ORM hidden defaults for `MaterialORM.thinner_basis` and `MaterialORM.thinner_required` are removed and guarded by regression. §22 is not marked complete until local regression execution and the LKM-Prof Table 1 hidden-value audit are proven.
+- §20 remains partial: Systems/KB work is not complete; systems 1–4 could not be read, and the reason/workaround has not yet been technically confirmed.
 - §23/§24 domain closed.
 - §26 closed: domain/service + regression + dialog smoke + main-window acceptance test are implemented and execution-proven by the green local full suite.
 - §32 closed: DFT domain/service workflow and headless UI smoke are implemented; regression coverage for missing acceptance bands ⇒ `UNKNOWN`, missing measured value ⇒ `UNKNOWN`, out-of-range evaluation, and the invariant that DFT binding does not auto-set inspection acceptance is execution-proven by the green local full suite.
