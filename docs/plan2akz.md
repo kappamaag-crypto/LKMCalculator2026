@@ -41,7 +41,7 @@
 | 19 | ВЫПОЛНЕНО | Legacy parity. |
 | 20 | ЧАСТИЧНО | KB / Системы. |
 | 21 | ЧАСТИЧНО | Compatibility. |
-| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LKM-Prof Table 1. |
+| 22 | ЧАСТИЧНО — НЕ ЗАКРЫВАТЬ | LKM-Prof Table 1. Материал: полная инженерная карточка и полный scalar ORM↔domain mapping реализованы; regression round-trip добавлен. TDS URL не является обязательным: инженерные параметры вводятся вручную, отсутствующие остаются `UNKNOWN`. Осталось execution-proof + аудит Table 1 на скрытые значения. |
 | 23 | ВЫПОЛНЕНО | Pre-Application domain/service. |
 | 24 | ВЫПОЛНЕНО | Source-backed only; empty⇒UNKNOWN; promote gate; conc/temp limits. Evidence: `test_chemical_resistance.py` (12). Agent catalog expansion remains §25. |
 | 25 | ЧАСТИЧНО | Catalog KNOWN. |
@@ -55,8 +55,9 @@
 
 ## Stages
 
+- §22 remains open: engineering material card and repository mapping are implemented, but §22 is not marked complete until local regression execution and the LKM-Prof Table 1 hidden-value audit are proven.
 - §23/§24 domain closed.
 - §26 closed: domain/service + regression + dialog smoke + main-window acceptance test are implemented and execution-proven by the green local full suite.
 - §32 closed: DFT domain/service workflow and headless UI smoke are implemented; regression coverage for missing acceptance bands ⇒ `UNKNOWN`, missing measured value ⇒ `UNKNOWN`, out-of-range evaluation, and the invariant that DFT binding does not auto-set inspection acceptance is execution-proven by the green local full suite.
-- Full local suite: `513 passed, 3 skipped, 49 warnings in 6.42s`.
+- Full local suite previously proven: `513 passed, 3 skipped, 49 warnings in 6.42s`.
 - SPKEFFA read-only.
