@@ -50,7 +50,7 @@ class MaterialORM(Base):
     recommended_dft_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     recommended_dft_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     max_single_layer_dft: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    thinner_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    thinner_required: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     thinner_name: Mapped[str] = mapped_column(String(200), default="")
     thinner_percent_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     thinner_percent_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -214,16 +214,3 @@ class PackageORM(Base):
     package_type: Mapped[str] = mapped_column(String(30), default="single")
     is_component_package: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-
-class CalculationSnapshotORM(Base):
-    __tablename__ = "calculation_snapshots"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    calculation_id: Mapped[int] = mapped_column(ForeignKey("calculations.id", ondelete="CASCADE"), nullable=False, unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    project_name: Mapped[str] = mapped_column(String(300), default="")
-    object_data_json: Mapped[str] = mapped_column(Text, default="{}")
-    system_data_json: Mapped[str] = mapped_column(Text, default="{}")
-    materials_data_json: Mapped[str] = mapped_column(Text, default="{}")
-    formula_version: Mapped[str] = mapped_column(String(30), default="3.0")
-    calculator_version: Mapped[str] = mapped_column(String(30), default="3.0.0")
-    result_json: Mapped[str] = mapped_column(Text, default="{}")
