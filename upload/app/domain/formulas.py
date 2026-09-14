@@ -192,7 +192,7 @@ def calculate_thinner(
     if parent_consumption_l <= 0 or thinner_percent == 0:
         return 0.0, 0.0, 0.0
     if thinner_density is None or thinner_density <= 0:
-        raise ValueError("Плотность разбавителя должна быть положительной.")
+        raise ValueError("плотность разбавителя должна быть положительной.")
     if basis is None:
         raise ValueError("Для разбавления нужно явно указать основание дозирования.")
     p = thinner_percent / 100.0
