@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.domain.calculator import LayerInput, SystemCalculator
+from app.domain.formulas import DILUTION_BASIS_BY_PAINT_VOLUME
 from app.domain.models import CoatingSystem, Material, ObjectData
 
 
@@ -27,9 +28,9 @@ def test_three_layer_system_totals_and_costs() -> None:
     obj = ObjectData(area_m2=1000.0)
     system = CoatingSystem(system_name="TEST-3L")
     inputs = [
-        LayerInput(primer, 80.0, losses_percent=10.0, thinner_percent=5.0, thinner=thinner),
+        LayerInput(primer, 80.0, losses_percent=10.0, thinner_percent=5.0, thinner=thinner, thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME),
         LayerInput(intermediate, 120.0, losses_percent=20.0),
-        LayerInput(finish, 60.0, losses_percent=15.0, thinner_percent=8.0, thinner=thinner),
+        LayerInput(finish, 60.0, losses_percent=15.0, thinner_percent=8.0, thinner=thinner, thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME),
     ]
 
     result, validation = SystemCalculator().calculate(
