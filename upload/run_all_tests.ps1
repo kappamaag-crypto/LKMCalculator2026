@@ -5,21 +5,18 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$uploadDir = (Resolve-Path $scriptDir).Path
+$uploadDir = (Resolve-Path (Split-Path -Parent $MyInvocation.MyCommand.Path)).Path
 $repoDir = Split-Path -Parent $uploadDir
 Set-Location $uploadDir
 
 $python = Get-Command python -ErrorAction SilentlyContinue
-if (-not $python) {
+if ($null -eq $python) {
     throw "Python не найден в PATH. Установите Python 3.11+ и повторите запуск."
 }
 
-Write-Host "=== LKMCalculator2026 :: полный regression run ===" -ForegroundColor Cyan
-Write-Host "Repo:   $repoDir"
+Write-Host "=== LKMCalculator2026 : полный regression run ===" -ForegroundColor Cyan
+Write-Host "Repo: $repoDir"
 Write-Host "Upload: $uploadDir"
-Write-Host ""
 
 if (-not $NoInstall) {
     $requirements = Join-Path $uploadDir "requirements.txt"
@@ -29,7 +26,7 @@ if (-not $NoInstall) {
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
     else {
-        Write-Host "[1/4] requirements.txt не найден — пропускаю установку." -ForegroundColor DarkYellow
+        Write-Host "[1/4] requirements.txt не найден, установка пропущена." -ForegroundColor DarkYellow
     }
 }
 else {
@@ -50,14 +47,14 @@ $pytestExit = $LASTEXITCODE
 $collected = @()
 if (-not $SkipCollect) {
     Write-Host ""
-    Write-Host "[3/4] Сбор списка тестов для привязки к §1–§32..." -ForegroundColor Yellow
+    Write-Host "[3/4] Сбор списка тестов..." -ForegroundColor Yellow
     & $python.Source -m pytest --collect-only -q *> $collectFile
     $collectExit = $LASTEXITCODE
-    if ($collectExit -ne 0) {
-        Write-Warning "pytest --collect-only завершился с кодом $collectExit; привязка тестов будет UNKNOWN."
+    if ($collectExit -eq 0 -and (Test-Path $collectFile)) {
+        $collected = @(Get-Content $collectFile | Where-Object { $_ -match "::test_" })
     }
-    elseif (Test-Path $collectFile) {
-        $collected = Get-Content $collectFile | Where-Object { $_ -match "::test_" }
+    else {
+        Write-Warning "pytest --collect-only завершился с кодом $collectExit."
     }
 }
 
@@ -126,28 +123,32 @@ function Get-SectionEvidence([string]$section) {
             }
         }
     }
-    return $hits | Sort-Object -Unique
+    return @($hits | Sort-Object -Unique)
 }
 
 function Get-JunitSectionStatus([string]$section) {
     if (-not (Test-Path $junit)) { return "UNKNOWN" }
     $evidence = @(Get-SectionEvidence $section)
     if ($evidence.Count -eq 0) { return "NO_DIRECT_TEST" }
-
     try {
         [xml]$xml = Get-Content $junit
         $cases = @($xml.testsuites.testsuite.testcase)
         $matched = @()
         foreach ($case in $cases) {
             foreach ($nodeid in $evidence) {
-                if ($nodeid -like "*::$($case.name)") {
+                $caseId = "$($case.classname)::$($case.name)"
+                if ($nodeid -like "*$caseId") {
                     $matched += $case
                     break
                 }
             }
         }
         if ($matched.Count -eq 0) { return "UNKNOWN" }
-        if ($matched | Where-Object { $_.failure -or $_.error -or $_.skipped }) { return "FAIL_OR_SKIPPED" }
+        foreach ($case in $matched) {
+            if ($null -ne $case.failure -or $null -ne $case.error -or $null -ne $case.skipped) {
+                return "FAIL_OR_SKIPPED"
+            }
+        }
         return "PASS"
     }
     catch {
@@ -156,38 +157,49 @@ function Get-JunitSectionStatus([string]$section) {
 }
 
 Write-Host ""
-Write-Host "[4/4] Сводка по §1–§32" -ForegroundColor Yellow
-Write-Host "PASS = связанные тесты прошли; FAIL_OR_SKIPPED = есть failure/error/skip; NO_DIRECT_TEST = прямого теста не найдено; UNKNOWN = доказательство нельзя определить автоматически; MANUAL = нужна ручная/E2E проверка."
+Write-Host "[4/4] Сводка по §1-§32" -ForegroundColor Yellow
+Write-Host "PASS = связанные тесты прошли; FAIL_OR_SKIPPED = failure/error/skip; NO_DIRECT_TEST = прямого теста нет; UNKNOWN = доказательство не определено автоматически."
 Write-Host ""
 
 $planPath = Join-Path $repoDir "docs\plan2akz.md"
-$planText = if (Test-Path $planPath) { Get-Content $planPath -Raw } else { "" }
+$planText = ""
+if (Test-Path $planPath) {
+    $planText = Get-Content $planPath -Raw
+}
 
 $planStatus = @{}
 foreach ($line in ($planText -split "`r?`n")) {
-    if ($line -match '^\|\s*(11\.1|\d+)\s*\|\s*([^|]+)\|') {
+    if ($line -match "^\|\s*(11\.1|\d+)\s*\|\s*([^|]+)\|") {
         $planStatus[$matches[1]] = $matches[2].Trim()
     }
 }
 
 foreach ($section in $sectionTests.Keys) {
-    $p = if ($planStatus.ContainsKey($section)) { $planStatus[$section] } else { "UNKNOWN" }
-    $t = Get-JunitSectionStatus $section
+    $planValue = "UNKNOWN"
+    if ($planStatus.ContainsKey($section)) {
+        $planValue = $planStatus[$section]
+    }
+    $testValue = Get-JunitSectionStatus $section
     $evidence = @(Get-SectionEvidence $section)
-    $manual = if ($manualSections.ContainsKey($section)) { $manualSections[$section] } else { "" }
-
+    $manual = ""
+    if ($manualSections.ContainsKey($section)) {
+        $manual = $manualSections[$section]
+    }
     $detail = "tests=$($evidence.Count)"
-    if ($manual) { $detail += "; manual=$manual" }
-    Write-Host ("§{0,-4} plan={1,-18} tests={2,-16} {3}" -f $section, $p, $t, $detail)
+    if ($manual) {
+        $detail = "$detail; manual=$manual"
+    }
+    Write-Host ("§{0,-4} plan={1,-18} tests={2,-16} {3}" -f $section, $planValue, $testValue, $detail)
 }
 
 Write-Host ""
-Write-Host "Pytest exit code: $pytestExit" -ForegroundColor $(if ($pytestExit -eq 0) { "Green" } else { "Red" })
+Write-Host "Pytest exit code: $pytestExit"
 Write-Host "JUnit: $junit"
-if (-not $SkipCollect) { Write-Host "Collection: $collectFile" }
+if (-not $SkipCollect) {
+    Write-Host "Collection: $collectFile"
+}
 Write-Host ""
-Write-Host "ВАЖНО: PASS тестов не переводит пункт plan2akz.md в ВЫПОЛНЕНО автоматически. Для закрытия требуется код + проверочное доказательство + отдельная фиксация в плане."
-Write-Host ""
+Write-Host "PASS тестов не переводит пункт plan2akz.md в ВЫПОЛНЕНО автоматически. Закрытие требует кода, доказательства и отдельной фиксации в плане."
 
 if ($pytestExit -ne 0) { exit $pytestExit }
 exit 0
