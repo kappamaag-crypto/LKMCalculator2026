@@ -50,7 +50,7 @@ class Material:
     thinner_name: str = ""
     thinner_percent_min: Optional[float] = None
     thinner_percent_max: Optional[float] = None
-    thinner_basis: str = "BY_PAINT_VOLUME"
+    thinner_basis: Optional[str] = None
     packaging_kg: Optional[float] = None
     packaging_l: Optional[float] = None
     is_two_component: bool = False
@@ -93,13 +93,12 @@ class LayerResult:
     material: Material
     target_dft: float
     losses_percent: float = 0.0
-    # §26/§28 provenance: EXPLICIT | PROFILE | DEFAULT (never invents percent)
     losses_source: str = "DEFAULT"
     losses_profile_name: str = ""
     losses_note: str = ""
     thinner_percent: float = 0.0
     thinner: Optional[Material] = None
-    thinner_basis: str = "BY_PAINT_VOLUME"
+    thinner_basis: Optional[str] = None
     wft: float = 0.0
     theoretical_coverage: float = 0.0
     practical_coverage: float = 0.0
