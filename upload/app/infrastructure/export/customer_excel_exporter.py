@@ -71,6 +71,34 @@ class CustomerExcelExporter(ExcelExporter):
                     continue
                 break
 
+    @staticmethod
+    def _trim_base_sheet(ws, keep_max_row: int = 11) -> None:
+        """Trim template rows without leaving stale merged-cell ranges behind.
+
+        openpyxl can retain merge metadata for rows removed by ``delete_rows`` while the
+        corresponding ``MergedCell`` objects no longer exist.  A later ``unmerge_cells``
+        then raises ``KeyError``.  Detach the merges first, delete the tail, and restore
+        only ranges that remain wholly inside the retained part of the template.
+        """
+        if ws.max_row <= keep_max_row:
+            return
+
+        original_merges = list(ws.merged_cells.ranges)
+        for merged in original_merges:
+            ws.unmerge_cells(str(merged))
+
+        ws.delete_rows(keep_max_row + 1, ws.max_row - keep_max_row)
+
+        for merged in original_merges:
+            min_col, min_row, max_col, max_row = range_boundaries(str(merged))
+            if max_row <= keep_max_row:
+                ws.merge_cells(
+                    start_row=min_row,
+                    start_column=min_col,
+                    end_row=max_row,
+                    end_column=max_col,
+                )
+
     def _expand_section(
         self,
         ws,
@@ -149,8 +177,7 @@ class CustomerExcelExporter(ExcelExporter):
         if "База" not in wb.sheetnames:
             return None
         ws = wb["База"]
-        if ws.max_row > 11:
-            ws.delete_rows(12, ws.max_row - 11)
+        self._trim_base_sheet(ws, 11)
         if layer_count > 2:
             self._expand_section(
                 ws,
