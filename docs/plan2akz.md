@@ -45,7 +45,7 @@
 | 23 | ВЫПОЛНЕНО | Pre-Application domain/service. |
 | 24 | ВЫПОЛНЕНО | Source-backed only; empty⇒UNKNOWN; promote gate; conc/temp limits. Evidence: `test_chemical_resistance.py` (12). Agent catalog expansion remains §25. |
 | 25 | ЧАСТИЧНО | Catalog KNOWN. |
-| 26 | ЧАСТИЧНО | Explanation Engine domain/service already wired; regression coverage added in `test_explanation_engine.py`; local pytest execution pending, UI/E2E acceptance remains open. |
+| 26 | ЧАСТИЧНО | Explanation Engine domain/service wired; regression tests added (`test_explanation_engine.py`), existing dialog smoke plus main-window acceptance smoke (`test_explanation_dialog_smoke.py`, `test_explanation_main_window_smoke.py`). Local pytest execution remains pending; UI/E2E acceptance is implemented but not execution-proven. |
 | 27 | ЧАСТИЧНО | Staging. |
 | 28 | ВЫПОЛНЕНО | LossProfile. |
 | 29 | ЧАСТИЧНО | confirm_draft. |
@@ -56,5 +56,5 @@
 ## Stages
 
 - §23/§24 domain closed.
-- §26: regression test stage added; not closed because pytest execution and UI/E2E acceptance are still pending.
+- §26: domain/service + regression + dialog smoke + main-window acceptance test are implemented; not closed because local pytest execution remains pending and the acceptance tests have not been execution-proven.
 - SPKEFFA read-only.
