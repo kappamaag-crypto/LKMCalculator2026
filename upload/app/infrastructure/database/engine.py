@@ -8,6 +8,7 @@ from typing import Generator
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from app.config import DB_PATH, ensure_directories
 
@@ -19,7 +20,12 @@ class Base(DeclarativeBase):
 def get_engine(db_path: Path | None = None):
     ensure_directories()
     path = db_path or DB_PATH
-    engine = create_engine(f"sqlite:///{path}", echo=False, connect_args={"check_same_thread": False})
+    engine = create_engine(
+        f"sqlite:///{path}",
+        echo=False,
+        connect_args={"check_same_thread": False},
+        poolclass=NullPool,
+    )
 
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
