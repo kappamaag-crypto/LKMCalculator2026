@@ -55,7 +55,7 @@ class ComparisonView(QWidget):
             for indicator in technology[0]:rows.append((indicator,[item[indicator] for item in technology],False))
         max_layers=max((len(s.layers) for s in systems),default=0)
         for n in range(max_layers):rows.extend([(f"Слой {n+1}: материал",[s.layers[n].material.display_name() if n<len(s.layers) else "—" for s in systems],False),(f"Слой {n+1}: DFT, мкм",[s.layers[n].target_dft if n<len(s.layers) else None for s in systems],False),(f"Слой {n+1}: WFT, мкм",[s.layers[n].wft if n<len(s.layers) else None for s in systems],False),(f"Слой {n+1}: расход, кг/м²",[s.layers[n].practical_consumption_kg if n<len(s.layers) else None for s in systems],True),(f"Слой {n+1}: расход, л/м²",[s.layers[n].practical_consumption_l if n<len(s.layers) else None for s in systems],True),(f"Слой {n+1}: стоимость, руб/м²",[s.layers[n].cost_per_m2 if n<len(s.layers) else None for s in systems],True),(f"Слой {n+1}: разбавитель, л/м²",[s.layers[n].thinner_consumption_l if n<len(s.layers) else None for s in systems],False)])
-        self.table.setRowCount(len(rows));green=QBrush(QColor("#d1fae5"));red=QBrush(QColor("#fee2e2"))
+        self.table.setColumnCount(len(headers));self.table.setHorizontalHeaderLabels(headers);self.table.setRowCount(len(rows));green=QBrush(QColor("#d1fae5"));red=QBrush(QColor("#fee2e2"))
         for r,(label,values,highlight) in enumerate(rows):
             self.table.setItem(r,0,QTableWidgetItem(label));numeric=[v for v in values if isinstance(v,(int,float)) and not isinstance(v,bool)];mn=min(numeric) if numeric else None;mx=max(numeric) if numeric else None
             for c,v in enumerate(values):
