@@ -44,6 +44,15 @@ class TestLayerCalculator:
     def test_dilution_basis_component_volume_matches_paint_volume(self): assert calculate_wft_with_dilution(200,73,10,.9,1.4,DILUTION_BASIS_BY_COMPONENT_VOLUME)==pytest.approx((200*100/73)*1.1)
     def test_dilution_basis_mix_volume_uses_final_mix_fraction(self): assert calculate_wft_with_dilution(200,73,10,.9,1.4,DILUTION_BASIS_BY_MIX_VOLUME)==pytest.approx((200*100/73)/(1-.1))
     def test_dilution_basis_mass_uses_density_conversion(self): assert calculate_wft_with_dilution(200,73,10,.9,1.4,DILUTION_BASIS_BY_MASS)==pytest.approx((200*100/73)*(1+.1*1.4/.9))
+    def test_missing_active_thinner_data_is_not_defaulted(self):
+        with pytest.raises(ValueError,match="плотность разбавителя"):
+            calculate_wft_with_dilution(200,73,10,None,1.4,DILUTION_BASIS_BY_PAINT_VOLUME)
+        with pytest.raises(ValueError,match="основание дозирования"):
+            calculate_wft_with_dilution(200,73,10,.9,1.4,None)
+    def test_no_thinner_does_not_require_thinner_engineering_data(self):
+        assert calculate_wft_with_dilution(200,73,0,None,None,None)==pytest.approx(200*100/73)
+        r=validate_layer_input(make_primer(),100,0,0)
+        assert not any(i.code == "LAYER_THINNER_BASIS" for i in r.errors)
     def test_loss_coefficient_rejects_invalid_values(self):
         with pytest.raises(ValueError): calculate_loss_coefficient(-0.01)
         with pytest.raises(ValueError): calculate_loss_coefficient(100)
@@ -53,7 +62,7 @@ class TestLayerCalculator:
     def test_zero_dft_has_zero_physical_consumption(self):
         r=LayerCalculator.calculate(make_primer(),0); assert r.wft==0 and r.practical_consumption_l==0 and r.practical_consumption_kg==0 and r.cost_per_m2==0
     def test_invalid_dilution_rejected_even_with_zero_dft(self):
-        with pytest.raises(ValueError,match="Процент разбавления"): calculate_wft_with_dilution(0,73,100)
+        with pytest.raises(ValueError,match="Процент разбавления"): calculate_wft_with_dilution(0,73,100,0.9,1.4,DILUTION_BASIS_BY_PAINT_VOLUME)
 class TestSystemCalculator:
     def test_two_layer_system(self):
         obj=ObjectData(area_m2=100); result,v=SystemCalculator().calculate(obj,[LayerInput(make_primer(),200),LayerInput(make_finish(),100)]); assert not v.has_errors and result.total_dft==300 and result.total_cost_per_m2>0
