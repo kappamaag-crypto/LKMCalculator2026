@@ -9,6 +9,7 @@ from openpyxl.styles import PatternFill
 from app.config import AppSettings
 from app.domain.calculator import LayerInput
 from app.domain.enums import BinderType, MaterialType
+from app.domain.formulas import DILUTION_BASIS_BY_PAINT_VOLUME
 from app.domain.models import Material, ObjectData
 from app.infrastructure.export.customer_excel_exporter import CustomerExcelExporter
 from app.services.calculation_service import CalculationService
@@ -47,7 +48,7 @@ def _result(layer_count: int, with_mixed_thinners: bool = False, long_name: bool
         ))
     thinner = Material(manufacturer="Blank", material_name="Разбавитель универсальный", material_type=MaterialType.THINNER, density=0.9, price_per_kg=50.0)
     obj = ObjectData(object_name="Тест", customer="Заказчик", area_m2=100.0)
-    layers = [LayerInput(material=m, target_dft=100 + i * 10, losses_percent=5.0, thinner_percent=5.0 if with_mixed_thinners and i % 2 == 1 else 0.0, thinner=thinner if with_mixed_thinners and i % 2 == 1 else None) for i, m in enumerate(materials, 1)]
+    layers = [LayerInput(material=m, target_dft=100 + i * 10, losses_percent=5.0, thinner_percent=5.0 if with_mixed_thinners and i % 2 == 1 else 0.0, thinner=thinner if with_mixed_thinners and i % 2 == 1 else None, thinner_basis=DILUTION_BASIS_BY_PAINT_VOLUME if with_mixed_thinners and i % 2 == 1 else None) for i, m in enumerate(materials, 1)]
     result, validation = CalculationService().calculate_system(obj, layers)
     assert not validation.has_errors
     return result
