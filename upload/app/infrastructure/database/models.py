@@ -54,7 +54,7 @@ class MaterialORM(Base):
     thinner_name: Mapped[str] = mapped_column(String(200), default="")
     thinner_percent_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     thinner_percent_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    thinner_basis: Mapped[str] = mapped_column(String(40), default="BY_PAINT_VOLUME")
+    thinner_basis: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     packaging_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     packaging_l: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     is_two_component: Mapped[bool] = mapped_column(Boolean, default=False)
