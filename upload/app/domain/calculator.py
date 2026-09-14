@@ -215,7 +215,13 @@ class SystemCalculator:
 
         if not skip_validation:
             layers_for_val = [
-                (li.material, li.target_dft, resolved_losses[idx].percent, li.thinner_percent)
+                (
+                    li.material,
+                    li.target_dft,
+                    resolved_losses[idx].percent,
+                    li.thinner_percent,
+                    li.thinner_basis,
+                )
                 for idx, li in enumerate(layer_inputs)
             ]
             validation_system = system if system is not None and system.layers else None
