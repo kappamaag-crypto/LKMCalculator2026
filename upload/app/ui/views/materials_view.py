@@ -7,12 +7,18 @@ from typing import Optional
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-    QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
     QMessageBox, QPushButton, QScrollArea, QTableWidget, QTableWidgetItem,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
 from app.domain.enums import ApplicationMethod, BinderType, MaterialType
+from app.domain.formulas import (
+    DILUTION_BASIS_BY_COMPONENT_VOLUME,
+    DILUTION_BASIS_BY_MASS,
+    DILUTION_BASIS_BY_MIX_VOLUME,
+    DILUTION_BASIS_BY_PAINT_VOLUME,
+)
 from app.domain.models import Material
 from app.infrastructure.database.engine import get_session_factory
 from app.infrastructure.database.repositories import MaterialRepository
@@ -125,9 +131,11 @@ class MaterialEditDialog(QDialog):
 
         self.ed_thinner_name = QLineEdit(material.thinner_name if material else "")
         self.cmb_thinner_basis = QComboBox()
-        self.cmb_thinner_basis.addItem("BY_PAINT_VOLUME", "BY_PAINT_VOLUME")
-        self.cmb_thinner_basis.addItem("BY_TOTAL_MIX", "BY_TOTAL_MIX")
-        self._set_combo_data(self.cmb_thinner_basis, material.thinner_basis if material else "BY_PAINT_VOLUME")
+        self.cmb_thinner_basis.addItem(DILUTION_BASIS_BY_PAINT_VOLUME, DILUTION_BASIS_BY_PAINT_VOLUME)
+        self.cmb_thinner_basis.addItem(DILUTION_BASIS_BY_MIX_VOLUME, DILUTION_BASIS_BY_MIX_VOLUME)
+        self.cmb_thinner_basis.addItem(DILUTION_BASIS_BY_MASS, DILUTION_BASIS_BY_MASS)
+        self.cmb_thinner_basis.addItem(DILUTION_BASIS_BY_COMPONENT_VOLUME, DILUTION_BASIS_BY_COMPONENT_VOLUME)
+        self._set_combo_data(self.cmb_thinner_basis, material.thinner_basis if material else DILUTION_BASIS_BY_PAINT_VOLUME)
 
         self.ed_packaging_kg = self.spin_packaging_kg
         self.ed_packaging_l = self.spin_packaging_l
@@ -253,7 +261,7 @@ class MaterialEditDialog(QDialog):
             max_single_layer_dft=self.spin_max_single_layer_dft.value(),
             thinner_required=self.chk_thinner_required.isChecked(), thinner_name=self.ed_thinner_name.text().strip(),
             thinner_percent_min=self.spin_thinner_min.value(), thinner_percent_max=self.spin_thinner_max.value(),
-            thinner_basis=self.cmb_thinner_basis.currentData() or "BY_PAINT_VOLUME",
+            thinner_basis=self.cmb_thinner_basis.currentData() or DILUTION_BASIS_BY_PAINT_VOLUME,
             packaging_kg=self.spin_packaging_kg.value(), packaging_l=self.spin_packaging_l.value(),
             is_two_component=self.chk_two_component.isChecked(),
             datasheet=self.ed_datasheet.text().strip(), datasheet_version=self.ed_datasheet_version.text().strip(),
@@ -308,7 +316,7 @@ class MaterialsView(QWidget):
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
-        self.table.horizontalHeader().setSectionResizeMode(1, self.table.horizontalHeader().Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.doubleClicked.connect(self._on_edit)
         root.addWidget(self.table)
         self.lbl_count = QLabel()
