@@ -37,7 +37,7 @@
 | 15 | ОТЛОЖЕНО | OGZ. |
 | 16 | ЧАСТИЧНО | Recommendations. |
 | 17 | ЧАСТИЧНО | Inspection DFT UI. |
-| 18 | ЧАСТИЧНО | Evidence log; full suite PENDING. |
+| 18 | ЧАСТИЧНО | Evidence log; full suite green: 513 passed, 3 skipped. |
 | 19 | ВЫПОЛНЕНО | Legacy parity. |
 | 20 | ЧАСТИЧНО | KB / Системы. |
 | 21 | ЧАСТИЧНО | Compatibility. |
@@ -45,17 +45,18 @@
 | 23 | ВЫПОЛНЕНО | Pre-Application domain/service. |
 | 24 | ВЫПОЛНЕНО | Source-backed only; empty⇒UNKNOWN; promote gate; conc/temp limits. Evidence: `test_chemical_resistance.py` (12). Agent catalog expansion remains §25. |
 | 25 | ЧАСТИЧНО | Catalog KNOWN. |
-| 26 | ЧАСТИЧНО | Explanation Engine domain/service wired; regression tests added (`test_explanation_engine.py`), existing dialog smoke plus main-window acceptance smoke (`test_explanation_dialog_smoke.py`, `test_explanation_main_window_smoke.py`). Local pytest execution remains pending; UI/E2E acceptance is implemented but not execution-proven. |
+| 26 | ВЫПОЛНЕНО | Explanation Engine domain/service wired; regression tests, dialog smoke and main-window acceptance smoke are execution-proven by full suite: 513 passed, 3 skipped. |
 | 27 | ЧАСТИЧНО | Staging. |
 | 28 | ВЫПОЛНЕНО | LossProfile. |
 | 29 | ЧАСТИЧНО | confirm_draft. |
 | 30 | ВЫПОЛНЕНО | Decision Log. |
 | 31 | ЧАСТИЧНО | Scenario. |
-| 32 | ЧАСТИЧНО | DFT inspection. |
+| 32 | ВЫПОЛНЕНО | DFT inspection domain/service workflow, headless UI smoke and regression coverage are execution-proven by full suite: 513 passed, 3 skipped. |
 
 ## Stages
 
 - §23/§24 domain closed.
-- §26: domain/service + regression + dialog smoke + main-window acceptance test are implemented; not closed because local pytest execution remains pending and the acceptance tests have not been execution-proven.
-- §32: DFT domain/service workflow and headless UI smoke exist. Added regression coverage for missing acceptance bands ⇒ `UNKNOWN`, missing measured value ⇒ `UNKNOWN`, out-of-range evaluation, and the invariant that DFT binding does not auto-set inspection acceptance. Tests are not execution-proven while the local repository/test environment remains unavailable.
+- §26 closed: domain/service + regression + dialog smoke + main-window acceptance test are implemented and execution-proven by the green local full suite.
+- §32 closed: DFT domain/service workflow and headless UI smoke are implemented; regression coverage for missing acceptance bands ⇒ `UNKNOWN`, missing measured value ⇒ `UNKNOWN`, out-of-range evaluation, and the invariant that DFT binding does not auto-set inspection acceptance is execution-proven by the green local full suite.
+- Full local suite: `513 passed, 3 skipped, 49 warnings in 6.42s`.
 - SPKEFFA read-only.
