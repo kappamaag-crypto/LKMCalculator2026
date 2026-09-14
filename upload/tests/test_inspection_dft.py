@@ -39,7 +39,7 @@ def test_dft_missing_limits_stays_unknown_not_zero():
 
     assert report.overall_status == DFT_OVERALL_UNKNOWN
     assert report.evaluations[0].status == DFT_UNKNOWN_LIMITS
-    assert "UNKNOWN" not in report.evaluations[0].message or "полоса" in report.evaluations[0].message
+    assert "полоса приёмки (min/max) неизвестна" in report.evaluations[0].message
 
 
 def test_dft_value_unknown_does_not_become_ok():
