@@ -14,7 +14,7 @@ from app.infrastructure.database.models import (
     MaterialComponentORM, MaterialMixORM,
 )
 from app.domain.models import Material, CoatingSystem, LayerDefinition, MaterialComponent, MaterialMix
-from app.domain.enums import MaterialType, BinderType
+from app.domain.enums import MaterialType, BinderType, ApplicationMethod
 
 
 def material_orm_to_domain(orm: MaterialORM) -> Material:
@@ -29,31 +29,89 @@ def material_orm_to_domain(orm: MaterialORM) -> Material:
         voc=orm.voc, color=orm.color or "", ral=orm.ral or "",
         price_per_kg=orm.price_per_kg, price_per_liter=orm.price_per_liter,
         prices_include_vat=orm.prices_include_vat, theoretical_coverage=orm.theoretical_coverage,
-        recommended_dft_min=orm.recommended_dft_min, recommended_dft_max=orm.recommended_dft_max,
-        max_single_layer_dft=orm.max_single_layer_dft, thinner_required=orm.thinner_required,
-        thinner_name=orm.thinner_name or "", thinner_percent_min=orm.thinner_percent_min,
-        thinner_percent_max=orm.thinner_percent_max, packaging_kg=orm.packaging_kg,
-        packaging_l=orm.packaging_l, is_two_component=orm.is_two_component,
+        application_method=ApplicationMethod(orm.application_method) if orm.application_method else None,
+        min_application_temperature=orm.min_application_temperature,
+        max_application_temperature=orm.max_application_temperature,
+        min_recoat_time_h=orm.min_recoat_time_h,
+        max_recoat_time_h=orm.max_recoat_time_h,
+        drying_time_h=orm.drying_time_h,
+        full_cure_time_h=orm.full_cure_time_h,
+        pot_life_h=orm.pot_life_h,
+        induction_time_min=orm.induction_time_min,
+        max_relative_humidity=orm.max_relative_humidity,
+        min_dew_point_margin_c=orm.min_dew_point_margin_c,
+        recommended_dft_min=orm.recommended_dft_min,
+        recommended_dft_max=orm.recommended_dft_max,
+        max_single_layer_dft=orm.max_single_layer_dft,
+        thinner_required=orm.thinner_required,
+        thinner_name=orm.thinner_name or "",
+        thinner_percent_min=orm.thinner_percent_min,
+        thinner_percent_max=orm.thinner_percent_max,
+        thinner_basis=orm.thinner_basis or "BY_PAINT_VOLUME",
+        packaging_kg=orm.packaging_kg, packaging_l=orm.packaging_l,
+        is_two_component=orm.is_two_component,
         is_active=orm.is_active, is_incomplete=orm.is_incomplete,
-        notes=orm.notes or "", datasheet=orm.datasheet or "", certificate=orm.certificate or "",
+        notes=orm.notes or "", datasheet=orm.datasheet or "",
+        datasheet_version=orm.datasheet_version or "", datasheet_date=orm.datasheet_date,
+        safety_data_sheet=orm.safety_data_sheet or "",
+        certificate=orm.certificate or "", certificate_version=orm.certificate_version or "",
+        test_protocol=orm.test_protocol or "",
         created_at=orm.created_at, updated_at=orm.updated_at,
     )
 
 
 def material_domain_to_orm(domain: Material, orm: Optional[MaterialORM] = None) -> MaterialORM:
-    if orm is None: orm = MaterialORM()
-    orm.manufacturer=domain.manufacturer; orm.brand=domain.brand; orm.material_name=domain.material_name
-    orm.material_type=domain.material_type.value if isinstance(domain.material_type,MaterialType) else str(domain.material_type)
-    orm.binder_type=domain.binder_type.value if isinstance(domain.binder_type,BinderType) else str(domain.binder_type)
-    orm.description=domain.description; orm.density=domain.density; orm.solids_percent=domain.solids_percent
-    orm.solids_by_volume_percent=domain.solids_by_volume_percent
-    orm.voc=domain.voc; orm.color=domain.color; orm.ral=domain.ral
-    orm.price_per_kg=domain.price_per_kg; orm.price_per_liter=domain.price_per_liter; orm.prices_include_vat=domain.prices_include_vat
-    orm.theoretical_coverage=domain.theoretical_coverage; orm.recommended_dft_min=domain.recommended_dft_min; orm.recommended_dft_max=domain.recommended_dft_max
-    orm.max_single_layer_dft=domain.max_single_layer_dft; orm.thinner_required=domain.thinner_required; orm.thinner_name=domain.thinner_name
-    orm.thinner_percent_min=domain.thinner_percent_min; orm.thinner_percent_max=domain.thinner_percent_max; orm.packaging_kg=domain.packaging_kg; orm.packaging_l=domain.packaging_l
-    orm.is_two_component=domain.is_two_component
-    orm.is_active=domain.is_active; orm.is_incomplete=domain.is_incomplete; orm.notes=domain.notes; orm.datasheet=domain.datasheet; orm.certificate=domain.certificate; orm.updated_at=datetime.utcnow()
+    if orm is None:
+        orm = MaterialORM()
+    orm.manufacturer = domain.manufacturer
+    orm.brand = domain.brand
+    orm.material_name = domain.material_name
+    orm.material_type = domain.material_type.value if isinstance(domain.material_type, MaterialType) else str(domain.material_type)
+    orm.binder_type = domain.binder_type.value if isinstance(domain.binder_type, BinderType) else str(domain.binder_type)
+    orm.description = domain.description
+    orm.density = domain.density
+    orm.solids_percent = domain.solids_percent
+    orm.solids_by_volume_percent = domain.solids_by_volume_percent
+    orm.voc = domain.voc
+    orm.color = domain.color
+    orm.ral = domain.ral
+    orm.price_per_kg = domain.price_per_kg
+    orm.price_per_liter = domain.price_per_liter
+    orm.prices_include_vat = domain.prices_include_vat
+    orm.theoretical_coverage = domain.theoretical_coverage
+    orm.application_method = domain.application_method.value if isinstance(domain.application_method, ApplicationMethod) else domain.application_method
+    orm.min_application_temperature = domain.min_application_temperature
+    orm.max_application_temperature = domain.max_application_temperature
+    orm.min_recoat_time_h = domain.min_recoat_time_h
+    orm.max_recoat_time_h = domain.max_recoat_time_h
+    orm.drying_time_h = domain.drying_time_h
+    orm.full_cure_time_h = domain.full_cure_time_h
+    orm.pot_life_h = domain.pot_life_h
+    orm.induction_time_min = domain.induction_time_min
+    orm.max_relative_humidity = domain.max_relative_humidity
+    orm.min_dew_point_margin_c = domain.min_dew_point_margin_c
+    orm.recommended_dft_min = domain.recommended_dft_min
+    orm.recommended_dft_max = domain.recommended_dft_max
+    orm.max_single_layer_dft = domain.max_single_layer_dft
+    orm.thinner_required = domain.thinner_required
+    orm.thinner_name = domain.thinner_name
+    orm.thinner_percent_min = domain.thinner_percent_min
+    orm.thinner_percent_max = domain.thinner_percent_max
+    orm.thinner_basis = domain.thinner_basis
+    orm.packaging_kg = domain.packaging_kg
+    orm.packaging_l = domain.packaging_l
+    orm.is_two_component = domain.is_two_component
+    orm.is_active = domain.is_active
+    orm.is_incomplete = domain.is_incomplete
+    orm.notes = domain.notes
+    orm.datasheet = domain.datasheet
+    orm.datasheet_version = domain.datasheet_version
+    orm.datasheet_date = domain.datasheet_date
+    orm.safety_data_sheet = domain.safety_data_sheet
+    orm.certificate = domain.certificate
+    orm.certificate_version = domain.certificate_version
+    orm.test_protocol = domain.test_protocol
+    orm.updated_at = datetime.utcnow()
     return orm
 
 
