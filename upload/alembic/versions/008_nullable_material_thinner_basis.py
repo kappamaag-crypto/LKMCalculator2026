@@ -1,5 +1,6 @@
 """Keep unknown material thinner basis as NULL instead of a hidden default."""
 from alembic import op
+import sqlalchemy as sa
 
 revision = "008_nullable_material_thinner_basis"
 down_revision = "007_system_templates"
@@ -11,7 +12,7 @@ def upgrade() -> None:
     with op.batch_alter_table("materials") as batch_op:
         batch_op.alter_column(
             "thinner_basis",
-            existing_type=None,
+            existing_type=sa.String(length=40),
             nullable=True,
             existing_nullable=False,
             existing_server_default="BY_PAINT_VOLUME",
@@ -23,7 +24,7 @@ def downgrade() -> None:
     with op.batch_alter_table("materials") as batch_op:
         batch_op.alter_column(
             "thinner_basis",
-            existing_type=None,
+            existing_type=sa.String(length=40),
             nullable=False,
             existing_nullable=True,
             server_default="BY_PAINT_VOLUME",
