@@ -47,7 +47,7 @@ class Material:
     recommended_dft_max: Optional[float] = None
     max_single_layer_dft: Optional[float] = None
     thinner_required: Optional[bool] = None
-    thinner_name: str = ""
+    thinner_name: Optional[str] = None
     thinner_percent_min: Optional[float] = None
     thinner_percent_max: Optional[float] = None
     thinner_basis: Optional[str] = None
@@ -258,80 +258,3 @@ class Package:
     component_id: Optional[int] = None
     package_name: str = ""
     net_weight_kg: Optional[float] = None
-    net_volume_l: Optional[float] = None
-    units_per_set: int = 1
-    package_type: str = "single"
-    is_component_package: bool = False
-    active: bool = True
-
-
-@dataclass(frozen=True)
-class ChemicalExposure:
-    id: Optional[int] = None
-    object_id: Optional[int] = None
-    medium_name: str = ""
-    concentration_percent: Optional[float] = None
-    temperature_c: Optional[float] = None
-    contact_type: str = "NONE"
-    duration: str = ""
-    frequency: str = ""
-    ph: Optional[float] = None
-    immersion: bool = False
-    notes: str = ""
-
-
-@dataclass(frozen=True)
-class MaterialCompatibility:
-    id: Optional[int] = None
-    material_a_id: Optional[int] = None
-    material_b_id: Optional[int] = None
-    compatibility: str = "UNKNOWN"
-    conditions: str = ""
-    source_document: str = ""
-    notes: str = ""
-
-
-@dataclass(frozen=True)
-class CalculationSnapshot:
-    id: Optional[int] = None
-    calculation_id: Optional[int] = None
-    created_at: Optional[datetime] = None
-    project_name: str = ""
-    object_data_json: str = "{}"
-    system_data_json: str = "{}"
-    materials_data_json: str = "{}"
-    formula_version: str = "3.0"
-    calculator_version: str = "3.0.0"
-    result_json: str = "{}"
-
-
-@dataclass(frozen=True)
-class CommercialCalculation:
-    material_cost: float = 0.0
-    labor_cost: float = 0.0
-    surface_prep_cost: float = 0.0
-    equipment_cost: float = 0.0
-    inspection_cost: float = 0.0
-    logistics_cost: float = 0.0
-    overhead_percent: float = 0.0
-    margin_percent: float = 0.0
-    subtotal: float = 0.0
-    profit: float = 0.0
-    vat_percent: float = 0.0
-    vat_amount: float = 0.0
-    total_price: float = 0.0
-    price_per_m2: float = 0.0
-
-
-@dataclass(frozen=True)
-class LossProfile:
-    id: Optional[int] = None
-    application_method: str = ""
-    equipment_type: str = ""
-    surface_geometry: str = ""
-    structure_complexity: str = ""
-    loss_percent_min: Optional[float] = None
-    loss_percent_default: Optional[float] = None
-    loss_percent_max: Optional[float] = None
-    transfer_efficiency: Optional[float] = None
-    notes: str = ""
