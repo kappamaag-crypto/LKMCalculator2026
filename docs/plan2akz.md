@@ -57,4 +57,5 @@
 
 - §23/§24 domain closed.
 - §26: domain/service + regression + dialog smoke + main-window acceptance test are implemented; not closed because local pytest execution remains pending and the acceptance tests have not been execution-proven.
+- §32: DFT domain/service workflow and headless UI smoke exist. Added regression coverage for missing acceptance bands ⇒ `UNKNOWN`, missing measured value ⇒ `UNKNOWN`, out-of-range evaluation, and the invariant that DFT binding does not auto-set inspection acceptance. Tests are not execution-proven while the local repository/test environment remains unavailable.
 - SPKEFFA read-only.
