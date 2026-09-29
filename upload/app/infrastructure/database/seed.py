@@ -1,5 +1,6 @@
 """Seed initial data and the curated SPKEFFA product catalog."""
 from __future__ import annotations
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,12 +21,19 @@ def seed_material_master_catalog(session: Session) -> dict[str, int]:
     per master-catalog revision and is then frozen by a marker so manual user
     cleanup is not reverted on later application starts.
     """
-    if MASTER_IMPORT_MARKER.exists():
-        return {"inserted": 0, "updated": 0, "skipped_marker": 1}
     if not MASTER_CATALOG_PATH.exists():
         return {"inserted": 0, "updated": 0, "catalog_missing": 1}
 
-    payload = json.loads(MASTER_CATALOG_PATH.read_text(encoding="utf-8"))
+    catalog_bytes = MASTER_CATALOG_PATH.read_bytes()
+    catalog_sha256 = hashlib.sha256(catalog_bytes).hexdigest()
+    if MASTER_IMPORT_MARKER.exists():
+        try:
+            marker = json.loads(MASTER_IMPORT_MARKER.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            marker = {}
+        if marker.get("catalog_sha256") == catalog_sha256:
+            return {"inserted": 0, "updated": 0, "skipped_marker": 1}
+    payload = json.loads(catalog_bytes.decode("utf-8"))
     records = payload.get("materials", [])
     now = datetime.now(timezone.utc)
     inserted = 0
@@ -101,6 +109,7 @@ def seed_material_master_catalog(session: Session) -> dict[str, int]:
         "updated": updated,
         "records_seen": len(records),
         "catalog_schema_version": payload.get("schema_version"),
+        "catalog_sha256": catalog_sha256,
         "imported_at": now.isoformat(),
     }
 
