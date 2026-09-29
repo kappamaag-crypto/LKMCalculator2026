@@ -153,12 +153,14 @@ def likely_material(v: Any, vals: list[Any] | None = None, col: int | None = Non
     if re.search(r"\b(?:эп|пф|гф|ко|ур|прим|стелпант|полак|политон)[- ]?\d{2,}", n, re.I):
         return True
     if vals is not None and col is not None and headers is not None:
-        if col in headers.get("material", []):
-            return True
         property_cols: list[int] = []
         for kind in ("density", "solids", "price_kg", "price_l", "dft", "coverage", "theor_consumption", "pract_consumption"):
             property_cols.extend(headers.get(kind, []))
         if any(abs(col - pc) <= 6 for pc in property_cols):
+            # Do not accept a whole header/name column as material. Require a
+            # nearby numeric product property and reject prose-like cells.
+            if len(n) > 100 or re.search(r"[.!?:]{2,}|\b(?:определите|выберите|нанесение|покрытие)\b", n):
+                return False
             for pc in property_cols:
                 if 0 <= pc < len(vals) and abs(col - pc) <= 6:
                     value = vals[pc]
