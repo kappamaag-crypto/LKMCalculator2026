@@ -142,6 +142,8 @@ def likely_material(v: Any, vals: list[Any] | None = None, col: int | None = Non
     }
     if n in generic:
         return False
+    if headers is not None and col is not None and col in headers.get("material", []):
+        return True
     positive = (
         "blank", "эффа", "литап", "литакоут", "литамастик", "литатанк",
         "литатерм", "литачар", "kindur", "neomarine", "inelka", "prim",
@@ -825,6 +827,7 @@ def main() -> None:
     out["summary"]["rejected_nonmaterial_observations"] = rejected_nonmaterial_observations
     out["summary"]["review_candidates"] = len(out.get("review_candidates", []))
     out["summary"]["source_rows"] = len(source_rows)
+    OUT.parent.mkdir(parents=True, exist_ok=True)
     SOURCE_ROWS_OUT.write_text(json.dumps({
         "schema_version": "3.0-material-source-rows-1",
         "generated_by": "upload/scripts/build_material_catalog.py",
@@ -832,7 +835,6 @@ def main() -> None:
         "row_count": len(source_rows),
         "rows": source_rows,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
-    OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
     fields = [
