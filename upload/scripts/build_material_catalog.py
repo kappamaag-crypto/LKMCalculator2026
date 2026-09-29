@@ -746,6 +746,7 @@ def main() -> None:
     validate_output(out)
     out["missing_workbooks"] = missing
     out["summary"]["rejected_nonmaterial_observations"] = rejected_nonmaterial_observations
+    out["summary"]["review_candidates"] = len(out.get("review_candidates", []))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -782,7 +783,6 @@ def main() -> None:
                 "sources": " | ".join(sources),
             })
 
-    out["summary"]["review_candidates"] = len(out.get("review_candidates", []))
     print(json.dumps(out["summary"] | {"missing_workbooks": missing}, ensure_ascii=False))
 
 
