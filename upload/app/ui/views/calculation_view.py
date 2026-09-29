@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 from dataclasses import replace
-from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QGroupBox,QLabel,QLineEdit,QDoubleSpinBox,QComboBox,QPushButton,QMessageBox,QTextEdit,QSplitter,QFileDialog,QDialog,QMenu
+from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QGroupBox,QLabel,QLineEdit,QDoubleSpinBox,QComboBox,QPushButton,QMessageBox,QTextEdit,QSplitter,QFileDialog,QDialog,QMenu,QCompleter
 from PySide6.QtCore import Qt,Signal,QTimer
 from PySide6.QtGui import QAction
 from app.domain.models import Material,ObjectData,CoatingSystem
@@ -34,7 +34,7 @@ class CalculationView(QWidget):
     def _build_ui(self):
         root=QVBoxLayout(self);root.setContentsMargins(12,12,12,12);root.setSpacing(10);t=QLabel("Расчёт системы покрытия");t.setProperty("heading",True);root.addWidget(t);sp=QSplitter(Qt.Horizontal)
         left=QWidget();ll=QVBoxLayout(left);b=QGroupBox("Объект");f=QFormLayout(b);self.ed_object=QLineEdit();self.ed_customer=QLineEdit();self.ed_project=QLineEdit();self.ed_calc_number=QLineEdit();self.ed_system_name=QLineEdit();self.ed_system_name.setPlaceholderText("Название системы");self.spin_area=QDoubleSpinBox();self.spin_area.setRange(0.01,1000000);self.spin_area.setValue(1);self.spin_area.setDecimals(2);self.spin_area.setSuffix(" м²");f.addRow("Объект:",self.ed_object);f.addRow("Заказчик:",self.ed_customer);f.addRow("Проект:",self.ed_project);f.addRow("№ расчёта:",self.ed_calc_number);f.addRow("Система:",self.ed_system_name);f.addRow("Площадь:",self.spin_area);self.spin_area.valueChanged.connect(self._on_area_changed);sysbox=QGroupBox("Сохранённая система");sf=QVBoxLayout(sysbox);self.cmb_system=QComboBox();self.cmb_system.addItem("— выбрать систему из базы —",None);self.btn_load_system=QPushButton("Загрузить систему в расчёт");self.btn_load_system.clicked.connect(self._on_load_saved_system);sf.addWidget(self.cmb_system);sf.addWidget(self.btn_load_system);ll.addWidget(b);ll.addWidget(sysbox);ll.addStretch();sp.addWidget(left)
-        right=QWidget();rl=QVBoxLayout(right);lb=QGroupBox("Слои системы");al=QVBoxLayout(lb);row=QHBoxLayout();self.cmb_material=QComboBox();self.cmb_material.setMinimumWidth(240);add=QPushButton("Добавить слой");add.clicked.connect(self._on_add_layer);add_material=QPushButton("+ Материал");add_material.setToolTip("Добавить материал прямо в текущий расчёт и сохранить его в БД");add_material.clicked.connect(self._on_add_material);rem=QPushButton("Удалить");rem.setProperty("secondary",True);rem.clicked.connect(self._on_remove_layer);clr=QPushButton("Очистить");clr.setProperty("secondary",True);clr.clicked.connect(self._on_clear_layers)
+        right=QWidget();rl=QVBoxLayout(right);lb=QGroupBox("Слои системы");al=QVBoxLayout(lb);row=QHBoxLayout();self.cmb_material=QComboBox();self.cmb_material.setEditable(True);self.cmb_material.setInsertPolicy(QComboBox.NoInsert);self.cmb_material.setMinimumWidth(320);self.cmb_material.setPlaceholderText("Введите название или часть названия материала…");self.cmb_material.setToolTip("Поиск по названию материала, бренду и производителю. Начните печатать.");completer=QCompleter(self.cmb_material.model(),self.cmb_material);completer.setCaseSensitivity(Qt.CaseInsensitive);completer.setFilterMode(Qt.MatchContains);completer.setCompletionMode(QCompleter.PopupCompletion);self.cmb_material.setCompleter(completer);self.cmb_material.lineEdit().editingFinished.connect(self._resolve_typed_material);add=QPushButton("Добавить слой");add.clicked.connect(self._on_add_layer);add_material=QPushButton("+ Материал");add_material.setToolTip("Добавить материал прямо в текущий расчёт и сохранить его в БД");add_material.clicked.connect(self._on_add_material);rem=QPushButton("Удалить");rem.setProperty("secondary",True);rem.clicked.connect(self._on_remove_layer);clr=QPushButton("Очистить");clr.setProperty("secondary",True);clr.clicked.connect(self._on_clear_layers)
         for x in (QLabel("Материал:"),self.cmb_material,add,add_material,rem,clr):row.addWidget(x)
         row.addStretch();al.addLayout(row);h=QLabel("Материал можно выбрать из базы или добавить прямо здесь. После добавления параметры DFT, потери, разбавитель и цена редактируются непосредственно в строке. Результаты обновляются автоматически.");h.setWordWrap(True);h.setProperty("subheading",True);al.addWidget(h);self.layer_table=LayerTableWidget();self.layer_table.layer_changed.connect(self._schedule_live_recalculate);al.addWidget(self.layer_table);rl.addWidget(lb)
         buttons=QHBoxLayout();self.btn_calc=QPushButton("Рассчитать");self.btn_calc.clicked.connect(self._on_calculate);self.btn_demo=QPushButton("Демо-система");self.btn_demo.setProperty("secondary",True);self.btn_demo.clicked.connect(self._on_load_demo);self.btn_excel=QPushButton("Excel ▾");self.btn_excel.setProperty("secondary",True);self.btn_excel.clicked.connect(self._on_export_excel);self.btn_excel.setMenu(self._create_export_menu("Excel",self._export_excel_with_mode));self.btn_excel.setEnabled(False);self.btn_pdf=QPushButton("PDF ▾");self.btn_pdf.setProperty("secondary",True);self.btn_pdf.clicked.connect(self._on_export_pdf);self.btn_pdf.setMenu(self._create_export_menu("PDF",self._export_pdf_with_mode));self.btn_pdf.setEnabled(False);self.btn_to_cmp=QPushButton("Добавить в сравнение");self.btn_to_cmp.setProperty("secondary",True);self.btn_to_cmp.clicked.connect(self._on_to_comparison);self.btn_to_cmp.setEnabled(False)
@@ -54,8 +54,59 @@ class CalculationView(QWidget):
             for key,action in getattr(menu,'_mode_actions',{}).items():action.setChecked(key==mode)
     def _export_settings(self,mode):return replace(self.settings,report_mode=mode)
     def _on_area_changed(self):self._area_unknown=False;self._schedule_live_recalculate()
+    @staticmethod
+    def _material_search_key(value: str) -> str:
+        return " ".join(str(value or "").replace("ё", "е").casefold().split())
+
+    def _material_search_values(self, material: Material) -> list[str]:
+        values = [material.material_name, material.display_name()]
+        if material.brand:
+            values.append(material.brand)
+        if material.manufacturer:
+            values.append(material.manufacturer)
+        note = material.notes or ""
+        if "Алиасы:" in note:
+            aliases = note.split("Алиасы:", 1)[1].split(". ", 1)[0]
+            values.extend(part.strip() for part in aliases.split(";") if part.strip())
+        return list(dict.fromkeys(values))
+
+    def _find_material_by_text(self, text: str) -> Optional[Material]:
+        query = self._material_search_key(text)
+        if not query:
+            return None
+        exact = [
+            material for material in self._materials
+            if any(self._material_search_key(value) == query for value in self._material_search_values(material))
+        ]
+        if exact:
+            return exact[0]
+        matches = [
+            material for material in self._materials
+            if any(query in self._material_search_key(value) for value in self._material_search_values(material))
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    def _resolve_typed_material(self) -> None:
+        material = self._find_material_by_text(self.cmb_material.currentText())
+        if material is None:
+            return
+        index = self.cmb_material.findData(material)
+        if index >= 0:
+            self.cmb_material.setCurrentIndex(index)
+
     def set_materials(self,materials:list):
-        self._all_materials=list(materials);self._materials=[m for m in materials if m.material_type!=MaterialType.THINNER];self.cmb_material.clear();[self.cmb_material.addItem(m.display_name(),m) for m in self._materials];self._refresh_systems()
+        self._all_materials=list(materials)
+        self._materials=[m for m in materials if m.material_type!=MaterialType.THINNER]
+        self.cmb_material.blockSignals(True)
+        self.cmb_material.clear()
+        self.cmb_material.addItem("",None)
+        for material in self._materials:
+            self.cmb_material.addItem(material.display_name(),material)
+        self.cmb_material.setCurrentIndex(0)
+        self.cmb_material.blockSignals(False)
+        if self.cmb_material.completer() is not None:
+            self.cmb_material.completer().setModel(self.cmb_material.model())
+        self._refresh_systems()
     def _on_add_material(self):
         dialog=AdHocMaterialDialog(self)
         if dialog.exec()!=QDialog.Accepted:return
@@ -93,12 +144,14 @@ class CalculationView(QWidget):
     def status_message(self,text):
         parent=self.window()
         if hasattr(parent,'statusBar'):parent.statusBar().showMessage(text,10000)
-    def _current_material(self)->Optional[object]:return self.cmb_material.currentData()
+    def _current_material(self)->Optional[Material]:
+        current = self.cmb_material.currentData()
+        return current if current is not None else self._find_material_by_text(self.cmb_material.currentText())
     def _build_object_data(self):return ObjectData(object_name=self.ed_object.text().strip(),customer=self.ed_customer.text().strip(),project=self.ed_project.text().strip(),calculation_number=self.ed_calc_number.text().strip(),area_m2=None if self._area_unknown else self.spin_area.value())
     def _build_system(self)->CoatingSystem:return CoatingSystem(system_name=self.ed_system_name.text().strip() or self._restored_system_name or "Пользовательская система")
     def _on_add_layer(self):
         m=self._current_material()
-        if m is None:QMessageBox.warning(self,"Внимание","Выберите материал");return
+        if m is None:QMessageBox.warning(self,"Материал","Материал не найден в базе. Введите название или часть названия и выберите найденный вариант.");return
         default_dft=m.recommended_dft_min if m.recommended_dft_min is not None and m.recommended_dft_min>0 else 100;self.layer_table.add_layer(LayerInput(material=m,target_dft=default_dft,losses_percent=self.settings.default_losses_percent,thinner_percent=0))
     def _on_remove_layer(self):self.layer_table.remove_selected()
     def _on_clear_layers(self):
