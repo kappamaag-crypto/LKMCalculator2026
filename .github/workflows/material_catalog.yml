@@ -36,10 +36,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin v3.0-engineering-upgrade
+          git rebase origin/v3.0-engineering-upgrade
           git add upload/data/material_catalog_master_v3.json
           if git diff --cached --quiet; then
             echo "No generated catalog changes."
             exit 0
           fi
           git commit -m "data: rebuild full material master catalog [skip ci]"
-          git push
+          git push origin HEAD:v3.0-engineering-upgrade
