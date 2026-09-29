@@ -15,7 +15,6 @@ from app.config import ensure_directories
 from app.infrastructure.logging_setup import setup_logging
 from app.infrastructure.database.engine import init_db, get_session_factory
 from app.infrastructure.database.seed import run_seed
-from scripts.import_material_master import import_master
 from app.services.notification_worker import NotificationWorker
 
 
@@ -29,10 +28,6 @@ def main() -> None:
     session_factory = get_session_factory()
     with session_factory() as session:
         run_seed(session)
-        # Полный Excel master-каталог импортируется один раз. После создания
-        # marker-файла ручное удаление дублей пользователем не откатывается.
-        import_result = import_master()
-        print(f"Material master import: {import_result}")
         # Worker одноразовый и opt-in: обычный запуск приложения не требует
         # SMTP и не создаёт фонового daemon/thread.
         NotificationWorker.run_once(session)
