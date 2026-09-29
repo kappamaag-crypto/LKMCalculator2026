@@ -14,6 +14,7 @@ Rules:
 
 from __future__ import annotations
 
+import csv
 import json
 import math
 import re
@@ -29,6 +30,8 @@ import xlrd
 ROOT = Path(__file__).resolve().parents[2]
 BOOKS = ROOT / "books"
 OUT = ROOT / "upload" / "data" / "material_catalog_master_v3.json"
+CSV_OUT = ROOT / "upload" / "data" / "material_catalog_master_v3.csv"
+REVIEW_CSV_OUT = ROOT / "upload" / "data" / "material_catalog_review_candidates_v3.csv"
 SPKEFFA = ROOT / "upload" / "data" / "spkeffa_catalog.json"
 
 WORKBOOKS = (
@@ -108,14 +111,11 @@ def range_text(v: Any) -> str | None:
     return None
 
 
-def likely_material(v: Any) -> bool:
+def likely_material(v: Any, vals: list[Any] | None = None, col: int | None = None, headers: dict[str, list[int]] | None = None) -> bool:
     s = text(v)
     n = norm(s)
     if not n or len(s) > 180:
         return False
-
-    # Hard exclusions: these are systems, instructions, headers, notes,
-    # process operations or descriptive prose rather than material entities.
     negative = (
         "определите", "выберите", "протокол ил", "предел огнестойкости", "описание",
         "антикоррозионная защита", "внутреннее покрытие", "наружное покрытие",
@@ -125,14 +125,13 @@ def likely_material(v: Any) -> bool:
         "без лакокрасочного", "для цинкового покрытия", "кол-во разбавителя",
         "цена с ндс", "стоимость", "нанесение грунтовочного",
         "нанесение финишного", "углеродистая и низколегированная сталь",
-        "материал металлических защитных покрытий",
+        "материал металлических защитных покрытий", "сайт:", ".ru", ".com",
+        "ооо ", "оао ", "пао ", "техническое задание", "инструкция",
     )
     if any(x in n for x in negative):
         return False
-
     if re.match(r"^(разбавитель|растворитель)\b", n, re.I):
         return True
-
     generic = {
         "грунт", "эмаль", "краска", "покрытие", "состав", "лкм",
         "растворитель", "разбавитель", "эпоксид", "полиуретан",
@@ -140,7 +139,6 @@ def likely_material(v: Any) -> bool:
     }
     if n in generic:
         return False
-
     positive = (
         "blank", "эффа", "литап", "литакоут", "литамастик", "литатанк",
         "литатерм", "литачар", "kindur", "neomarine", "inelka", "prim",
@@ -152,9 +150,24 @@ def likely_material(v: Any) -> bool:
     )
     if any(x in n for x in positive):
         return True
-
-    # Named products without a brand marker but with a model/article token.
-    return bool(re.search(r"\b(?:эп|пф|гф|ко|ур|прим|стелпант|полак|политон)[- ]?\d{2,}", n, re.I))
+    if re.search(r"\b(?:эп|пф|гф|ко|ур|прим|стелпант|полак|политон)[- ]?\d{2,}", n, re.I):
+        return True
+    if vals is not None and col is not None and headers is not None:
+        if col in headers.get("material", []):
+            return True
+        property_cols: list[int] = []
+        for kind in ("density", "solids", "price_kg", "price_l", "dft", "coverage", "theor_consumption", "pract_consumption"):
+            property_cols.extend(headers.get(kind, []))
+        if any(abs(col - pc) <= 6 for pc in property_cols):
+            for pc in property_cols:
+                if 0 <= pc < len(vals) and abs(col - pc) <= 6:
+                    value = vals[pc]
+                    if num(value) is not None:
+                        return True
+                    parts = split_multi(value)
+                    if len(parts) >= 2 and all(num(p) is not None for p in parts):
+                        return True
+    return False
 
 
 def canonicalize_material_name(raw: str) -> str | None:
@@ -174,6 +187,7 @@ def canonicalize_material_name(raw: str) -> str | None:
         r"^материал\s+металлических", r"^ооо\s", r"^цена\s+с\s+ндс",
         r"^площаль\b", r"^площадь\b", r"^кол-во\s+разбав",
         r"^стоимость", r"^полиуретан$", r"^эпоксид$", r"^связующее$",
+        r"^пк\s", r"\bсайт\s*:", r"\.ru\b", r"\.com\b", r"^ооо\s", r"^оао\s", r"^пао\s",
     )
     if any(re.search(p, n, re.I) for p in rejects):
         return None
@@ -217,8 +231,23 @@ def canonicalize_material_name(raw: str) -> str | None:
         "литатанк стронг": "Литатанк Стронг",
         "литакоут классик": "Литакоут Классик",
         "литакоут классик фрост": "Литакоут Классик (Фрост)",
+        "литакоут классик/фрост": "Литакоут Классик/Фрост",
     }
     key = norm(s)
+    if "blank mio" in key:
+        return "Blank MIO"
+    if "blank zinc" in key:
+        return "Blank Zinc"
+    if "blank universal" in key:
+        return "Blank Universal"
+    if "blank finish" in key:
+        return "Blank Finish"
+    if "blank tank lp" in key:
+        return "Blank Tank LP"
+    if "blank tank" in key:
+        return "Blank Tank"
+    if "blank hp" in key:
+        return "Blank HP"
     if key in aliases:
         return aliases[key]
     return s
@@ -285,7 +314,7 @@ def observation_from_row(
     vals: list[Any],
     headers: dict[str, list[int]],
 ) -> list[dict[str, Any]]:
-    candidates = [(i, text(v)) for i, v in enumerate(vals) if likely_material(v)]
+    candidates = [(i, text(v)) for i, v in enumerate(vals) if likely_material(v, vals, i, headers)]
     if not candidates:
         return []
 
@@ -490,7 +519,7 @@ def choose_preferred(
 
 
 
-def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
     result: list[dict[str, Any]] = []
 
     for key, item in materials.items():
@@ -567,7 +596,7 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
             "theoretical_consumption_kg_m2": tc,
             "practical_consumption_kg_m2": pc,
             "calculation_ready": density is not None and sv is not None,
-            "source_records": item.get("source_records", []),
+            "data_quality_status": (\n                "READY" if density is not None and sv is not None\n                else "PARTIAL_DENSITY" if density is not None\n                else "PARTIAL_SOLIDS_BY_VOLUME" if sv is not None\n                else "NAME_ONLY"\n            ),\n            "conflict_fields": [\n                fld for fld, values in (\n                    ("density", sorted({round(float(o["density"]), 8) for o in observations if isinstance(o.get("density"), (int, float)) and 0.5 <= float(o["density"]) <= 5})),\n                    ("solids_by_volume_percent", sorted({round(float(o["solids_by_volume_percent"]), 8) for o in observations if isinstance(o.get("solids_by_volume_percent"), (int, float)) and 5 <= float(o["solids_by_volume_percent"]) <= 100})),\n                ) if len(values) > 1\n            ],\n            "source_records": item.get("source_records", []),
             "observations": observations,
             "catalog_fields": catalog,
         }
@@ -590,7 +619,7 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
     observations = sum(len(x["observations"]) for x in result)
 
     return {
-        "schema_version": "3.0-material-master-3",
+        "schema_version": "3.0-material-master-4",
         "generated_by": "upload/scripts/build_material_catalog.py",
         "generated_from": list(WORKBOOKS) + ["upload/data/spkeffa_catalog.json"],
         "project_semantics": {
@@ -617,6 +646,7 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
             "excel_dry_residue_semantics": "VOLUMETRIC_DRY_SOLIDS_PERCENT",
         },
         "materials": result,
+        "review_candidates": sorted((review_candidates or {}).values(), key=lambda x: norm(x["material_name"])),
     }
 
 
@@ -668,11 +698,26 @@ def main() -> None:
     enrich_slash_values(all_observations)
 
     materials: dict[str, dict[str, Any]] = {}
+    review_candidates: dict[str, dict[str, Any]] = {}
     rejected_nonmaterial_observations = 0
 
     for o in all_observations:
         raw = o["material_name_raw"]
         if not likely_material(raw):
+            has_properties = any(
+                isinstance(o.get(f), (int, float))
+                for f in ("density", "solids_by_volume_percent", "price_per_kg", "price_per_liter", "recommended_dft", "theoretical_consumption_kg_m2", "practical_consumption_kg_m2")
+            )
+            if has_properties and raw:
+                k = norm(raw)
+                rc = review_candidates.setdefault(k, {
+                    "material_name": raw,
+                    "aliases": [],
+                    "observations": [],
+                    "reason": "property-backed but not confidently classified as a material",
+                })
+                rc["aliases"].append(raw)
+                rc["observations"].append(o)
             rejected_nonmaterial_observations += 1
             continue
 
@@ -697,12 +742,47 @@ def main() -> None:
 
     add_spkeffa_sources(materials)
 
-    out = finalize(materials)
+    out = finalize(materials, review_candidates)
     validate_output(out)
     out["missing_workbooks"] = missing
     out["summary"]["rejected_nonmaterial_observations"] = rejected_nonmaterial_observations
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    fields = [
+        "status", "material_name", "data_quality_status", "calculation_ready",
+        "manufacturer", "brand", "binder", "material_type", "density",
+        "solids_by_volume_percent", "price_per_kg", "price_per_liter",
+        "recommended_dft", "theoretical_consumption_kg_m2", "practical_consumption_kg_m2",
+        "conflict_fields", "observation_count", "alias_count", "source_workbooks",
+    ]
+    with CSV_OUT.open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+        w.writeheader()
+        for row in out["materials"]:
+            row2 = dict(row)
+            row2["conflict_fields"] = ", ".join(row.get("conflict_fields", []))
+            row2["observation_count"] = len(row.get("observations", []))
+            row2["alias_count"] = len(row.get("aliases", []))
+            sources = sorted({o.get("source", {}).get("file") for o in row.get("observations", []) if o.get("source")})
+            row2["source_workbooks"] = " | ".join(sources)
+            w.writerow(row2)
+
+    review_fields = ["material_name", "alias_count", "observation_count", "reason", "sources"]
+    with REVIEW_CSV_OUT.open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=review_fields)
+        w.writeheader()
+        for row in out.get("review_candidates", []):
+            sources = sorted({o.get("source", {}).get("file") for o in row.get("observations", []) if o.get("source")})
+            w.writerow({
+                "material_name": row.get("material_name", ""),
+                "alias_count": len(set(row.get("aliases", []))),
+                "observation_count": len(row.get("observations", [])),
+                "reason": row.get("reason", ""),
+                "sources": " | ".join(sources),
+            })
+
+    out["summary"]["review_candidates"] = len(out.get("review_candidates", []))
     print(json.dumps(out["summary"] | {"missing_workbooks": missing}, ensure_ascii=False))
 
 
