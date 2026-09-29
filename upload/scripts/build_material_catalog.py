@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Build the v3 master material catalog from the project Excel sources.
 
+Builder revision: 2026-09-29/full-workbook-pass.
+
 Rules:
 - Every source observation is preserved with workbook/sheet/row provenance.
 - In the five Excel workbooks the "Сухой остаток" field is treated as
