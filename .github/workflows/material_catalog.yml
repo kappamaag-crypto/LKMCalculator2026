@@ -36,7 +36,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add upload/data/material_catalog_master_v3.json
+          git add upload/data/material_catalog_master_v3.json \
+            upload/data/material_catalog_master_v3.csv \
+            upload/data/material_catalog_review_candidates_v3.csv
           if git diff --cached --quiet; then
             echo "No generated catalog changes."
             exit 0
