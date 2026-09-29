@@ -96,18 +96,27 @@ def seed_material_master_catalog(session: Session) -> dict[str, int]:
             updated += 1
 
     session.flush()
+    return {
+        "inserted": inserted,
+        "updated": updated,
+        "records_seen": len(records),
+        "catalog_schema_version": payload.get("schema_version"),
+        "imported_at": now.isoformat(),
+    }
+
+
+def write_master_import_marker(result: dict[str, int | str]) -> None:
     MASTER_IMPORT_MARKER.write_text(
         json.dumps({
             "import_version": "4",
-            "catalog_schema_version": payload.get("schema_version"),
-            "imported_at": now.isoformat(),
-            "records_seen": len(records),
-            "inserted": inserted,
-            "updated": updated,
+            "catalog_schema_version": result.get("catalog_schema_version"),
+            "imported_at": result.get("imported_at"),
+            "records_seen": result.get("records_seen", 0),
+            "inserted": result.get("inserted", 0),
+            "updated": result.get("updated", 0),
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    return {"inserted": inserted, "updated": updated, "records_seen": len(records)}
 
 
 def seed_dictionaries(session: Session) -> None:
@@ -248,6 +257,8 @@ def run_seed(session: Session) -> None:
     seed_demo_system(session, demo_ids)
     seed_compatibility(session)
     session.commit()
+    if master_result.get("records_seen") and not master_result.get("skipped_marker"):
+        write_master_import_marker(master_result)
     print(
         f"Seed completed: dictionaries, {len(catalog_ids)} SPKEFFA materials, "
         f"master catalog import={master_result}, demo system, compatibility rules."
