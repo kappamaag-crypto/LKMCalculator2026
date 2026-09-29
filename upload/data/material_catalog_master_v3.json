@@ -1,0 +1,1134 @@
+{
+  "schema_version": "3.0-material-master-1",
+  "generated_from": [
+    "upload/data/spkeffa_catalog.json",
+    "books/Системы 2.XLSX",
+    "books/Системы 3.xlsx",
+    "books/Системы 4.xlsx",
+    "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+    "books/Системы 1.xls"
+  ],
+  "policy": {
+    "preserve_provenance": true,
+    "do_not_infer_volume_solids_from_mass_solids": true,
+    "keep_ranges_as_text_until_range_model_exists": true,
+    "composite_dft_is_unknown": true,
+    "name_only_candidates_are_not_calculation_ready": true
+  },
+  "summary": {
+    "source_catalog_materials": 19,
+    "master_material_records": 42,
+    "calculation_ready": 8,
+    "name_only": 23
+  },
+  "materials": [
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Blank",
+      "material_name": "Blank Universal",
+      "material_type": "грунт-эмаль",
+      "binder_type": "эпоксид",
+      "density": 1.4,
+      "solids_percent": 73,
+      "solids_by_volume_percent": 73,
+      "recommended_dft_min": 80,
+      "recommended_dft_max": 250,
+      "max_single_layer_dft": 250,
+      "min_application_temperature": -5,
+      "max_application_temperature": 40,
+      "max_relative_humidity": 85,
+      "min_dew_point_margin_c": 3,
+      "is_two_component": true,
+      "corrosion_categories": [
+        "C3",
+        "C4",
+        "C5"
+      ],
+      "datasheet": "https://spk-effa.ru/docs/blank/Blank_Universal.pdf",
+      "source_url": "https://spk-effa.ru/blank/universal.html",
+      "notes": "Сухой остаток указан на сайте как 73 ± 2 %. Не интерпретировать его автоматически как объемную долю сухого остатка.",
+      "aliases": [
+        "Грунт-Эмаль Blank Universal",
+        "Blank Universal"
+      ],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        },
+        {
+          "source": "Системы 3.xlsx: АКЗ rows 8-19",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 4.xlsx: rows 13-22",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 2.XLSX: АКЗ",
+          "verification": "workbook-direct"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": true
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Blank",
+      "material_name": "Blank Finish",
+      "material_type": "финишное покрытие",
+      "binder_type": "полиуретан",
+      "density": 1.3,
+      "solids_percent": 58,
+      "solids_by_volume_percent": 58,
+      "recommended_dft_min": 60,
+      "recommended_dft_max": 100,
+      "max_single_layer_dft": 100,
+      "is_two_component": true,
+      "datasheet": "https://spk-effa.ru/docs/blank/Blank_Finish.pdf",
+      "source_url": "https://spk-effa.ru/blank/finish.html",
+      "notes": "Сухой остаток 58 ± 3 %. Объемная доля сухого остатка не указана в карточке сайта.",
+      "aliases": [
+        "Эмаль Blank Finish",
+        "Blank Finish"
+      ],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        },
+        {
+          "source": "Системы 3.xlsx: АКЗ rows 8-19",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 4.xlsx: rows 13-22",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 2.XLSX: АКЗ",
+          "verification": "workbook-direct"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": true
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Blank",
+      "material_name": "Blank One",
+      "material_type": "грунт-эмаль",
+      "binder_type": "прочее",
+      "density": 1.3,
+      "solids_percent": 55,
+      "solids_by_volume_percent": null,
+      "is_two_component": false,
+      "datasheet": "https://spk-effa.ru/docs/blank/Blank_One.pdf",
+      "source_url": "https://spk-effa.ru/blank/one.html",
+      "notes": "Одноупаковочная грунт-эмаль. Сухой остаток 55 ± 3 %.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Blank",
+      "material_name": "Blank HP",
+      "material_type": "эпоксидное покрытие",
+      "binder_type": "эпоксид",
+      "density": 1.5,
+      "solids_percent": 85,
+      "solids_by_volume_percent": 85,
+      "is_two_component": true,
+      "datasheet": "https://spk-effa.ru/docs/blank/Blank_HP.pdf",
+      "source_url": "https://spk-effa.ru/blank/hp.html",
+      "notes": "Сухой остаток 85 ± 2 %.",
+      "aliases": [
+        "Грунт-Эмаль Blank HP",
+        "Blank HP"
+      ],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        },
+        {
+          "source": "Системы 3.xlsx: АКЗ rows 12-15,19",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 4.xlsx: rows 17-20",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 2.XLSX: АКЗ",
+          "verification": "workbook-direct"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": true
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Blank",
+      "material_name": "Blank Tank",
+      "material_type": "эпоксидное покрытие",
+      "binder_type": "эпоксид",
+      "density": 1.45,
+      "solids_percent": 90,
+      "solids_by_volume_percent": 90,
+      "is_two_component": true,
+      "datasheet": "https://spk-effa.ru/docs/blank/Blank_Tank.pdf",
+      "source_url": "https://spk-effa.ru/blank/tank.html",
+      "notes": "Двухупаковочное эпоксидное покрытие. Сухой остаток 90 ± 2 %.",
+      "aliases": [
+        "Blank Tank",
+        "Blank Tank"
+      ],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        },
+        {
+          "source": "Системы 3.xlsx: АКЗ rows 10-11",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 4.xlsx: rows 15-16",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 2.XLSX: АКЗ",
+          "verification": "workbook-direct"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": true
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Blank",
+      "material_name": "Blank Tank LP",
+      "material_type": "эпоксидное покрытие",
+      "binder_type": "эпоксид",
+      "density": 1.2,
+      "solids_percent": 58,
+      "solids_by_volume_percent": 58,
+      "is_two_component": true,
+      "datasheet": "https://spk-effa.ru/docs/blank/Blank_Tank_LP.pdf",
+      "source_url": "https://spk-effa.ru/blank/tank-lp.html",
+      "notes": "Сухой остаток по объему 58 ± 2 %.",
+      "aliases": [
+        "Blank Tank",
+        "Blank Tank LP"
+      ],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        },
+        {
+          "source": "Системы 3.xlsx: АКЗ rows 10-11",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 4.xlsx: rows 15-16",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 2.XLSX: АКЗ",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "evidence": "notes explicitly state dry residue by volume 58 ± 2 %"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "volume_solids_range_text": "58 ± 2 %",
+      "calculation_ready": true
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Blank",
+      "material_name": "Blank MIO",
+      "material_type": "промежуточное покрытие",
+      "binder_type": "эпоксид",
+      "density": 1.6,
+      "solids_percent": 73,
+      "solids_by_volume_percent": 73,
+      "is_two_component": true,
+      "datasheet": "https://spk-effa.ru/docs/blank/Blank_MIO.pdf",
+      "source_url": "https://spk-effa.ru/blank/mio.html",
+      "notes": "Эпоксидное покрытие с MIO. Сухой остаток 73 ± 2 %.",
+      "aliases": [
+        "Blank MIO",
+        "Blank MIO"
+      ],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        },
+        {
+          "source": "Системы 3.xlsx: АКЗ row 18",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 4.xlsx: row 23",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 2.XLSX: АКЗ",
+          "verification": "workbook-direct"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": true
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Blank",
+      "material_name": "Blank Zinc",
+      "material_type": "цинконаполненный грунт",
+      "binder_type": "эпоксид",
+      "density": 2.9,
+      "solids_percent": 58,
+      "solids_by_volume_percent": 58,
+      "is_two_component": true,
+      "datasheet": "https://spk-effa.ru/docs/blank/Blank_Zinc.pdf",
+      "source_url": "https://spk-effa.ru/blank/zinc.html",
+      "notes": "Цинконаполненный эпоксидный грунт. Сухой остаток 58 ± 2 %.",
+      "aliases": [
+        "Blank Zinc",
+        "Blank Zinc"
+      ],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        },
+        {
+          "source": "Системы 3.xlsx: АКЗ row 18",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 4.xlsx: row 23",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "Системы 2.XLSX: АКЗ",
+          "verification": "workbook-direct"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": true
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Blank",
+      "material_name": "Blank DTM",
+      "material_type": "грунт-эмаль",
+      "binder_type": "полиуретан",
+      "density": 1.3,
+      "solids_percent": 60,
+      "solids_by_volume_percent": null,
+      "is_two_component": true,
+      "datasheet": "https://spk-effa.ru/docs/blank/Blank_DTM.pdf",
+      "source_url": "https://spk-effa.ru/blank/dtm.html",
+      "notes": "Полиуретановая грунт-эмаль. Сухой остаток 60 ± 2 %.",
+      "aliases": [
+        "Blank DTM",
+        "Blank DTM"
+      ],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        },
+        {
+          "source": "Системы 2.XLSX: АКЗ row 19",
+          "verification": "workbook-direct"
+        },
+        {
+          "source": "main workbook candidate",
+          "verification": "workbook-direct"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «ЭФФА»",
+      "brand": "ЭФФА",
+      "material_name": "ЭФФА-01 на водной основе",
+      "material_type": "специализированное покрытие",
+      "binder_type": "акрил",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "is_two_component": false,
+      "datasheet": "https://spk-effa.ru/docs/effa/EFFA_01_water.pdf",
+      "source_url": "https://spk-effa.ru/ognezaschita/effa-01-voda.html",
+      "notes": "Огнезащитный состав. Критические инженерные параметры должны подтверждаться TDS.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «ЭФФА»",
+      "brand": "ЭФФА",
+      "material_name": "ЭФФА-01 на органических растворителях",
+      "material_type": "специализированное покрытие",
+      "binder_type": "акрил",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "is_two_component": false,
+      "datasheet": "https://spk-effa.ru/docs/effa/EFFA_01_organic_and_EFFA_KT01_organic.pdf",
+      "source_url": "https://spk-effa.ru/ognezaschita/effa-01-rastvoritel.html",
+      "notes": "Огнезащитный состав. Критические инженерные параметры должны подтверждаться TDS.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «ЭФФА»",
+      "brand": "ЭФФА",
+      "material_name": "ЭФФА А-01",
+      "material_type": "специализированное покрытие",
+      "binder_type": "акрил",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "is_two_component": false,
+      "datasheet": "https://spk-effa.ru/docs/effa/EFFA_A-01.pdf",
+      "source_url": "https://spk-effa.ru/ognezaschita/effa-a-01.html",
+      "notes": "Огнезащитный состав. Критические инженерные параметры должны подтверждаться TDS.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «ЭФФА»",
+      "brand": "ЭФФА",
+      "material_name": "ЭФФА ЭП-150",
+      "material_type": "эпоксидное покрытие",
+      "binder_type": "эпоксид",
+      "density": 1.025,
+      "solids_percent": 95,
+      "solids_by_volume_percent": null,
+      "is_two_component": true,
+      "datasheet": "https://spk-effa.ru/docs/effa/EFFA_EP150_and_EP150K.pdf",
+      "source_url": "https://spk-effa.ru/ognezaschita/effa-ep-150.html",
+      "notes": "Двухкомпонентное эпоксидное огнезащитное покрытие. Предел огнестойкости R30–R120.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «ЭФФА»",
+      "brand": "ЭФФА",
+      "material_name": "ЭФФА ЭП-150К",
+      "material_type": "эпоксидное покрытие",
+      "binder_type": "эпоксид",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "is_two_component": true,
+      "datasheet": "https://spk-effa.ru/docs/effa/EFFA_EP150_and_EP150K.pdf",
+      "source_url": "https://spk-effa.ru/ognezaschita/effa-ep-150k.html",
+      "notes": "Огнезащитный состав. Не заполнять ratio/DFT без подтверждения TDS.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «ЭФФА»",
+      "brand": "ЭФФА",
+      "material_name": "ЭФФА-КТ01",
+      "material_type": "специализированное покрытие",
+      "binder_type": "акрил",
+      "density": 1,
+      "solids_percent": 75,
+      "solids_by_volume_percent": null,
+      "is_two_component": false,
+      "datasheet": "https://spk-effa.ru/docs/effa/EFFA_KT01.pdf",
+      "source_url": "https://spk-effa.ru/ognezaschita/effa-kt01.html",
+      "notes": "Теплоизолирующий/огнезащитный состав; сухой остаток 75 ± 5 %, плотность 1 ± 0,1 кг/л.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «ЭФФА»",
+      "brand": "ЭФФА",
+      "material_name": "ЭФФА-01Б",
+      "material_type": "специализированное покрытие",
+      "binder_type": "акрил",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "is_two_component": false,
+      "datasheet": "https://spk-effa.ru/docs/effa/EFFA_01B.pdf",
+      "source_url": "https://spk-effa.ru/ognezaschita/effa-01b.html",
+      "notes": "Огнезащитный состав. Критические инженерные параметры должны подтверждаться TDS.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «ЭФФА»",
+      "brand": "ЭФФА",
+      "material_name": "ЭФФА для кабелей",
+      "material_type": "специализированное покрытие",
+      "binder_type": "акрил",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "is_two_component": false,
+      "datasheet": null,
+      "source_url": "https://spk-effa.ru/ognezaschita/effa-kabel.html",
+      "notes": "Специализированный состав для кабелей; использовать только после подтверждения области применения и TDS.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Veksa",
+      "material_name": "VEKSA PR 10",
+      "material_type": "грунт",
+      "binder_type": "полиуретан",
+      "density": 0.98,
+      "solids_percent": 50,
+      "solids_by_volume_percent": null,
+      "recommended_dft_min": null,
+      "recommended_dft_max": null,
+      "is_two_component": false,
+      "max_relative_humidity": 80,
+      "min_application_temperature": 5,
+      "max_application_temperature": 25,
+      "datasheet": "https://spk-effa.ru/docs/veksa/VEKSA_PR_10.pdf",
+      "source_url": "https://spk-effa.ru/veksa/pr-10.html",
+      "notes": "Однокомпонентный полиуретановый грунт для оснований под PP 11. Расход около 0,30 кг/м² зависит от пористости.",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": false
+    },
+    {
+      "manufacturer": "ООО «Колоридо»",
+      "brand": "Veksa",
+      "material_name": "VEKSA PP 11",
+      "material_type": "полиуретановое покрытие",
+      "binder_type": "полиуретан",
+      "density": 1.5,
+      "solids_percent": 100,
+      "solids_by_volume_percent": 100,
+      "recommended_dft_min": 2000,
+      "recommended_dft_max": null,
+      "is_two_component": true,
+      "max_relative_humidity": 70,
+      "min_application_temperature": 10,
+      "max_application_temperature": 25,
+      "datasheet": "https://spk-effa.ru/docs/veksa/VEKSA_PP_11.pdf",
+      "source_url": "https://spk-effa.ru/veksa/pp-11.html",
+      "notes": "Двухкомпонентный полиуретановый наливной пол. А:Б = 4,7:1 по массе; от 2 мм; расход от 3,0 кг/м².",
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "upload/data/spkeffa_catalog.json",
+          "source_ref": "main",
+          "source_updated": "2026-08-01"
+        }
+      ],
+      "data_status": "SOURCE_CATALOG",
+      "calculation_ready": true
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литакоут Классик/Фрост",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "GlobalCoat 590",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литамастик 290",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литапрайм Экспресс Ф",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литапрайм Цинк 80",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литатерм 540 ЦИНК",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литатерм Финиш",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литапрайм Экспресс",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "KinDUR UV",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литатанк стандарт",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литакоут Классик RAL 7035",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литакоут Флекси",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Грунт ЭПИПРАЙМ HS",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "PRIMACOR SBA Microzinc",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Эмаль Церта",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Грунт-эмаль AMETCOR PRO",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Литачар",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Декотерм-эоKinDUR U",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "Изолэо primer",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "MIO",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "NEOMARINE INELKA ZINC",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "NEOMARINE INELKA E",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    },
+    {
+      "manufacturer": "",
+      "brand": "",
+      "material_name": "INELKA 500",
+      "material_type": "",
+      "binder_type": "UNKNOWN",
+      "density": null,
+      "solids_percent": null,
+      "solids_by_volume_percent": null,
+      "price_per_kg": null,
+      "price_per_liter": null,
+      "aliases": [],
+      "source_records": [
+        {
+          "source": "books/Таблица на 1 кв.м ЛКМ основная.xlsx",
+          "source_status": "candidate-name extracted from sharedStrings"
+        }
+      ],
+      "data_status": "NAME_ONLY",
+      "calculation_ready": false,
+      "notes": "Название обнаружено в книге. Технические поля не заполнять до чтения соответствующего листа/строки и проверки источника."
+    }
+  ]
+}
