@@ -111,19 +111,112 @@ def range_text(v: Any) -> str | None:
 def likely_material(v: Any) -> bool:
     s = text(v)
     n = norm(s)
-    if not n or len(s) > 220:
+    if not n or len(s) > 180:
         return False
-    if n in {norm(x) for x in GENERIC_EXCLUDE}:
+
+    # Hard exclusions: these are systems, instructions, headers, notes,
+    # process operations or descriptive prose rather than material entities.
+    negative = (
+        "определите", "выберите", "протокол ил:", "предел огнестойкости",
+        "антикоррозионная защита", "внутреннее покрытие", "наружное покрытие",
+        "описание:", "на сварных швах", "толщина сухого слоя",
+        "расход лкм", "практический расход", "теоретический расход",
+        "площадь", "увеличение количества", "группы лакокрасочных",
+        "без лакокрасочного", "для цинкового покрытия", "кол-во разбавителя",
+        "цена с ндс", "стоимость", "нанесение грунтовочного",
+        "нанесение финишного", "углеродистая и низколегированная сталь",
+        "материал металлических защитных покрытий",
+    )
+    if any(x in n for x in negative):
         return False
-    if any(x in n for x in GENERIC_EXCLUDE):
-        # Fire-protection product names containing ЭФФА are still accepted.
-        if "эффа" not in n and not any(k in n for k in ("blank", "лит", "kindur", "inelka", "primacor", "globalcoat", "ametcor")):
-            return False
-    if any(k in n for k in PRODUCT_KEYWORDS):
-        if n in {"грунт", "эмаль", "краска", "покрытие", "лкм", "растворитель", "разбавитель"}:
-            return False
+
+    if re.match(r"^(разбавитель|растворитель)\b", n, re.I):
         return True
-    return False
+
+    generic = {
+        "грунт", "эмаль", "краска", "покрытие", "состав", "лкм",
+        "растворитель", "разбавитель", "эпоксид", "полиуретан",
+        "акрил", "фенолэпоксид", "эпоксидная грунт эмаль",
+    }
+    if n in generic:
+        return False
+
+    positive = (
+        "blank", "эффа", "литап", "литакоут", "литамастик", "литатанк",
+        "литатерм", "литачар", "kindur", "neomarine", "inelka", "prim",
+        "globalcoat", "globaltop", "ametcor", "декотерм", "изолэ",
+        "ecomast", "masscotank", "stelpant", "wg-", "эметалл",
+        "эпипрайм", "эпоксикоут", "dyopox", "церта", "гф-021",
+        "эп-0199", "эп-0110", "полак", "политон", "lakra", "урпейнт",
+        "dyo", "veksa",
+    )
+    if any(x in n for x in positive):
+        return True
+
+    # Named products without a brand marker but with a model/article token.
+    return bool(re.search(r"\b(?:эп|пф|гф|ко|ур|прим|стелпант|полак|политон)[- ]?\d{2,}", n, re.I))
+
+
+def canonicalize_material_name(raw: str) -> str | None:
+    s = text(raw).replace("ё", "е")
+    n = norm(s)
+
+    # Explicit thinner entity.
+    if re.match(r"^(разбавитель|растворитель)\b", n, re.I):
+        return re.sub(r"\s+", " ", s).strip()
+
+    rejects = (
+        r"^описание:", r"^протокол\s", r"^система(\s|$)", r"^акз(\s|$)",
+        r"^антикоррозионная\s+защита", r"^внутренн", r"^наружн",
+        r"^площад", r"^определ", r"^выбер", r"^без\s+лакокрасоч",
+        r"^толщина\s", r"^кол-во\s+разбав", r"^предел\s+огнестой",
+        r"^группы\s+лакокрасоч", r"^нанесение\s", r"^увеличение\s",
+        r"^материал\s+металлических", r"^ооо\s", r"^цена\s+с\s+ндс",
+        r"^стоимость", r"^полиуретан$", r"^эпоксид$", r"^связующее$",
+    )
+    if any(re.search(p, n, re.I) for p in rejects):
+        return None
+
+    # Remove layer counters and product-type prefixes.
+    s = re.sub(r"^\s*\d+\s*(?:слой|слоя)\s+", "", s, flags=re.I)
+    s = re.sub(
+        r"^(?:грунт-?эмаль|грунтовка|грунт|эмаль|краска|"
+        r"огнезащитный состав|огнезащита|теплоизолирующий состав|"
+        r"теплоогнезащитный состав)\s*[:：]?\s*",
+        "",
+        s,
+        flags=re.I,
+    )
+
+    # Remove RAL and explicit fire-test qualifiers from the material key.
+    s = re.sub(r"\s+Ral\s*[-:]?\s*\d{3,4}\b", "", s, flags=re.I)
+    s = re.sub(r"\s+R\s*\d+\b.*$", "", s, flags=re.I)
+    s = re.sub(r"\s+ПТМ\s*[-–—:]?\s*[0-9.,]+\s*мм.*$", "", s, flags=re.I)
+    s = re.sub(r"\s+(?:для\s+УГВ\s+режима|УГВ)$", "", s, flags=re.I)
+    s = re.sub(r"\s+(?:или\s+ЭФФА[- ]?ЭП[- ]?150К)$", "", s, flags=re.I)
+    s = re.sub(r"\s+", " ", s).strip(" -–—:;,")
+    if not s:
+        return None
+
+    aliases = {
+        "blank universal": "Blank Universal",
+        "blank finish": "Blank Finish",
+        "blank hp": "Blank HP",
+        "blank tank": "Blank Tank",
+        "blank tank lp": "Blank Tank LP",
+        "blank mio": "Blank MIO",
+        "blank zinc": "Blank Zinc",
+        "blank dtm": "Blank DTM",
+        "blank one": "Blank One",
+        "литатанк стандарт": "Литатанк Стандарт",
+        "литатанк стронг": "Литатанк Стронг",
+        "литакоут классик": "Литакоут Классик",
+        "литакоут классик фрост": "Литакоут Классик (Фрост)",
+    }
+    key = norm(s)
+    if key in aliases:
+        return aliases[key]
+    return s
 
 
 def split_multi(v: Any) -> list[str]:
@@ -350,34 +443,71 @@ def add_spkeffa_sources(materials: dict[str, dict[str, Any]]) -> None:
 
 def choose_single(values: list[float]) -> float | None:
     uniq = sorted({round(v, 8) for v in values})
-    if len(uniq) == 1:
-        return uniq[0]
-    return None
+    return uniq[0] if len(uniq) == 1 else None
+
+
+SOURCE_PRIORITY = {
+    "Таблица на 1 кв.м ЛКМ основная.xlsx": 100,
+    "Системы 3.xlsx": 90,
+    "Системы 4.xlsx": 80,
+    "Системы 2.XLSX": 70,
+    "Системы 1.xls": 60,
+}
+
+
+def choose_preferred(
+    observations: list[dict[str, Any]],
+    field: str,
+    *,
+    minimum: float | None = None,
+    maximum: float | None = None,
+) -> float | None:
+    ranked: list[tuple[int, float]] = []
+    for o in observations:
+        value = o.get(field)
+        if not isinstance(value, (int, float)):
+            continue
+        value = float(value)
+        if minimum is not None and value < minimum:
+            continue
+        if maximum is not None and value > maximum:
+            continue
+        source = o.get("source", {}).get("file", "")
+        ranked.append((SOURCE_PRIORITY.get(source, 0), value))
+
+    if not ranked:
+        return None
+
+    highest = max(p for p, _ in ranked)
+    top = [v for p, v in ranked if p == highest]
+    counts = Counter(round(v, 8) for v in top)
+    return float(counts.most_common(1)[0][0])
+
 
 
 def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
     result: list[dict[str, Any]] = []
+
     for key, item in materials.items():
         observations = item.get("observations", [])
-        def vals(field: str) -> list[float]:
-            return [float(o[field]) for o in observations if isinstance(o.get(field), (int, float))]
-
-        dens = [v for v in vals("density") if 0.5 <= v <= 5.0]
-        solids = [v for v in vals("solids_by_volume_percent") if 5.0 <= v <= 100.0]
-        pk = [v for v in vals("price_per_kg") if 0.0 <= v <= 100000.0]
-        pl = [v for v in vals("price_per_liter") if 0.0 <= v <= 200000.0]
-        dft = [v for v in vals("recommended_dft") if 0.0 <= v <= 10000.0]
-        tc = [v for v in vals("theoretical_consumption_kg_m2") if 0.0 <= v <= 1000.0]
-        pc = [v for v in vals("practical_consumption_kg_m2") if 0.0 <= v <= 1000.0]
-
-        density = choose_single(dens)
-        sv = choose_single(solids)
-
         catalog = item.get("catalog_fields", {})
-        if density is None and isinstance(catalog.get("density"), (int, float)) and 0.5 <= float(catalog["density"]) <= 5.0:
-            density = float(catalog["density"])
-        if sv is None and isinstance(catalog.get("solids_by_volume_percent"), (int, float)) and 5.0 <= float(catalog["solids_by_volume_percent"]) <= 100.0:
-            sv = float(catalog["solids_by_volume_percent"])
+
+        density = choose_preferred(observations, "density", minimum=0.5, maximum=5.0)
+        sv = choose_preferred(observations, "solids_by_volume_percent", minimum=5.0, maximum=100.0)
+        pk = choose_preferred(observations, "price_per_kg", minimum=0.0, maximum=100000.0)
+        pl = choose_preferred(observations, "price_per_liter", minimum=0.0, maximum=200000.0)
+        dft = choose_preferred(observations, "recommended_dft", minimum=0.0, maximum=10000.0)
+        tc = choose_preferred(observations, "theoretical_consumption_kg_m2", minimum=0.0, maximum=1000.0)
+        pc = choose_preferred(observations, "practical_consumption_kg_m2", minimum=0.0, maximum=1000.0)
+
+        if density is None and isinstance(catalog.get("density"), (int, float)):
+            cv = float(catalog["density"])
+            if 0.5 <= cv <= 5:
+                density = cv
+        if sv is None and isinstance(catalog.get("solids_by_volume_percent"), (int, float)):
+            cv = float(catalog["solids_by_volume_percent"])
+            if 5 <= cv <= 100:
+                sv = cv
 
         aliases = sorted({x for x in item.get("aliases", []) if x})
         if item.get("material_name") not in aliases:
@@ -385,23 +515,52 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
         out = {
             "material_name": item["material_name"],
-            "status": "THINNER" if re.match(r"^(разбавитель|растворитель)\b", norm(item["material_name"]), re.I) else "MATERIAL",
+            "status": (
+                "THINNER"
+                if re.match(r"^(разбавитель|растворитель)\b", norm(item["material_name"]), re.I)
+                else "MATERIAL"
+            ),
             "aliases": aliases,
-            "manufacturer": catalog.get("manufacturer") or next((o.get("manufacturer") for o in observations if o.get("manufacturer")), ""),
-            "brand": catalog.get("brand") or next((o.get("brand") for o in observations if o.get("brand")), ""),
-            "binder": catalog.get("binder_type") or next((o.get("binder") for o in observations if o.get("binder")), ""),
+            "manufacturer": catalog.get("manufacturer") or next(
+                (o.get("manufacturer") for o in observations if o.get("manufacturer")), ""
+            ),
+            "brand": catalog.get("brand") or next(
+                (o.get("brand") for o in observations if o.get("brand")), ""
+            ),
+            "binder": catalog.get("binder_type") or next(
+                (o.get("binder") for o in observations if o.get("binder")), ""
+            ),
             "material_type": catalog.get("material_type", ""),
             "density": density,
             "solids_by_volume_percent": sv,
-            "density_values": sorted({round(v, 8) for v in dens}),
-            "solids_by_volume_values": sorted({round(v, 8) for v in solids}),
-            "price_per_kg": choose_single(pk),
-            "price_per_liter": choose_single(pl),
-            "price_observations": sorted({round(v, 8) for v in pk}),
-            "price_liter_observations": sorted({round(v, 8) for v in pl}),
-            "recommended_dft": choose_single(dft),
-            "theoretical_consumption_kg_m2": choose_single(tc),
-            "practical_consumption_kg_m2": choose_single(pc),
+            "density_values": sorted({
+                round(float(o["density"]), 8)
+                for o in observations
+                if isinstance(o.get("density"), (int, float)) and 0.5 <= float(o["density"]) <= 5
+            }),
+            "solids_by_volume_values": sorted({
+                round(float(o["solids_by_volume_percent"]), 8)
+                for o in observations
+                if isinstance(o.get("solids_by_volume_percent"), (int, float))
+                and 5 <= float(o["solids_by_volume_percent"]) <= 100
+            }),
+            "price_per_kg": pk,
+            "price_per_liter": pl,
+            "price_observations": sorted({
+                round(float(o["price_per_kg"]), 8)
+                for o in observations
+                if isinstance(o.get("price_per_kg"), (int, float))
+                and 0 <= float(o["price_per_kg"]) <= 100000
+            }),
+            "price_liter_observations": sorted({
+                round(float(o["price_per_liter"]), 8)
+                for o in observations
+                if isinstance(o.get("price_per_liter"), (int, float))
+                and 0 <= float(o["price_per_liter"]) <= 200000
+            }),
+            "recommended_dft": dft,
+            "theoretical_consumption_kg_m2": tc,
+            "practical_consumption_kg_m2": pc,
             "calculation_ready": density is not None and sv is not None,
             "source_records": item.get("source_records", []),
             "observations": observations,
@@ -410,10 +569,10 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
         ranges = []
         for o in observations:
-            for f in ("density", "solids_by_volume_percent", "price_per_kg", "price_per_liter"):
-                rk = f + "_range_text"
+            for fld in ("density", "solids_by_volume_percent", "price_per_kg", "price_per_liter"):
+                rk = fld + "_range_text"
                 if o.get(rk):
-                    ranges.append({"field": f, "value": o[rk], "source": o["source"]})
+                    ranges.append({"field": fld, "value": o[rk], "source": o["source"]})
         if ranges:
             out["range_values"] = ranges
 
@@ -421,10 +580,12 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
     result.sort(key=lambda x: norm(x["material_name"]))
     ready = sum(1 for x in result if x["calculation_ready"])
-    named = len(result)
+    material_count = sum(1 for x in result if x["status"] == "MATERIAL")
+    thinner_count = sum(1 for x in result if x["status"] == "THINNER")
     observations = sum(len(x["observations"]) for x in result)
+
     return {
-        "schema_version": "3.0-material-master-2",
+        "schema_version": "3.0-material-master-3",
         "generated_by": "upload/scripts/build_material_catalog.py",
         "generated_from": list(WORKBOOKS) + ["upload/data/spkeffa_catalog.json"],
         "project_semantics": {
@@ -432,10 +593,19 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
             "do_not_convert_or_reinterpret_excel_dry_residue_as_mass_solids": True,
             "preserve_conflicts_as_observations": True,
             "preserve_ranges": True,
-            "preserve_source_sheet_row": True,
+            "preserve_source_sheet_row_column": True,
+            "source_priority_for_primary_values": [
+                "Таблица на 1 кв.м ЛКМ основная.xlsx",
+                "Системы 3.xlsx",
+                "Системы 4.xlsx",
+                "Системы 2.XLSX",
+                "Системы 1.xls",
+            ],
         },
         "summary": {
-            "material_records": named,
+            "material_records": material_count,
+            "thinner_records": thinner_count,
+            "all_records": len(result),
             "calculation_ready_records": ready,
             "observations": observations,
             "source_workbooks": len(WORKBOOKS),
@@ -462,24 +632,29 @@ def main() -> None:
     enrich_slash_values(all_observations)
 
     materials: dict[str, dict[str, Any]] = {}
+    rejected_nonmaterial_observations = 0
+
     for o in all_observations:
         raw = o["material_name_raw"]
-        # Remove generic "Грунт"/"Эмаль" prefixes only for canonical key matching;
-        # keep the original raw name in aliases and provenance.
-        canonical_key = norm(re.sub(r"^(грунт-?эмаль|грунт|эмаль)\s+", "", raw, flags=re.I))
-        canonical_key = canonical_key or norm(raw)
+        if not likely_material(raw):
+            rejected_nonmaterial_observations += 1
+            continue
+
+        canonical = canonicalize_material_name(raw)
+        if canonical is None:
+            rejected_nonmaterial_observations += 1
+            continue
+
+        canonical_key = norm(canonical)
         target = materials.setdefault(
             canonical_key,
             {
-                "material_name": raw,
-                "aliases": [raw],
+                "material_name": canonical,
+                "aliases": [],
                 "observations": [],
                 "source_records": [],
             },
         )
-        if len(text(raw)) > len(text(target["material_name"])):
-            # Prefer the more descriptive variant when names are variants.
-            target["material_name"] = raw
         target["aliases"].append(raw)
         target["observations"].append(o)
         target["source_records"].append(o["source"])
@@ -488,6 +663,7 @@ def main() -> None:
 
     out = finalize(materials)
     out["missing_workbooks"] = missing
+    out["summary"]["rejected_nonmaterial_observations"] = rejected_nonmaterial_observations
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(out["summary"] | {"missing_workbooks": missing}, ensure_ascii=False))
