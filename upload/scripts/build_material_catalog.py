@@ -117,7 +117,7 @@ def likely_material(v: Any) -> bool:
     # Hard exclusions: these are systems, instructions, headers, notes,
     # process operations or descriptive prose rather than material entities.
     negative = (
-        "определите", "выберите", "протокол ил:", "предел огнестойкости",
+        "определите", "выберите", "протокол ил", "предел огнестойкости", "описание",
         "антикоррозионная защита", "внутреннее покрытие", "наружное покрытие",
         "описание:", "на сварных швах", "толщина сухого слоя",
         "расход лкм", "практический расход", "теоретический расход",
@@ -166,15 +166,20 @@ def canonicalize_material_name(raw: str) -> str | None:
         return re.sub(r"\s+", " ", s).strip()
 
     rejects = (
-        r"^описание:", r"^протокол\s", r"^система(\s|$)", r"^акз(\s|$)",
+        r"^описание\b", r"^протокол\s", r"^система(\s|$)", r"^акз(\s|$)",
         r"^антикоррозионная\s+защита", r"^внутренн", r"^наружн",
         r"^площад", r"^определ", r"^выбер", r"^без\s+лакокрасоч",
         r"^толщина\s", r"^кол-во\s+разбав", r"^предел\s+огнестой",
         r"^группы\s+лакокрасоч", r"^нанесение\s", r"^увеличение\s",
         r"^материал\s+металлических", r"^ооо\s", r"^цена\s+с\s+ндс",
+        r"^площаль\b", r"^площадь\b", r"^кол-во\s+разбав",
         r"^стоимость", r"^полиуретан$", r"^эпоксид$", r"^связующее$",
     )
     if any(re.search(p, n, re.I) for p in rejects):
+        return None
+
+    # Composite/system labels are not standalone material entities.
+    if " + " in s or " плюс " in n:
         return None
 
     # Remove layer counters and product-type prefixes.
@@ -615,6 +620,28 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+
+def validate_output(output: dict[str, Any]) -> None:
+    """Fail the build if obvious system/instruction prose leaked into materials."""
+    bad_tokens = (
+        "описание", "предел огнестойкости", "антикоррозионная защита",
+        "определите", "выберите", "практический расход", "теоретический расход",
+        "внутреннее покрытие", "наружное покрытие", "система ", "протокол ил",
+        "площадь ", "кол-во разбавителя", "нанесение грунтовочного",
+    )
+    leaked = [
+        m["material_name"]
+        for m in output.get("materials", [])
+        if m.get("status") == "MATERIAL"
+        and any(token in norm(m.get("material_name", "")) for token in bad_tokens)
+    ]
+    if leaked:
+        raise RuntimeError(
+            "Material catalog validation failed; non-material names leaked: "
+            + "; ".join(leaked[:20])
+        )
+
+
 def main() -> None:
     all_observations: list[dict[str, Any]] = []
     missing: list[str] = []
@@ -662,6 +689,7 @@ def main() -> None:
     add_spkeffa_sources(materials)
 
     out = finalize(materials)
+    validate_output(out)
     out["missing_workbooks"] = missing
     out["summary"]["rejected_nonmaterial_observations"] = rejected_nonmaterial_observations
     OUT.parent.mkdir(parents=True, exist_ok=True)
