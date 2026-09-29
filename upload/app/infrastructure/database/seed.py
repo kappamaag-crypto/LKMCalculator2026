@@ -9,6 +9,105 @@ from app.domain.enums import MaterialType, BinderType, CompatibilityStatus
 from app.domain.compatibility import check_binders
 
 CATALOG_PATH = Path(__file__).resolve().parents[3] / "data" / "spkeffa_catalog.json"
+MASTER_CATALOG_PATH = Path(__file__).resolve().parents[3] / "data" / "material_catalog_master_v3.json"
+MASTER_IMPORT_MARKER = Path(__file__).resolve().parents[3] / "data" / ".material_master_imported_v4"
+
+
+def seed_material_master_catalog(session: Session) -> dict[str, int]:
+    """Import the generated five-workbook master catalog exactly as-is.
+
+    Duplicate cleanup is intentionally NOT performed here. The import runs once
+    per master-catalog revision and is then frozen by a marker so manual user
+    cleanup is not reverted on later application starts.
+    """
+    if MASTER_IMPORT_MARKER.exists():
+        return {"inserted": 0, "updated": 0, "skipped_marker": 1}
+    if not MASTER_CATALOG_PATH.exists():
+        return {"inserted": 0, "updated": 0, "catalog_missing": 1}
+
+    payload = json.loads(MASTER_CATALOG_PATH.read_text(encoding="utf-8"))
+    records = payload.get("materials", [])
+    now = datetime.now(timezone.utc)
+    inserted = 0
+    updated = 0
+
+    for item in records:
+        name = str(item.get("material_name") or "").strip()
+        if not name:
+            continue
+        status = item.get("status")
+        material_type = (
+            MaterialType.THINNER.value if status == "THINNER"
+            else item.get("material_type") if item.get("material_type") in {x.value for x in MaterialType}
+            else MaterialType.OTHER.value
+        )
+        binder = item.get("binder")
+        binder_type = binder if binder in {x.value for x in BinderType} else BinderType.UNKNOWN.value
+        density = item.get("density")
+        sv = item.get("solids_by_volume_percent")
+
+        source_files = sorted({
+            o.get("source", {}).get("file", "")
+            for o in item.get("observations", [])
+            if o.get("source", {}).get("file")
+        })
+        aliases = list(dict.fromkeys(x for x in item.get("aliases", []) if x))
+        note_parts = [
+            "Импорт из material_catalog_master_v3.json.",
+            f"Наблюдений: {len(item.get('observations', []))}.",
+            f"Источники Excel: {'; '.join(source_files)}." if source_files else "",
+            f"Алиасы: {'; '.join(aliases)}." if aliases else "",
+            "Поле «Сухой остаток» из Excel сохранено как объёмный сухой остаток.",
+            "Конфликты значений не схлопывались; все наблюдения сохранены в master JSON.",
+        ]
+        if item.get("range_values"):
+            note_parts.append("Диапазонные значения сохранены в master JSON.")
+        notes = " ".join(x for x in note_parts if x)
+
+        fields = {
+            "manufacturer": item.get("manufacturer") or "",
+            "brand": item.get("brand") or "",
+            "material_name": name,
+            "material_type": material_type,
+            "binder_type": binder_type,
+            "density": density,
+            # Для этих Excel-источников массовый сухой остаток не выводим.
+            "solids_percent": None,
+            "solids_by_volume_percent": sv,
+            "price_per_kg": item.get("price_per_kg"),
+            "price_per_liter": item.get("price_per_liter"),
+            "prices_include_vat": True,
+            "is_active": True,
+            "is_incomplete": density is None or sv is None,
+            "notes": notes,
+        }
+
+        existing = session.query(MaterialORM).filter_by(material_name=name).first()
+        if existing is None:
+            session.add(MaterialORM(**fields, created_at=now, updated_at=now))
+            inserted += 1
+        else:
+            for key, value in fields.items():
+                if key in {"manufacturer", "brand", "material_type", "binder_type", "is_active", "is_incomplete", "notes"}:
+                    setattr(existing, key, value)
+                elif value is not None:
+                    setattr(existing, key, value)
+            existing.updated_at = now
+            updated += 1
+
+    session.flush()
+    MASTER_IMPORT_MARKER.write_text(
+        json.dumps({
+            "import_version": "4",
+            "catalog_schema_version": payload.get("schema_version"),
+            "imported_at": now.isoformat(),
+            "records_seen": len(records),
+            "inserted": inserted,
+            "updated": updated,
+        }, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return {"inserted": inserted, "updated": updated, "records_seen": len(records)}
 
 
 def seed_dictionaries(session: Session) -> None:
@@ -141,5 +240,15 @@ def seed_compatibility(session: Session) -> None:
 
 
 def run_seed(session: Session) -> None:
-    seed_dictionaries(session); demo_ids = seed_demo_materials(session); catalog_ids = seed_spkeffa_catalog(session); demo_ids.update(catalog_ids); seed_demo_system(session, demo_ids); seed_compatibility(session); session.commit()
-    print(f"Seed completed: dictionaries, {len(catalog_ids)} SPKEFFA materials, demo system, compatibility rules.")
+    seed_dictionaries(session)
+    demo_ids = seed_demo_materials(session)
+    catalog_ids = seed_spkeffa_catalog(session)
+    demo_ids.update(catalog_ids)
+    master_result = seed_material_master_catalog(session)
+    seed_demo_system(session, demo_ids)
+    seed_compatibility(session)
+    session.commit()
+    print(
+        f"Seed completed: dictionaries, {len(catalog_ids)} SPKEFFA materials, "
+        f"master catalog import={master_result}, demo system, compatibility rules."
+    )
