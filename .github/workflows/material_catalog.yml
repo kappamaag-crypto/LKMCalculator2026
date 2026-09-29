@@ -1,0 +1,44 @@
+name: build material catalog
+
+on:
+  push:
+    branches:
+      - v3.0-engineering-upgrade
+    paths:
+      - 'books/**'
+      - 'upload/scripts/build_material_catalog.py'
+      - 'upload/data/spkeffa_catalog.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Excel readers
+        run: python -m pip install --upgrade openpyxl xlrd
+
+      - name: Build full material catalog
+        run: python upload/scripts/build_material_catalog.py
+
+      - name: Commit generated catalog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add upload/data/material_catalog_master_v3.json
+          if git diff --cached --quiet; then
+            echo "No generated catalog changes."
+            exit 0
+          fi
+          git commit -m "data: rebuild full material master catalog [skip ci]"
+          git push
