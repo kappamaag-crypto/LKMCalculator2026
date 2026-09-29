@@ -516,6 +516,20 @@ def add_spkeffa_sources(materials: dict[str, dict[str, Any]]) -> None:
         )
 
 
+def parse_bounds(raw: Any) -> tuple[float | None, float | None]:
+    s = text(raw).replace("−", "-").replace("–", "-").replace("—", "-")
+    if "±" in s or "+/-" in s or "+-" in s:
+        values = re.findall(r"\d+(?:[.,]\d+)?", s)
+        if values:
+            nominal = float(values[0].replace(",", "."))
+            tolerance = float(values[1].replace(",", ".")) if len(values) > 1 else 0.0
+            return nominal - tolerance, nominal + tolerance
+    m = re.search(r"^\s*([-+]?\d+(?:[.,]\d+)?)\s*-\s*([-+]?\d+(?:[.,]\d+)?)", s)
+    if m:
+        return float(m.group(1).replace(",", ".")), float(m.group(2).replace(",", "."))
+    return None, None
+
+
 def choose_single(values: list[float]) -> float | None:
     uniq = sorted({round(v, 8) for v in values})
     return uniq[0] if len(uniq) == 1 else None
@@ -572,8 +586,19 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
         pk = choose_preferred(observations, "price_per_kg", minimum=0.0, maximum=100000.0)
         pl = choose_preferred(observations, "price_per_liter", minimum=0.0, maximum=200000.0)
         dft = choose_preferred(observations, "recommended_dft", minimum=0.0, maximum=10000.0)
+        cov = choose_preferred(observations, "coverage_m2_l", minimum=0.0, maximum=100000.0)
         tc = choose_preferred(observations, "theoretical_consumption_kg_m2", minimum=0.0, maximum=1000.0)
         pc = choose_preferred(observations, "practical_consumption_kg_m2", minimum=0.0, maximum=1000.0)
+
+        dft_lows = []
+        dft_highs = []
+        for ob in observations:
+            lo, hi = parse_bounds(ob.get("recommended_dft_raw"))
+            if lo is not None and hi is not None and hi > lo:
+                dft_lows.append(lo)
+                dft_highs.append(hi)
+        dft_min = min(dft_lows) if dft_lows else None
+        dft_max = max(dft_highs) if dft_highs else None
 
         if density is None and isinstance(catalog.get("density"), (int, float)):
             cv = float(catalog["density"])
@@ -596,6 +621,7 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
                 else "MATERIAL"
             ),
             "aliases": aliases,
+            "color": catalog.get("color") or next((o.get("color") for o in observations if o.get("color")), ""),
             "manufacturer": catalog.get("manufacturer") or next(
                 (o.get("manufacturer") for o in observations if o.get("manufacturer")), ""
             ),
@@ -634,6 +660,8 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
                 and 0 <= float(o["price_per_liter"]) <= 200000
             }),
             "recommended_dft": dft,
+            "recommended_dft_min": dft_min,
+            "recommended_dft_max": dft_max,
             "coverage_m2_l": cov,
             "theoretical_consumption_kg_m2": tc,
             "practical_consumption_kg_m2": pc,
