@@ -69,3 +69,27 @@ JSON → таблицы `calculations` + `calculation_layers`
 | Дубликаты | Проверка по name + manufacturer |
 | Неполные данные | Пометка `is_incomplete=True` + отчёт |
 | Изменение формул | Unit-тесты, сравнивающие результаты со старым калькулятором |
+
+## Актуальная расширенная база материалов v3
+
+Помимо исторической coatings.db, проект теперь использует master-каталог из пяти Excel-источников:
+
+- books/Системы 1.xls
+- books/Системы 2.XLSX
+- books/Системы 3.xlsx
+- books/Системы 4.xlsx
+- books/Таблица на 1 кв.м ЛКМ основная.xlsx
+
+Генератор: upload/scripts/build_material_catalog.py.
+
+Для всех пяти Excel-источников поле «Сухой остаток» означает **объёмный сухой остаток (%)** и сохраняется только в solids_by_volume_percent. В solids_percent эти значения не копируются.
+
+Полный master импортируется в materials при запуске приложения. Дубли специально не удаляются автоматически: пользователь может выполнить ручную чистку после первоначального импорта. Повторный запуск не восстанавливает вручную удалённые записи того же master-каталога, поскольку импорт фиксируется по SHA-256 каталога.
+
+Для Windows без GitHub Actions доступен локальный запуск:
+
+```powershell
+.\upload\scripts\rebuild_material_catalog.ps1
+```
+
+Результаты генератора: upload/data/material_catalog_master_v3.json, upload/data/material_catalog_master_v3.csv, upload/data/material_catalog_review_candidates_v3.csv.
