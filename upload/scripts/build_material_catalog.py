@@ -208,6 +208,7 @@ def observation_from_row(
     for col, name in candidates:
         o: dict[str, Any] = {
             "material_name_raw": name,
+            "material_column": col,
             "source": {
                 "file": file_name,
                 "sheet": sheet,
@@ -216,10 +217,17 @@ def observation_from_row(
         }
 
         def take_near(columns: list[int], numeric_only: bool = False) -> Any:
-            c = nearest_right(col, columns, len(vals))
-            if c is None or c >= len(vals):
-                return None
-            return vals[c]
+            ordered = sorted((x for x in columns if x >= col), key=lambda x: x - col)
+            for c in ordered:
+                if c >= len(vals):
+                    continue
+                value = vals[c]
+                if not numeric_only:
+                    return value
+                parts = split_multi(value)
+                if num(value) is not None or (len(parts) > 1 and all(num(p) is not None for p in parts)):
+                    return value
+            return None
 
         density = take_near(density_cols, True)
         solids = take_near(solid_cols, True)
@@ -269,30 +277,33 @@ def observation_from_row(
 
 
 def enrich_slash_values(rows_obs: list[dict[str, Any]]) -> None:
-    """Repair common side-by-side rows where property cells are packed A/B/C."""
+    """Map packed A/B/C side-by-side properties by material-cell order."""
     by_row: dict[tuple[str, str, int], list[dict[str, Any]]] = defaultdict(list)
     for o in rows_obs:
         s = o["source"]
         by_row[(s["file"], s["sheet"], s["row"])].append(o)
 
+    fields = (
+        "density", "solids_by_volume_percent", "price_per_kg", "price_per_liter",
+        "recommended_dft", "theoretical_consumption_kg_m2", "practical_consumption_kg_m2",
+    )
     for group in by_row.values():
         if len(group) < 2:
             continue
-        fields = (
-            "density", "solids_by_volume_percent", "price_per_kg", "price_per_liter",
-            "recommended_dft", "theoretical_consumption_kg_m2", "practical_consumption_kg_m2",
-        )
+        group = sorted(group, key=lambda x: x.get("material_column", 0))
         for field in fields:
             raw_key = field + "_raw"
-            packed = [o.get(raw_key, "") for o in group]
-            packed_source = next((x for x in packed if "/" in x), None)
-            if not packed_source:
+            packed_source = None
+            for o in group:
+                raw = o.get(raw_key, "")
+                parts = split_multi(raw)
+                if len(parts) == len(group):
+                    packed_source = parts
+                    break
+            if packed_source is None:
                 continue
-            parts = split_multi(packed_source)
-            if len(parts) != len(group):
-                continue
-            for o, p in zip(sorted(group, key=lambda x: x["source"]["row"]), parts):
-                o[field + "_raw"] = p
+            for o, p in zip(group, packed_source):
+                o[raw_key] = p
                 v = num(p)
                 if v is not None:
                     o[field] = v
@@ -351,23 +362,21 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
         def vals(field: str) -> list[float]:
             return [float(o[field]) for o in observations if isinstance(o.get(field), (int, float))]
 
-        dens, solids, pk, pl, dft, tc, pc = (
-            vals("density"),
-            vals("solids_by_volume_percent"),
-            vals("price_per_kg"),
-            vals("price_per_liter"),
-            vals("recommended_dft"),
-            vals("theoretical_consumption_kg_m2"),
-            vals("practical_consumption_kg_m2"),
-        )
+        dens = [v for v in vals("density") if 0.5 <= v <= 5.0]
+        solids = [v for v in vals("solids_by_volume_percent") if 5.0 <= v <= 100.0]
+        pk = [v for v in vals("price_per_kg") if 0.0 <= v <= 100000.0]
+        pl = [v for v in vals("price_per_liter") if 0.0 <= v <= 200000.0]
+        dft = [v for v in vals("recommended_dft") if 0.0 <= v <= 10000.0]
+        tc = [v for v in vals("theoretical_consumption_kg_m2") if 0.0 <= v <= 1000.0]
+        pc = [v for v in vals("practical_consumption_kg_m2") if 0.0 <= v <= 1000.0]
 
         density = choose_single(dens)
         sv = choose_single(solids)
 
         catalog = item.get("catalog_fields", {})
-        if density is None and isinstance(catalog.get("density"), (int, float)):
+        if density is None and isinstance(catalog.get("density"), (int, float)) and 0.5 <= float(catalog["density"]) <= 5.0:
             density = float(catalog["density"])
-        if sv is None and isinstance(catalog.get("solids_by_volume_percent"), (int, float)):
+        if sv is None and isinstance(catalog.get("solids_by_volume_percent"), (int, float)) and 5.0 <= float(catalog["solids_by_volume_percent"]) <= 100.0:
             sv = float(catalog["solids_by_volume_percent"])
 
         aliases = sorted({x for x in item.get("aliases", []) if x})
@@ -376,6 +385,7 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
         out = {
             "material_name": item["material_name"],
+            "status": "THINNER" if re.match(r"^(разбавитель|растворитель)\b", norm(item["material_name"]), re.I) else "MATERIAL",
             "aliases": aliases,
             "manufacturer": catalog.get("manufacturer") or next((o.get("manufacturer") for o in observations if o.get("manufacturer")), ""),
             "brand": catalog.get("brand") or next((o.get("brand") for o in observations if o.get("brand")), ""),
@@ -429,6 +439,7 @@ def finalize(materials: dict[str, dict[str, Any]]) -> dict[str, Any]:
             "calculation_ready_records": ready,
             "observations": observations,
             "source_workbooks": len(WORKBOOKS),
+            "excel_dry_residue_semantics": "VOLUMETRIC_DRY_SOLIDS_PERCENT",
         },
         "materials": result,
     }
