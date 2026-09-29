@@ -652,9 +652,18 @@ def main() -> None:
             missing.append(file_name)
             continue
         rows = load_rows(path)
-        headers = header_columns(rows)
-        for sheet, rn, vals in rows:
-            all_observations.extend(observation_from_row(file_name, sheet, rn, vals, headers))
+        rows_by_sheet: dict[str, list[tuple[str, int, list[Any]]]] = defaultdict(list)
+        for row in rows:
+            rows_by_sheet[row[0]].append(row)
+
+        for sheet, sheet_rows in rows_by_sheet.items():
+            # Each sheet can have a different layout. Never reuse column maps
+            # from another sheet in the same workbook.
+            headers = header_columns(sheet_rows)
+            for _sheet, rn, vals in sheet_rows:
+                all_observations.extend(
+                    observation_from_row(file_name, sheet, rn, vals, headers)
+                )
 
     enrich_slash_values(all_observations)
 
