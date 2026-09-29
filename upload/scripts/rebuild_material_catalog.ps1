@@ -10,6 +10,7 @@ $Builder = Join-Path $Root "upload\scripts\build_material_catalog.py"
 $OutputJson = Join-Path $Root "upload\data\material_catalog_master_v3.json"
 $OutputCsv = Join-Path $Root "upload\data\material_catalog_master_v3.csv"
 $ReviewCsv = Join-Path $Root "upload\data\material_catalog_review_candidates_v3.csv"
+$SourceRowsJson = Join-Path $Root "upload\data\material_catalog_source_rows_v3.json"
 
 $Books = @(
     "Системы 1.xls",
@@ -42,7 +43,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "=== GENERATED FILES ===" -ForegroundColor Green
-foreach ($Path in @($OutputJson, $OutputCsv, $ReviewCsv)) {
+foreach ($Path in @($OutputJson, $OutputCsv, $ReviewCsv, $SourceRowsJson)) {
     if (-not (Test-Path -LiteralPath $Path)) {
         throw "Генератор не создал файл: $Path"
     }
