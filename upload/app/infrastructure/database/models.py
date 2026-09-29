@@ -61,6 +61,7 @@ class MaterialORM(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_incomplete: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str] = mapped_column(Text, default="")
+    source_data_json: Mapped[str] = mapped_column(Text, default="{}")
     datasheet: Mapped[str] = mapped_column(String(500), default="")
     datasheet_version: Mapped[str] = mapped_column(String(100), default="")
     datasheet_date: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
