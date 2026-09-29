@@ -8,6 +8,7 @@ on:
       - 'books/**'
       - 'upload/scripts/build_material_catalog.py'
       - 'upload/data/spkeffa_catalog.json'
+      - '.github/workflows/material_catalog.yml'
   workflow_dispatch:
 
 permissions:
