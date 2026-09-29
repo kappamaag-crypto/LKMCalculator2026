@@ -84,10 +84,24 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
             "solids_by_volume_percent": sv,
             "price_per_kg": item.get("price_per_kg"),
             "price_per_liter": item.get("price_per_liter"),
+            "theoretical_coverage": item.get("coverage_m2_l"),
+            "recommended_dft_min": item.get("recommended_dft_min"),
+            "recommended_dft_max": item.get("recommended_dft_max"),
+            "color": item.get("color") or "",
             "prices_include_vat": True,
             "is_active": True,
             "is_incomplete": density is None or sv is None,
             "notes": notes,
+            "source_data_json": json.dumps({
+                "schema_version": payload.get("schema_version"),
+                "source_row_ids": item.get("source_row_ids", []),
+                "aliases": aliases,
+                "catalog_fields": item.get("catalog_fields", {}),
+                "source_records": item.get("source_records", []),
+                "observations": item.get("observations", []),
+                "range_values": item.get("range_values", []),
+                "conflict_fields": item.get("conflict_fields", []),
+            }, ensure_ascii=False, separators=(",", ":")),
         }
 
         existing = session.query(MaterialORM).filter_by(material_name=name).first()
