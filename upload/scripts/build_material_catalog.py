@@ -15,6 +15,7 @@ Rules:
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import math
 import re
@@ -32,6 +33,7 @@ BOOKS = ROOT / "books"
 OUT = ROOT / "upload" / "data" / "material_catalog_master_v3.json"
 CSV_OUT = ROOT / "upload" / "data" / "material_catalog_master_v3.csv"
 REVIEW_CSV_OUT = ROOT / "upload" / "data" / "material_catalog_review_candidates_v3.csv"
+SOURCE_ROWS_OUT = ROOT / "upload" / "data" / "material_catalog_source_rows_v3.json"
 SPKEFFA = ROOT / "upload" / "data" / "spkeffa_catalog.json"
 
 WORKBOOKS = (
@@ -69,6 +71,7 @@ HEADER_HINTS = {
     "manufacturer": ("производитель", "изготовитель"),
     "brand": ("бренд", "марка"),
     "ral": ("ral",),
+    "color": ("цвет", "colour"),
 }
 
 
@@ -263,6 +266,37 @@ def split_multi(v: Any) -> list[str]:
     return [p for p in parts if p]
 
 
+def _column_letter(number: int) -> str:
+    out = ""
+    n = number
+    while n:
+        n, rem = divmod(n - 1, 26)
+        out = chr(65 + rem) + out
+    return out
+
+
+def row_id(file_name: str, sheet: str, row_number: int) -> str:
+    return hashlib.sha1(f"{file_name}|{sheet}|{row_number}".encode("utf-8")).hexdigest()
+
+
+def make_source_row(file_name: str, sheet: str, row_number: int, vals: list[Any], headers: dict[str, list[int]]) -> dict[str, Any]:
+    cells = []
+    for col, value in enumerate(vals):
+        if value in (None, ""):
+            continue
+        cells.append({
+            "column_index": col,
+            "column_letter": _column_letter(col + 1),
+            "value": text(value),
+        })
+    return {
+        "source_row_id": row_id(file_name, sheet, row_number),
+        "source": {"file": file_name, "sheet": sheet, "row": row_number},
+        "cells": cells,
+        "header_columns": headers,
+    }
+
+
 def load_rows(path: Path) -> list[tuple[str, int, list[Any]]]:
     rows: list[tuple[str, int, list[Any]]] = []
     if path.suffix.lower() == ".xls":
@@ -333,11 +367,13 @@ def observation_from_row(
     maker_cols = headers.get("manufacturer", [])
     brand_cols = headers.get("brand", [])
     ral_cols = headers.get("ral", [])
+    color_cols = headers.get("color", [])
 
     for col, name in candidates:
         o: dict[str, Any] = {
             "material_name_raw": name,
             "material_column": col,
+            "source_row_id": row_id(file_name, sheet, row_number),
             "source": {
                 "file": file_name,
                 "sheet": sheet,
@@ -370,6 +406,7 @@ def observation_from_row(
         brand = take_near(brand_cols)
         binder = take_near(binder_cols)
         ral = take_near(ral_cols)
+        color = take_near(color_cols)
 
         # If one property cell contains slash-separated layer values, map the
         # values by candidate order later in the aggregation stage.
@@ -400,6 +437,8 @@ def observation_from_row(
             o["binder"] = text(binder)
         if ral not in (None, ""):
             o["ral"] = text(ral)
+        if color not in (None, ""):
+            o["color"] = text(color)
         obs.append(o)
 
     return obs
@@ -595,12 +634,14 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
                 and 0 <= float(o["price_per_liter"]) <= 200000
             }),
             "recommended_dft": dft,
+            "coverage_m2_l": cov,
             "theoretical_consumption_kg_m2": tc,
             "practical_consumption_kg_m2": pc,
             "calculation_ready": density is not None and sv is not None,
             "data_quality_status": (\n                "READY" if density is not None and sv is not None\n                else "PARTIAL_DENSITY" if density is not None\n                else "PARTIAL_SOLIDS_BY_VOLUME" if sv is not None\n                else "NAME_ONLY"\n            ),\n            "conflict_fields": [\n                fld for fld, values in (\n                    ("density", sorted({round(float(o["density"]), 8) for o in observations if isinstance(o.get("density"), (int, float)) and 0.5 <= float(o["density"]) <= 5})),\n                    ("solids_by_volume_percent", sorted({round(float(o["solids_by_volume_percent"]), 8) for o in observations if isinstance(o.get("solids_by_volume_percent"), (int, float)) and 5 <= float(o["solids_by_volume_percent"]) <= 100})),\n                ) if len(values) > 1\n            ],\n            "source_records": item.get("source_records", []),
             "observations": observations,
             "catalog_fields": catalog,
+            "source_row_ids": sorted({o.get("source_row_id") for o in observations if o.get("source_row_id")}),
         }
 
         ranges = []
@@ -621,7 +662,7 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
     observations = sum(len(x["observations"]) for x in result)
 
     return {
-        "schema_version": "3.0-material-master-4",
+        "schema_version": "3.0-material-master-5",
         "generated_by": "upload/scripts/build_material_catalog.py",
         "generated_from": list(WORKBOOKS) + ["upload/data/spkeffa_catalog.json"],
         "project_semantics": {
@@ -630,6 +671,8 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
             "preserve_conflicts_as_observations": True,
             "preserve_ranges": True,
             "preserve_source_sheet_row_column": True,
+            "preserve_all_nonempty_source_cells": True,
+            "duplicates_are_not_deleted_by_import": True,
             "source_priority_for_primary_values": [
                 "Таблица на 1 кв.м ЛКМ основная.xlsx",
                 "Системы 3.xlsx",
@@ -646,6 +689,7 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
             "observations": observations,
             "source_workbooks": len(WORKBOOKS),
             "excel_dry_residue_semantics": "VOLUMETRIC_DRY_SOLIDS_PERCENT",
+            "source_rows": 0,
         },
         "materials": result,
         "review_candidates": sorted((review_candidates or {}).values(), key=lambda x: norm(x["material_name"])),
@@ -676,6 +720,7 @@ def validate_output(output: dict[str, Any]) -> None:
 
 def main() -> None:
     all_observations: list[dict[str, Any]] = []
+    source_rows: list[dict[str, Any]] = []
     missing: list[str] = []
 
     for file_name in WORKBOOKS:
@@ -692,6 +737,8 @@ def main() -> None:
             # Each sheet can have a different layout. Never reuse column maps
             # from another sheet in the same workbook.
             headers = header_columns(sheet_rows)
+            for _sheet, rn, vals in sheet_rows:
+                source_rows.append(make_source_row(file_name, sheet, rn, vals, headers))
             for _sheet, rn, vals in sheet_rows:
                 all_observations.extend(
                     observation_from_row(file_name, sheet, rn, vals, headers)
@@ -749,6 +796,14 @@ def main() -> None:
     out["missing_workbooks"] = missing
     out["summary"]["rejected_nonmaterial_observations"] = rejected_nonmaterial_observations
     out["summary"]["review_candidates"] = len(out.get("review_candidates", []))
+    out["summary"]["source_rows"] = len(source_rows)
+    SOURCE_ROWS_OUT.write_text(json.dumps({
+        "schema_version": "3.0-material-source-rows-1",
+        "generated_by": "upload/scripts/build_material_catalog.py",
+        "generated_from": list(WORKBOOKS),
+        "row_count": len(source_rows),
+        "rows": source_rows,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
