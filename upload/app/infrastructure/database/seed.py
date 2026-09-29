@@ -14,7 +14,7 @@ MASTER_CATALOG_PATH = Path(__file__).resolve().parents[3] / "data" / "material_c
 MASTER_IMPORT_MARKER = Path(__file__).resolve().parents[3] / "data" / ".material_master_imported_v4"
 
 
-def seed_material_master_catalog(session: Session) -> dict[str, int]:
+def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
     """Import the generated five-workbook master catalog exactly as-is.
 
     Duplicate cleanup is intentionally NOT performed here. The import runs once
@@ -119,6 +119,7 @@ def write_master_import_marker(result: dict[str, int | str]) -> None:
         json.dumps({
             "import_version": "4",
             "catalog_schema_version": result.get("catalog_schema_version"),
+            "catalog_sha256": result.get("catalog_sha256"),
             "imported_at": result.get("imported_at"),
             "records_seen": result.get("records_seen", 0),
             "inserted": result.get("inserted", 0),
