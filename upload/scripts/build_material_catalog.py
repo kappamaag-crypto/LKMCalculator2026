@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build the v3 master material catalog from the project Excel sources.
+"""Build the v3 master material catalog from every supported Excel source in books/.
 
-Builder revision: 2026-09-29/full-workbook-pass.
+Builder revision: 2026-09-30/universal-workbook-and-ral-variants.
 
 Rules:
 - Every source observation is preserved with workbook/sheet/row provenance.
@@ -474,6 +474,7 @@ def enrich_slash_values(rows_obs: list[dict[str, Any]]) -> None:
     fields = (
         "density", "solids_by_volume_percent", "price_per_kg", "price_per_liter",
         "recommended_dft", "theoretical_consumption_kg_m2", "practical_consumption_kg_m2",
+        "ral",
     )
     for group in by_row.values():
         if len(group) < 2:
@@ -492,6 +493,11 @@ def enrich_slash_values(rows_obs: list[dict[str, Any]]) -> None:
                 continue
             for o, p in zip(group, packed_source):
                 o[raw_key] = p
+                if field == "ral":
+                    code = extract_ral("", p)
+                    if code:
+                        o["ral"] = code
+                    continue
                 v = num(p)
                 if v is not None:
                     o[field] = v
