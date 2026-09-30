@@ -71,6 +71,25 @@ class MaterialORM(Base):
     test_protocol: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    variants: Mapped[list["MaterialVariantORM"]] = relationship(back_populates="material", cascade="all, delete-orphan", order_by="MaterialVariantORM.ral")
+
+class MaterialVariantORM(Base):
+    __tablename__ = "material_variants"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    material_id: Mapped[int] = mapped_column(ForeignKey("materials.id", ondelete="CASCADE"), nullable=False, index=True)
+    ral: Mapped[str] = mapped_column(String(50), default="")
+    color: Mapped[str] = mapped_column(String(100), default="")
+    price_per_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    price_per_liter: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    prices_include_vat: Mapped[bool] = mapped_column(Boolean, default=True)
+    density: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    solids_by_volume_percent: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    recommended_dft_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    recommended_dft_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    source_data_json: Mapped[str] = mapped_column(Text, default="{}")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    material: Mapped["MaterialORM"] = relationship(back_populates="variants")
+    __table_args__ = (UniqueConstraint("material_id", "ral", "color", name="uq_material_variant_ral_color"),)
 
 class CoatingSystemORM(Base):
     __tablename__ = "coating_systems"
@@ -101,6 +120,7 @@ class CoatingSystemLayerORM(Base):
     system_id: Mapped[int] = mapped_column(ForeignKey("coating_systems.id", ondelete="CASCADE"))
     layer_number: Mapped[int] = mapped_column(Integer, nullable=False)
     material_id: Mapped[Optional[int]] = mapped_column(ForeignKey("materials.id", ondelete="SET NULL"), nullable=True)
+    material_variant_id: Mapped[Optional[int]] = mapped_column(ForeignKey("material_variants.id", ondelete="SET NULL"), nullable=True, index=True)
     layer_type: Mapped[str] = mapped_column(String(50), default="прочее")
     dft_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     dft_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
