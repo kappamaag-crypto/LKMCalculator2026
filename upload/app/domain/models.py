@@ -24,6 +24,7 @@ class Material:
     voc: Optional[float] = None
     color: str = ""
     ral: str = ""
+    variant_id: Optional[int] = None
     price_per_kg: Optional[float] = None
     price_per_liter: Optional[float] = None
     prices_include_vat: bool = True
@@ -66,6 +67,7 @@ class Material:
     notes: str = ""
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    variants: list["MaterialVariant"] = field(default_factory=list)
 
     def display_name(self) -> str:
         parts = [p for p in (self.manufacturer, self.brand, self.material_name) if p]
@@ -78,9 +80,31 @@ class Material:
 
 
 @dataclass
+class MaterialVariant:
+    id: Optional[int] = None
+    material_id: Optional[int] = None
+    ral: str = ""
+    color: str = ""
+    price_per_kg: Optional[float] = None
+    price_per_liter: Optional[float] = None
+    prices_include_vat: bool = True
+    density: Optional[float] = None
+    solids_by_volume_percent: Optional[float] = None
+    recommended_dft_min: Optional[float] = None
+    recommended_dft_max: Optional[float] = None
+    source_data_json: str = "{}"
+    is_active: bool = True
+
+    def display_name(self, base_name: str) -> str:
+        suffix = self.ral or self.color
+        return f"{base_name} — {suffix}" if suffix else base_name
+
+
+@dataclass
 class LayerDefinition:
     material_id: Optional[int] = None
     material: Optional[Material] = None
+    material_variant_id: Optional[int] = None
     layer_number: int = 1
     layer_type: MaterialType = MaterialType.OTHER
     dft_min: Optional[float] = None
