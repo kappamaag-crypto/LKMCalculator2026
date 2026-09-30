@@ -125,6 +125,9 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
                     setattr(existing, key, value)
                 elif value is not None:
                     setattr(existing, key, value)
+            if variants:
+                existing.price_per_kg = None
+                existing.price_per_liter = None
             existing.updated_at = now
             updated += 1
 
