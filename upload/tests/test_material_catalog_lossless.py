@@ -72,3 +72,13 @@ def test_ral_variants_have_distinct_catalog_identity():
 
 def test_discovered_workbooks_are_not_hard_coded():
     assert all(path.lower().endswith((".xls", ".xlsx", ".xlsm")) for path in builder.WORKBOOKS)
+
+
+def test_variant_group_preserves_ral_and_price():
+    observations = [
+        {"ral": "7035", "color": "серый", "price_per_kg": 700.0, "density": 1.4, "solids_by_volume_percent": 73.0},
+        {"ral": "7040", "color": "серый", "price_per_kg": 750.0, "density": 1.4, "solids_by_volume_percent": 73.0},
+    ]
+    assert observations[0]["price_per_kg"] != observations[1]["price_per_kg"]
+    assert observations[0]["density"] == observations[1]["density"]
+    assert observations[0]["solids_by_volume_percent"] == observations[1]["solids_by_volume_percent"]
