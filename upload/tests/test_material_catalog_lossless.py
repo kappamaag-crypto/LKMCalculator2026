@@ -76,9 +76,22 @@ def test_discovered_workbooks_are_not_hard_coded():
 
 def test_variant_group_preserves_ral_and_price():
     observations = [
-        {"ral": "7035", "color": "серый", "price_per_kg": 700.0, "density": 1.4, "solids_by_volume_percent": 73.0},
-        {"ral": "7040", "color": "серый", "price_per_kg": 750.0, "density": 1.4, "solids_by_volume_percent": 73.0},
+        {"source": {"file": "x.xlsx", "sheet": "S", "row": 1}, "source_row_id": "1", "ral": "7035", "color": "серый", "price_per_kg": 700.0, "density": 1.4, "solids_by_volume_percent": 73.0, "material_name_raw": "Blank Finish"},
+        {"source": {"file": "x.xlsx", "sheet": "S", "row": 2}, "source_row_id": "2", "ral": "7040", "color": "серый", "price_per_kg": 750.0, "density": 1.4, "solids_by_volume_percent": 73.0, "material_name_raw": "Blank Finish"},
     ]
-    assert observations[0]["price_per_kg"] != observations[1]["price_per_kg"]
-    assert observations[0]["density"] == observations[1]["density"]
-    assert observations[0]["solids_by_volume_percent"] == observations[1]["solids_by_volume_percent"]
+    output = builder.finalize({
+        "blank finish": {
+            "material_name": "Blank Finish",
+            "base_material_name": "Blank Finish",
+            "ral": "",
+            "aliases": ["Blank Finish Ral 7035", "Blank Finish Ral 7040"],
+            "observations": observations,
+            "source_records": [x["source"] for x in observations],
+        }
+    })
+    assert len(output["materials"]) == 1
+    variants = {v["ral"]: v for v in output["materials"][0]["variants"]}
+    assert variants["7035"]["price_per_kg"] == 700.0
+    assert variants["7040"]["price_per_kg"] == 750.0
+    assert variants["7035"]["density"] == variants["7040"]["density"] == 1.4
+    assert variants["7035"]["solids_by_volume_percent"] == variants["7040"]["solids_by_volume_percent"] == 73.0
