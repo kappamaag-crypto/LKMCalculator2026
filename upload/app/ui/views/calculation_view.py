@@ -95,13 +95,46 @@ class CalculationView(QWidget):
             self.cmb_material.setCurrentIndex(index)
 
     def set_materials(self,materials:list):
-        self._all_materials=list(materials)
-        self._materials=[m for m in materials if m.material_type!=MaterialType.THINNER]
+        # Expand RAL/color variants into selectable calculation materials.
+        expanded=[]
+        for material in materials:
+            expanded.append(material)
+            for variant in getattr(material, "variants", []) or []:
+                vm=replace(
+                    material,
+                    variant_id=variant.id,
+                    ral=variant.ral or material.ral,
+                    color=variant.color or material.color,
+                    price_per_kg=variant.price_per_kg,
+                    price_per_liter=variant.price_per_liter,
+                    density=variant.density if variant.density is not None else material.density,
+                    solids_by_volume_percent=(
+                        variant.solids_by_volume_percent
+                        if variant.solids_by_volume_percent is not None
+                        else material.solids_by_volume_percent
+                    ),
+                    recommended_dft_min=(
+                        variant.recommended_dft_min
+                        if variant.recommended_dft_min is not None
+                        else material.recommended_dft_min
+                    ),
+                    recommended_dft_max=(
+                        variant.recommended_dft_max
+                        if variant.recommended_dft_max is not None
+                        else material.recommended_dft_max
+                    ),
+                )
+                expanded.append(vm)
+        self._all_materials=list(expanded)
+        self._materials=[m for m in expanded if m.material_type!=MaterialType.THINNER]
         self.cmb_material.blockSignals(True)
         self.cmb_material.clear()
         self.cmb_material.addItem("",None)
         for material in self._materials:
-            self.cmb_material.addItem(material.display_name(),material)
+            label=material.display_name()
+            if material.variant_id and material.ral:
+                label=f"{label} — RAL {material.ral}"
+            self.cmb_material.addItem(label,material)
         self.cmb_material.setCurrentIndex(0)
         self.cmb_material.blockSignals(False)
         if self.cmb_material.completer() is not None:
