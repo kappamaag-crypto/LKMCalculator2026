@@ -12,13 +12,13 @@ $OutputCsv = Join-Path $Root "upload\data\material_catalog_master_v3.csv"
 $ReviewCsv = Join-Path $Root "upload\data\material_catalog_review_candidates_v3.csv"
 $SourceRowsJson = Join-Path $Root "upload\data\material_catalog_source_rows_v3.json"
 
-$Books = @(
-    "Системы 1.xls",
-    "Системы 2.XLSX",
-    "Системы 3.xlsx",
-    "Системы 4.xlsx",
-    "Таблица на 1 кв.м ЛКМ основная.xlsx"
-)
+$Books = Get-ChildItem -LiteralPath (Join-Path $Root "books") -File |
+    Where-Object { $_.Extension.ToLowerInvariant() -in @(".xls", ".xlsx", ".xlsm") } |
+    Sort-Object Name
+
+if ($Books.Count -eq 0) {
+    throw "В папке books не найдено ни одного поддерживаемого Excel (.xls/.xlsx/.xlsm)."
+}
 
 Write-Host "=== LKM Calculator: expanded material master rebuild ===" -ForegroundColor Cyan
 Write-Host "Root: $Root"
@@ -26,12 +26,8 @@ Write-Host "Python: $Python"
 Write-Host ""
 
 foreach ($Book in $Books) {
-    $Path = Join-Path $Root ("books\" + $Book)
-    if (-not (Test-Path -LiteralPath $Path)) {
-        throw "Не найден исходный Excel: $Path"
-    }
-    $Size = (Get-Item -LiteralPath $Path).Length
-    Write-Host ("OK  {0}  {1:N0} bytes" -f $Book, $Size)
+    $Size = $Book.Length
+    Write-Host ("OK  {0}  {1:N0} bytes" -f $Book.Name, $Size)
 }
 
 Write-Host ""
