@@ -151,7 +151,16 @@ class MaterialRepository:
         orm = self.session.get(MaterialORM, material_id)
         return material_orm_to_domain(orm) if orm else None
     def get_by_name(self, name: str) -> Optional[Material]:
-        orm = self.session.scalar(select(MaterialORM).where(MaterialORM.material_name == name))
+        orm = self.session.scalar(select(MaterialORM).where(MaterialORM.material_name == name, MaterialORM.ral == ""))
+        if orm is None:
+            orm = self.session.scalar(select(MaterialORM).where(MaterialORM.material_name == name))
+        return material_orm_to_domain(orm) if orm else None
+
+    def get_by_name_and_ral(self, name: str, ral: str = "") -> Optional[Material]:
+        orm = self.session.scalar(select(MaterialORM).where(
+            MaterialORM.material_name == name,
+            MaterialORM.ral == (ral or ""),
+        ))
         return material_orm_to_domain(orm) if orm else None
     def list_all(self, active_only: bool = True) -> list[Material]:
         stmt = select(MaterialORM).order_by(MaterialORM.material_name)
