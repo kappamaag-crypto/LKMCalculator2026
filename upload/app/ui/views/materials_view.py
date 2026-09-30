@@ -307,9 +307,9 @@ class MaterialsView(QWidget):
         d.setProperty("secondary", True)
         d.clicked.connect(self._on_delete)
         br.addWidget(a); br.addWidget(e); br.addWidget(d); br.addStretch(); root.addLayout(br)
-        self.table = QTableWidget(0, 10)
+        self.table = QTableWidget(0, 11)
         self.table.setHorizontalHeaderLabels([
-            "ID", "Название", "Производитель", "Тип", "Связующее", "Плотность",
+            "ID", "Название", "RAL", "Производитель", "Тип", "Связующее", "Плотность",
             "СО, %", "СО по объёму, %", "Цена, руб/кг", "Цена, руб/л",
         ])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -341,7 +341,7 @@ class MaterialsView(QWidget):
         self.table.setRowCount(len(rows))
         for r, m in enumerate(rows):
             vals = [
-                str(m.id or ""), m.material_name, m.manufacturer or "—",
+                str(m.id or ""), m.material_name, m.ral or "—", m.manufacturer or "—",
                 m.material_type.value if hasattr(m.material_type, "value") else str(m.material_type),
                 m.binder_type.value if hasattr(m.binder_type, "value") else str(m.binder_type),
                 f"{m.density:.2f}" if m.density is not None else "—",
