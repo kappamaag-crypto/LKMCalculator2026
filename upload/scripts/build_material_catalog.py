@@ -36,13 +36,16 @@ REVIEW_CSV_OUT = ROOT / "upload" / "data" / "material_catalog_review_candidates_
 SOURCE_ROWS_OUT = ROOT / "upload" / "data" / "material_catalog_source_rows_v3.json"
 SPKEFFA = ROOT / "upload" / "data" / "spkeffa_catalog.json"
 
-WORKBOOKS = (
-    "Системы 1.xls",
-    "Системы 2.XLSX",
-    "Системы 3.xlsx",
-    "Системы 4.xlsx",
-    "Таблица на 1 кв.м ЛКМ основная.xlsx",
-)
+def discover_workbooks() -> tuple[str, ...]:
+    """Discover every supported Excel workbook in books/ without a hard-coded list."""
+    supported = {".xls", ".xlsx", ".xlsm"}
+    return tuple(sorted(
+        p.name for p in BOOKS.iterdir()
+        if p.is_file() and p.suffix.lower() in supported and not p.name.startswith("~$")
+    ))
+
+
+WORKBOOKS = discover_workbooks()
 
 PRODUCT_KEYWORDS = (
     "blank", "эффа", "лит", "kindur", "neomarine", "inelka", "primacor",
@@ -175,6 +178,20 @@ def likely_material(v: Any, vals: list[Any] | None = None, col: int | None = Non
                     if len(parts) >= 2 and all(num(p) is not None for p in parts):
                         return True
     return False
+
+
+def extract_ral(raw: Any, explicit: Any = None) -> str:
+    """Return a normalized RAL code from an explicit column or product name."""
+    value = text(explicit)
+    if value:
+        m = re.search(r"(?:RAL|РАЛ)\s*[-:]?\s*(\d{3,4})\b", value, re.I)
+        if m:
+            return m.group(1)
+        m = re.fullmatch(r"\s*(\d{3,4})\s*", value)
+        if m:
+            return m.group(1)
+    m = re.search(r"(?:RAL|РАЛ)\s*[-:]?\s*(\d{3,4})\b", text(raw), re.I)
+    return m.group(1) if m else ""
 
 
 def canonicalize_material_name(raw: str) -> str | None:
@@ -409,6 +426,7 @@ def observation_from_row(
         binder = take_near(binder_cols)
         ral = take_near(ral_cols)
         color = take_near(color_cols)
+        ral_code = extract_ral(name, ral)
 
         # If one property cell contains slash-separated layer values, map the
         # values by candidate order later in the aggregation stage.
@@ -437,8 +455,8 @@ def observation_from_row(
             o["brand"] = text(brand)
         if binder not in (None, ""):
             o["binder"] = text(binder)
-        if ral not in (None, ""):
-            o["ral"] = text(ral)
+        if ral_code:
+            o["ral"] = ral_code
         if color not in (None, ""):
             o["color"] = text(color)
         obs.append(o)
@@ -615,8 +633,12 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
         if item.get("material_name") not in aliases:
             aliases.insert(0, item["material_name"])
 
+        variant_ral = item.get("ral", "")
         out = {
             "material_name": item["material_name"],
+            "base_material_name": item.get("base_material_name", item["material_name"]),
+            "variant_key": f"{norm(item['material_name'])}|ral:{norm(variant_ral) or 'none'}",
+            "ral": variant_ral,
             "status": (
                 "THINNER"
                 if re.match(r"^(разбавитель|растворитель)\b", norm(item["material_name"]), re.I)
@@ -692,7 +714,7 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
     observations = sum(len(x["observations"]) for x in result)
 
     return {
-        "schema_version": "3.0-material-master-5",
+        "schema_version": "3.0-material-master-6",
         "generated_by": "upload/scripts/build_material_catalog.py",
         "generated_from": list(WORKBOOKS) + ["upload/data/spkeffa_catalog.json"],
         "project_semantics": {
@@ -703,6 +725,8 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
             "preserve_source_sheet_row_column": True,
             "preserve_all_nonempty_source_cells": True,
             "duplicates_are_not_deleted_by_import": True,
+            "ral_is_part_of_material_variant_identity": True,
+            "workbooks_are_auto_discovered_from_books": True,
             "source_priority_for_primary_values": [
                 "Таблица на 1 кв.м ЛКМ основная.xlsx",
                 "Системы 3.xlsx",
@@ -806,10 +830,14 @@ def main() -> None:
             continue
 
         canonical_key = norm(canonical)
+        ral_code = extract_ral(raw, o.get("ral"))
+        variant_key = f"{canonical_key}|ral:{norm(ral_code) or 'none'}"
         target = materials.setdefault(
-            canonical_key,
+            variant_key,
             {
                 "material_name": canonical,
+                "base_material_name": canonical,
+                "ral": ral_code,
                 "aliases": [],
                 "observations": [],
                 "source_records": [],
@@ -838,7 +866,7 @@ def main() -> None:
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
     fields = [
-        "status", "material_name", "data_quality_status", "calculation_ready",
+        "status", "material_name", "base_material_name", "ral", "variant_key", "data_quality_status", "calculation_ready",
         "manufacturer", "brand", "binder", "material_type", "density",
         "solids_by_volume_percent", "price_per_kg", "price_per_liter",
         "recommended_dft", "theoretical_consumption_kg_m2", "practical_consumption_kg_m2",
