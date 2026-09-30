@@ -702,6 +702,32 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
             "source_row_ids": sorted({o.get("source_row_id") for o in observations if o.get("source_row_id")}),
         }
 
+        # Preserve commercial RAL/color variants separately.
+        variant_groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+        for o in observations:
+            ral = text(o.get("ral"))
+            color = text(o.get("color"))
+            if ral or color:
+                variant_groups[(norm(ral), norm(color))].append(o)
+        variants = []
+        for (_rk, _ck), vos in sorted(variant_groups.items()):
+            rals = [text(o.get("ral")) for o in vos if text(o.get("ral"))]
+            colors = [text(o.get("color")) for o in vos if text(o.get("color"))]
+            dft_bounds = [parse_bounds(o.get("recommended_dft_raw")) for o in vos]
+            variants.append({
+                "ral": rals[0] if rals else "",
+                "color": colors[0] if colors else "",
+                "price_per_kg": choose_preferred(vos, "price_per_kg", minimum=0.0, maximum=100000.0),
+                "price_per_liter": choose_preferred(vos, "price_per_liter", minimum=0.0, maximum=200000.0),
+                "density": choose_preferred(vos, "density", minimum=0.5, maximum=5.0),
+                "solids_by_volume_percent": choose_preferred(vos, "solids_by_volume_percent", minimum=5.0, maximum=100.0),
+                "recommended_dft_min": min((x[0] for x in dft_bounds if x[0] is not None), default=None),
+                "recommended_dft_max": max((x[1] for x in dft_bounds if x[1] is not None), default=None),
+                "source_row_ids": sorted({o.get("source_row_id") for o in vos if o.get("source_row_id")}),
+                "observations": vos,
+            })
+        out["variants"] = variants
+
         ranges = []
         for o in observations:
             for fld in ("density", "solids_by_volume_percent", "price_per_kg", "price_per_liter"):
@@ -727,6 +753,7 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
             "excel_dry_residue_means_volumetric_dry_solids_percent": True,
             "do_not_convert_or_reinterpret_excel_dry_residue_as_mass_solids": True,
             "preserve_conflicts_as_observations": True,
+            "preserve_ral_variants": True,
             "preserve_ranges": True,
             "preserve_source_sheet_row_column": True,
             "preserve_all_nonempty_source_cells": True,
