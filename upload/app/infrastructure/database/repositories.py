@@ -11,10 +11,21 @@ from sqlalchemy.orm import Session
 from app.infrastructure.database.models import (
     MaterialORM, CoatingSystemORM, CoatingSystemLayerORM, CalculationORM,
     CalculationLayerORM, ComparisonORM, LayerCompatibilityORM, DictionaryORM,
-    MaterialComponentORM, MaterialMixORM,
+    MaterialComponentORM, MaterialMixORM, MaterialVariantORM,
 )
-from app.domain.models import Material, CoatingSystem, LayerDefinition, MaterialComponent, MaterialMix
+from app.domain.models import Material, MaterialVariant, CoatingSystem, LayerDefinition, MaterialComponent, MaterialMix
 from app.domain.enums import MaterialType, BinderType, ApplicationMethod
+
+
+def material_variant_orm_to_domain(orm: MaterialVariantORM) -> MaterialVariant:
+    return MaterialVariant(
+        id=orm.id, material_id=orm.material_id, ral=orm.ral or "", color=orm.color or "",
+        price_per_kg=orm.price_per_kg, price_per_liter=orm.price_per_liter,
+        prices_include_vat=orm.prices_include_vat, density=orm.density,
+        solids_by_volume_percent=orm.solids_by_volume_percent,
+        recommended_dft_min=orm.recommended_dft_min, recommended_dft_max=orm.recommended_dft_max,
+        source_data_json=orm.source_data_json or "{}", is_active=orm.is_active,
+    )
 
 
 def material_orm_to_domain(orm: MaterialORM) -> Material:
@@ -57,6 +68,7 @@ def material_orm_to_domain(orm: MaterialORM) -> Material:
         certificate=orm.certificate or "", certificate_version=orm.certificate_version or "",
         test_protocol=orm.test_protocol or "",
         created_at=orm.created_at, updated_at=orm.updated_at,
+        variants=[material_variant_orm_to_domain(v) for v in getattr(orm, "variants", []) if v.is_active],
     )
 
 
@@ -177,6 +189,15 @@ class MaterialRepository:
         if soft: orm.is_active = False; orm.updated_at = datetime.utcnow()
         else: self.session.delete(orm)
         self.session.flush()
+    def list_variants(self, material_id: int, active_only: bool = True) -> list[MaterialVariant]:
+        stmt = select(MaterialVariantORM).where(MaterialVariantORM.material_id == material_id).order_by(MaterialVariantORM.ral, MaterialVariantORM.color)
+        if active_only: stmt = stmt.where(MaterialVariantORM.is_active.is_(True))
+        return [material_variant_orm_to_domain(o) for o in self.session.scalars(stmt)]
+
+    def get_variant(self, variant_id: int) -> Optional[MaterialVariant]:
+        orm = self.session.get(MaterialVariantORM, variant_id)
+        return material_variant_orm_to_domain(orm) if orm else None
+
     def count(self, active_only: bool = True) -> int:
         stmt = select(func.count(MaterialORM.id))
         if active_only: stmt = stmt.where(MaterialORM.is_active.is_(True))
