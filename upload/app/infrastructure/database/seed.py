@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy.orm import Session
-from app.infrastructure.database.models import MaterialORM, MaterialComponentORM, MaterialMixORM, CoatingSystemORM, CoatingSystemLayerORM, LayerCompatibilityORM, DictionaryORM
+from app.infrastructure.database.models import MaterialORM, MaterialVariantORM, MaterialComponentORM, MaterialMixORM, CoatingSystemORM, CoatingSystemLayerORM, LayerCompatibilityORM, DictionaryORM
 from app.domain.enums import MaterialType, BinderType, CompatibilityStatus
 from app.domain.compatibility import check_binders
 
@@ -73,6 +73,11 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
             note_parts.append("Диапазонные значения сохранены в master JSON.")
         notes = " ".join(x for x in note_parts if x)
 
+        variants = item.get("variants", []) or []
+        # If several RAL/color variants exist, the base record must not carry
+        # an arbitrary variant price.
+        base_price_kg = item.get("price_per_kg") if len(variants) <= 1 else None
+        base_price_l = item.get("price_per_liter") if len(variants) <= 1 else None
         fields = {
             "manufacturer": item.get("manufacturer") or "",
             "brand": item.get("brand") or "",
@@ -84,8 +89,8 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
             # Для этих Excel-источников массовый сухой остаток не выводим.
             "solids_percent": None,
             "solids_by_volume_percent": sv,
-            "price_per_kg": item.get("price_per_kg"),
-            "price_per_liter": item.get("price_per_liter"),
+            "price_per_kg": base_price_kg,
+            "price_per_liter": base_price_l,
             "theoretical_coverage": item.get("coverage_m2_l"),
             "recommended_dft_min": item.get("recommended_dft_min"),
             "recommended_dft_max": item.get("recommended_dft_max"),
@@ -121,6 +126,32 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
                     setattr(existing, key, value)
             existing.updated_at = now
             updated += 1
+
+        base = existing if existing is not None else session.query(MaterialORM).filter_by(material_name=name).first()
+        if base is not None:
+            for variant in variants:
+                ral = str(variant.get("ral") or "").strip()
+                color = str(variant.get("color") or "").strip()
+                q = session.query(MaterialVariantORM).filter_by(material_id=base.id, ral=ral, color=color).first()
+                vf = {
+                    "material_id": base.id,
+                    "ral": ral,
+                    "color": color,
+                    "price_per_kg": variant.get("price_per_kg"),
+                    "price_per_liter": variant.get("price_per_liter"),
+                    "prices_include_vat": True,
+                    "density": variant.get("density"),
+                    "solids_by_volume_percent": variant.get("solids_by_volume_percent"),
+                    "recommended_dft_min": variant.get("recommended_dft_min"),
+                    "recommended_dft_max": variant.get("recommended_dft_max"),
+                    "source_data_json": json.dumps(variant, ensure_ascii=False, separators=(",", ":")),
+                    "is_active": True,
+                }
+                if q is None:
+                    session.add(MaterialVariantORM(**vf))
+                else:
+                    for k, v in vf.items():
+                        setattr(q, k, v)
 
     session.flush()
     return {
