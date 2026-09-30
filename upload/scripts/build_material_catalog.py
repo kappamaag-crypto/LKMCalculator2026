@@ -639,11 +639,11 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
         if item.get("material_name") not in aliases:
             aliases.insert(0, item["material_name"])
 
-        variant_ral = item.get("ral", "")
+        variant_ral = ""
         out = {
             "material_name": item["material_name"],
             "base_material_name": item.get("base_material_name", item["material_name"]),
-            "variant_key": f"{norm(item['material_name'])}|ral:{norm(variant_ral) or 'none'}",
+            "variant_key": norm(item["material_name"]),
             "ral": variant_ral,
             "status": (
                 "THINNER"
@@ -863,14 +863,17 @@ def main() -> None:
             continue
 
         canonical_key = norm(canonical)
-        ral_code = extract_ral(raw, o.get("ral"))
-        variant_key = f"{canonical_key}|ral:{norm(ral_code) or 'none'}"
+        # Keep one technical material record. RAL/color is a commercial
+        # variant inside that record, not a second material.
+        detected_ral = extract_ral(raw, o.get("ral"))
+        if detected_ral and not o.get("ral"):
+            o["ral"] = detected_ral
         target = materials.setdefault(
-            variant_key,
+            canonical_key,
             {
                 "material_name": canonical,
                 "base_material_name": canonical,
-                "ral": ral_code,
+                "ral": "",
                 "aliases": [],
                 "observations": [],
                 "source_records": [],
