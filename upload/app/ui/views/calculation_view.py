@@ -98,8 +98,10 @@ class CalculationView(QWidget):
         # Expand RAL/color variants into selectable calculation materials.
         expanded=[]
         for material in materials:
-            expanded.append(material)
-            for variant in getattr(material, "variants", []) or []:
+            variants=getattr(material, "variants", []) or []
+            if not variants:
+                expanded.append(material)
+            for variant in variants:
                 vm=replace(
                     material,
                     variant_id=variant.id,
