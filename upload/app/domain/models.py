@@ -69,7 +69,12 @@ class Material:
 
     def display_name(self) -> str:
         parts = [p for p in (self.manufacturer, self.brand, self.material_name) if p]
-        return " ".join(parts) if parts else self.material_name or "Без названия"
+        base = " ".join(parts) if parts else self.material_name or "Без названия"
+        if self.ral:
+            base = f"{base} — RAL {self.ral}"
+        elif self.color:
+            base = f"{base} — {self.color}"
+        return base
 
 
 @dataclass
