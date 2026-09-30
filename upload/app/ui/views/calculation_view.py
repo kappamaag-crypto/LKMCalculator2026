@@ -60,6 +60,10 @@ class CalculationView(QWidget):
 
     def _material_search_values(self, material: Material) -> list[str]:
         values = [material.material_name, material.display_name()]
+        if material.ral:
+            values.append(material.ral)
+        if material.color:
+            values.append(material.color)
         if material.brand:
             values.append(material.brand)
         if material.manufacturer:
