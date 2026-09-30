@@ -76,8 +76,8 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
         variants = item.get("variants", []) or []
         # If several RAL/color variants exist, the base record must not carry
         # an arbitrary variant price.
-        base_price_kg = item.get("price_per_kg") if len(variants) <= 1 else None
-        base_price_l = item.get("price_per_liter") if len(variants) <= 1 else None
+        base_price_kg = item.get("price_per_kg") if not variants else None
+        base_price_l = item.get("price_per_liter") if not variants else None
         fields = {
             "manufacturer": item.get("manufacturer") or "",
             "brand": item.get("brand") or "",
@@ -111,10 +111,11 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
                 "observations": item.get("observations", []),
                 "range_values": item.get("range_values", []),
                 "conflict_fields": item.get("conflict_fields", []),
+                "variants": variants,
             }, ensure_ascii=False, separators=(",", ":")),
         }
 
-        existing = session.query(MaterialORM).filter_by(material_name=name, ral=str(item.get("ral") or "")).first()
+        existing = session.query(MaterialORM).filter_by(material_name=name, ral="").first()
         if existing is None:
             session.add(MaterialORM(**fields, created_at=now, updated_at=now))
             inserted += 1
