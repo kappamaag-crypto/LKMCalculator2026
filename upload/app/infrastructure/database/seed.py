@@ -64,6 +64,7 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
             "Импорт из material_catalog_master_v3.json.",
             f"Наблюдений: {len(item.get('observations', []))}.",
             f"Источники Excel: {'; '.join(source_files)}." if source_files else "",
+            f"RAL: {item.get('ral')}." if item.get("ral") else "Вариант без RAL.",
             f"Алиасы: {'; '.join(aliases)}." if aliases else "",
             "Поле «Сухой остаток» из Excel сохранено как объёмный сухой остаток.",
             "Конфликты значений не схлопывались; все наблюдения сохранены в master JSON.",
@@ -76,6 +77,7 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
             "manufacturer": item.get("manufacturer") or "",
             "brand": item.get("brand") or "",
             "material_name": name,
+            "ral": str(item.get("ral") or ""),
             "material_type": material_type,
             "binder_type": binder_type,
             "density": density,
@@ -96,6 +98,9 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
                 "schema_version": payload.get("schema_version"),
                 "source_row_ids": item.get("source_row_ids", []),
                 "aliases": aliases,
+                "base_material_name": item.get("base_material_name", name),
+                "ral": item.get("ral") or "",
+                "variant_key": item.get("variant_key") or "",
                 "catalog_fields": item.get("catalog_fields", {}),
                 "source_records": item.get("source_records", []),
                 "observations": item.get("observations", []),
@@ -104,7 +109,7 @@ def seed_material_master_catalog(session: Session) -> dict[str, int | str]:
             }, ensure_ascii=False, separators=(",", ":")),
         }
 
-        existing = session.query(MaterialORM).filter_by(material_name=name).first()
+        existing = session.query(MaterialORM).filter_by(material_name=name, ral=str(item.get("ral") or "")).first()
         if existing is None:
             session.add(MaterialORM(**fields, created_at=now, updated_at=now))
             inserted += 1
