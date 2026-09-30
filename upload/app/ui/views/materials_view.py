@@ -370,7 +370,7 @@ class MaterialsView(QWidget):
     def _save_if_missing(material):
         with get_session_factory()() as session:
             repo = MaterialRepository(session)
-            existing = repo.get_by_name(material.material_name)
+            existing = repo.get_by_name_and_ral(material.material_name, material.ral)
             if existing is not None:
                 return existing
             saved = repo.add(material)
