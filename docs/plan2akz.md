@@ -52,6 +52,7 @@
 | 30 | ВЫПОЛНЕНО | Decision Log. |
 | 31 | ЧАСТИЧНО | Scenario. |
 | 32 | ВЫПОЛНЕНО | DFT inspection domain/service workflow, headless UI smoke and regression coverage are execution-proven by full suite: 513 passed, 3 skipped. |
+| 33 | IN_PROGRESS | Universal Excel discovery + RAL-aware material identity implemented in importer/seed/repository/UI; execution-proof and full rebuild with all source books still required. |
 
 ## Stages
 
@@ -66,7 +67,7 @@
 
 ## §33. Каталог материалов: универсальные Excel-источники и RAL-варианты
 
-**Статус: IN_PROGRESS**
+**Статус: IN_PROGRESS — код реализован, execution-proof ещё не закрыт**
 
 ### 33.1 Универсальное обнаружение Excel
 
@@ -118,6 +119,17 @@ Blank Finish
 
 Обязательны тесты: два RAL с разными ценами; одинаковые характеристики; отсутствующая цена; отдельные характеристики одного RAL; одинаковый материал/RAL из разных источников; защита от перезаписи второго RAL; защита от схлопывания RAL при rebuild.
 
-### 33.7 Закрытие §33
+### 33.7 Реализовано в коде
+
+- `books/` автоматически сканируется для `.xls`, `.xlsx`, `.xlsm`;
+- RAL извлекается как из отдельной колонки, так и из названия материала;
+- packed/slash values для RAL распределяются по соседним материалам;
+- идентичность импортируемой записи учитывает `material_name + RAL`;
+- seed больше не перезаписывает RAL 7035 данными RAL 7040;
+- RAL отображается в `Material.display_name()` и в таблице базы материалов;
+- repository/UI сохраняют варианты по `name + RAL`;
+- цена остаётся на уровне выбранного RAL и не усредняется между вариантами.
+
+### 33.8 Закрытие §33
 
 До `DONE` необходимо определить `MaterialVariant` либо эквивалентную модель, изменить importer/seed/repository, сохранить обратную совместимость БД, выполнить regression + smoke и подтвердить результат.
