@@ -373,10 +373,16 @@ class CustomerExcelExporter(ExcelExporter):
         if ws is None:
             return super().export_calculation(result, path, recommendation)
 
-        extra = max(len(result.layers) - 2, 0)
-        total_row = 11 + 2 * extra
+        layer_count = len(result.layers)
+        extra = max(layer_count - 2, 0)
+        if layer_count <= 1:
+            thinner_start = 8
+            total_row = 9
+        else:
+            thinner_start = 9 + extra
+            total_row = 11 + 2 * extra
         self._write_metadata(ws, result)
-        self._write_block(ws, result, 7, 9 + extra, total_row)
+        self._write_block(ws, result, 7, thinner_start, total_row)
         self._configure_print_layout(ws, total_row)
         wb.save(path)
         return path
