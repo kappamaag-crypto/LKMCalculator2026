@@ -17,14 +17,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.domain.ptm import (
-    HeatingMode,
-    PTMCalculationInput,
-    PTMProfileType,
-    calculate,
-    list_profiles,
-    list_standards,
-)
+from app.domain.ptm import HeatingMode, PTMProfileType
+from app.services.ptm_service import PTMService
 
 
 class PTMView(QWidget):
@@ -32,6 +26,7 @@ class PTMView(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.service = PTMService()
         self._build_ui()
         self._populate()
 
@@ -140,7 +135,7 @@ class PTMView(QWidget):
     def _populate(self):
         self.cmb_standard.blockSignals(True)
         self.cmb_standard.clear()
-        for standard in list_standards():
+        for standard in self.service.list_standards():
             self.cmb_standard.addItem(standard, standard)
         self.cmb_standard.blockSignals(False)
         self._refresh_profiles()
@@ -148,7 +143,7 @@ class PTMView(QWidget):
     def _refresh_profiles(self):
         profile_type = self.cmb_type.currentData()
         standard = self.cmb_standard.currentData()
-        rows = list_profiles(standard=standard, profile_type=profile_type)
+        rows = self.service.list_profiles(standard=standard, profile_type=profile_type)
         self.cmb_profile.blockSignals(True)
         self.cmb_profile.clear()
         for row in rows:
@@ -190,18 +185,16 @@ class PTMView(QWidget):
         if profile is None or mode is None:
             return
         try:
-            result = calculate(
-                PTMCalculationInput(
-                    profile=profile,
-                    heating_mode=mode,
-                    heated_perimeter_mm=(
-                        self.spin_custom_perimeter.value()
-                        if mode == HeatingMode.CUSTOM
-                        else None
-                    ),
-                    length_m=self.spin_length.value(),
-                    quantity=self.spin_quantity.value(),
-                )
+            result = self.service.calculate(
+                profile,
+                heating_mode=mode,
+                heated_perimeter_mm=(
+                    self.spin_custom_perimeter.value()
+                    if mode == HeatingMode.CUSTOM
+                    else None
+                ),
+                length_m=self.spin_length.value(),
+                quantity=self.spin_quantity.value(),
             )
         except ValueError as exc:
             self.lbl_ptm.setText("UNKNOWN")
