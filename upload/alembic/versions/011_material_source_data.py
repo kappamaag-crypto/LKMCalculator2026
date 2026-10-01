@@ -10,10 +10,13 @@ depends_on = None
 
 def upgrade() -> None:
     with op.batch_alter_table("materials") as batch_op:
+        # Keep a database-level default during the SQLite batch rebuild.
+        # Alembic copies existing rows into the temporary table without
+        # explicitly selecting the newly added column; removing the default
+        # in the same batch therefore causes NOT NULL failures.
         batch_op.add_column(
             sa.Column("source_data_json", sa.Text(), nullable=False, server_default="{}")
         )
-        batch_op.alter_column("source_data_json", server_default=None)
 
 
 def downgrade() -> None:
