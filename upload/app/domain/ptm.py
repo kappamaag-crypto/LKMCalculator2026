@@ -10,7 +10,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Optional
+import json
 
 
 class PTMProfileType(str, Enum):
@@ -353,24 +355,70 @@ def list_standards(profile_type: Optional[PTMProfileType] = None) -> list[str]:
     return list(STANDARD_OPTIONS.get(profile_type, ()))
 
 
-# Source-backed starter catalogue. The table can be expanded without changing
-# the domain formulas. 20Б1 is kept as the first regression/reference row.
-PTM_PROFILES: tuple[PTMProfile, ...] = (
-    PTMProfile(
-        standard="ГОСТ Р 57837-2017",
-        profile_type=PTMProfileType.I_BEAM,
-        name="20Б1",
-        area_cm2=27.16,
-        mass_kg_per_m=21.3,
-        height_mm=200.0,
-        width_mm=100.0,
-        web_thickness_mm=5.5,
-        flange_thickness_mm=8.0,
-        source="ГОСТ Р 57837-2017 / сортамент",
-        source_url="https://engineerum.com/sortament/gost-r-57837-2017/",
-        notes="Площадь и масса: табличные. Периметр для PTM рассчитывается из h, b, s.",
-    ),
-)
+# The full catalogue is stored outside the code so it can be rebuilt from
+# source tables without changing the calculation engine.
+CATALOG_PATH = Path(__file__).resolve().parents[2] / "data" / "ptm_sortament_v1.json"
+
+def _enum_profile_type(value: str) -> PTMProfileType:
+    for item in PTMProfileType:
+        if item.value == value:
+            return item
+    raise ValueError(f"Unknown PTM profile type: {value}")
+
+def _load_catalog() -> tuple[PTMProfile, ...]:
+    fallback = (
+        PTMProfile(
+            standard="ГОСТ Р 57837-2017",
+            profile_type=PTMProfileType.I_BEAM,
+            name="20Б1",
+            area_cm2=27.16,
+            mass_kg_per_m=21.3,
+            height_mm=200.0,
+            width_mm=100.0,
+            web_thickness_mm=5.5,
+            flange_thickness_mm=8.0,
+            source="ГОСТ Р 57837-2017 / сортамент",
+            source_url="https://engineerum.com/sortament/gost-r-57837-2017/",
+            notes="Fallback reference row.",
+        ),
+    )
+    try:
+        payload = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+        profiles = []
+        for row in payload.get("profiles", []):
+            try:
+                profiles.append(
+                    PTMProfile(
+                        standard=str(row.get("standard") or ""),
+                        profile_type=_enum_profile_type(str(row.get("profile_type") or "")),
+                        name=str(row.get("name") or ""),
+                        area_cm2=row.get("area_cm2"),
+                        mass_kg_per_m=row.get("mass_kg_per_m"),
+                        height_mm=row.get("height_mm"),
+                        width_mm=row.get("width_mm"),
+                        web_thickness_mm=row.get("web_thickness_mm"),
+                        flange_thickness_mm=row.get("flange_thickness_mm"),
+                        leg_a_mm=row.get("leg_a_mm"),
+                        leg_b_mm=row.get("leg_b_mm"),
+                        wall_thickness_mm=row.get("wall_thickness_mm"),
+                        outside_diameter_mm=row.get("outside_diameter_mm"),
+                        diameter_mm=row.get("diameter_mm"),
+                        sheet_thickness_mm=row.get("sheet_thickness_mm"),
+                        perimeter_all_sides_mm=row.get("perimeter_all_sides_mm"),
+                        source=str(row.get("source") or ""),
+                        source_url=str(row.get("source_url") or ""),
+                        notes=str(row.get("notes") or ""),
+                    )
+                )
+            except (TypeError, ValueError):
+                continue
+        if profiles:
+            return tuple(profiles)
+    except (OSError, ValueError, TypeError):
+        pass
+    return fallback
+
+PTM_PROFILES: tuple[PTMProfile, ...] = _load_catalog()
 
 
 def list_profiles(
