@@ -65,12 +65,14 @@ def _export(tmp_path: Path, layer_count: int, with_mixed_thinners: bool = False,
 
 def test_customer_excel_one_layer_removes_second_template_layer(tmp_path):
     ws = _export(tmp_path, 1)["База"]
-    assert ws.max_row == 9
+    assert ws.max_row == 11
     assert ws["C7"].value == "Blank Слой 1"
+    assert ws["B8"].value is None
     assert ws["C8"].value is None
-    assert ws["B8"].value == "Разбавитель"
-    assert ws["C9"].value == "Толщина покрытия (мкм)"
-    assert str(ws.print_area) == "'База'!$B$1:$R$9"
+    assert ws["B10"].value is None
+    assert ws["C10"].value is None
+    assert ws["C11"].value == "Толщина покрытия (мкм)"
+    assert str(ws.print_area) == "'База'!$B$1:$R$11"
 
 
 def test_customer_excel_ral_is_only_in_ral_column(tmp_path):
