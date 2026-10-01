@@ -1,11 +1,13 @@
-"""Pure-domain PTM (reduced steel thickness) calculations for fire protection.
+"""Pure-domain PTM (reduced steel thickness) calculations.
 
-The module contains no UI or ORM dependencies. Standard/profile data is kept
-separate from formulas so the catalogue can be expanded independently.
+The PTM layer is deliberately independent from fire-protection coating
+materials. It only resolves steel section geometry/sortament and calculates
+F, P and derived surface values.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -17,7 +19,8 @@ class PTMProfileType(str, Enum):
     ANGLE = "Уголок"
     BOX = "Профиль"
     PIPE = "Труба"
-    CUSTOM = "Ручной ввод"
+    ROUND_BAR = "Круг"
+    SHEET = "Лист"
 
 
 class HeatingMode(str, Enum):
@@ -27,19 +30,60 @@ class HeatingMode(str, Enum):
     CUSTOM = "Пользовательский периметр"
 
 
+# Required sortament choices. Fixed tables are populated independently from
+# the calculation engine; dimensions-only types use the same UI with manual
+# geometry inputs.
+STANDARD_OPTIONS: dict[PTMProfileType, tuple[str, ...]] = {
+    PTMProfileType.I_BEAM: (
+        "ГОСТ Р 57837-2017",
+        "СТО АСЧМ 20-93",
+        "ГОСТ 26020-83",
+        "ГОСТ 8239-89",
+        "ГОСТ 19425-74",
+        "DIN 1025",
+        "СВАРНОЙ по размерам",
+    ),
+    PTMProfileType.CHANNEL: (
+        "ГОСТ 8240-97",
+        "DIN 1026",
+        "ГОСТ 8278-83",
+    ),
+    PTMProfileType.ANGLE: (
+        "ГОСТ 8509-93, 8510-86",
+        "DIN EN 10056-1-1998",
+    ),
+    PTMProfileType.BOX: (
+        "ГОСТ 32931-2015",
+        "ГОСТ 30245-2003",
+        "DIN EN 10210-2-2006",
+        "DIN EN 10219-2-2006",
+    ),
+    PTMProfileType.PIPE: ("По размерам",),
+    PTMProfileType.ROUND_BAR: ("По размерам",),
+    PTMProfileType.SHEET: ("По толщине",),
+}
+
+
 @dataclass(frozen=True)
 class PTMProfile:
     standard: str
     profile_type: PTMProfileType
     name: str
-    area_cm2: float
+    area_cm2: Optional[float]
     mass_kg_per_m: Optional[float]
     height_mm: Optional[float] = None
     width_mm: Optional[float] = None
     web_thickness_mm: Optional[float] = None
     flange_thickness_mm: Optional[float] = None
+    leg_a_mm: Optional[float] = None
+    leg_b_mm: Optional[float] = None
+    wall_thickness_mm: Optional[float] = None
+    outside_diameter_mm: Optional[float] = None
+    diameter_mm: Optional[float] = None
+    sheet_thickness_mm: Optional[float] = None
     perimeter_all_sides_mm: Optional[float] = None
     source: str = ""
+    source_url: str = ""
     notes: str = ""
 
 
@@ -72,55 +116,42 @@ def _positive(value: float, field: str) -> float:
 
 
 def calculate_ptm(area_cm2: float, heated_perimeter_mm: float) -> float:
-    """PTM in mm from section area in cm² and heated perimeter in mm.
-
-    Equivalent dimensional form to x = S * 10 / P.
-    """
+    """F/P with cm² and mm units, returned as mm."""
     _positive(area_cm2, "Площадь сечения")
     _positive(heated_perimeter_mm, "Обогреваемый периметр")
     return area_cm2 * 10.0 / heated_perimeter_mm
 
 
 def i_beam_perimeter(height_mm: float, width_mm: float, web_thickness_mm: float, mode: HeatingMode) -> float:
-    """Simplified I-beam heated-perimeter formulas.
-
-    These are the conventional cross-section approximations used by the
-    public reference calculator and its explanatory material; corner radii
-    are intentionally not modelled here.
-    """
     h = _positive(height_mm, "Высота")
     b = _positive(width_mm, "Ширина полки")
-    tw = _positive(web_thickness_mm, "Толщина стенки")
-    if tw >= min(h, b):
-        raise ValueError("Толщина стенки не может быть равна/больше габаритов профиля.")
+    s = _positive(web_thickness_mm, "Толщина стенки")
     if mode == HeatingMode.FOUR_SIDES:
-        return 2.0 * h + 4.0 * b - 2.0 * tw
+        return 2.0 * h + 4.0 * b - 2.0 * s
     if mode == HeatingMode.THREE_SIDES:
-        return 2.0 * h + 3.0 * b - 2.0 * tw
+        return 2.0 * h + 3.0 * b - 2.0 * s
     if mode == HeatingMode.TWO_SIDES:
-        return 2.0 * h + 2.0 * b - 2.0 * tw
+        return 2.0 * h + 2.0 * b - 2.0 * s
     raise ValueError("Для пользовательского периметра используйте HeatingMode.CUSTOM.")
 
 
 def channel_perimeter(height_mm: float, width_mm: float, web_thickness_mm: float, mode: HeatingMode) -> float:
     h = _positive(height_mm, "Высота")
-    b = _positive(width_mm, "Ширина")
-    tw = _positive(web_thickness_mm, "Толщина стенки")
+    b = _positive(width_mm, "Ширина полки")
+    s = _positive(web_thickness_mm, "Толщина стенки")
     if mode == HeatingMode.FOUR_SIDES:
-        return 2.0 * h + 4.0 * b - 2.0 * tw
+        return 2.0 * h + 4.0 * b - 2.0 * s
     if mode == HeatingMode.THREE_SIDES:
-        return 2.0 * h + 3.0 * b - 2.0 * tw
+        return 2.0 * h + 3.0 * b - 2.0 * s
     if mode == HeatingMode.TWO_SIDES:
-        return 1.0 * h + 2.0 * b - 2.0 * tw
+        return 2.0 * h + 2.0 * b
     raise ValueError("Для пользовательского периметра используйте HeatingMode.CUSTOM.")
 
 
-def angle_perimeter(leg_a_mm: float, leg_b_mm: float, thickness_mm: float, mode: HeatingMode) -> float:
+def angle_perimeter(leg_a_mm: float, leg_b_mm: float, mode: HeatingMode) -> float:
     a = _positive(leg_a_mm, "Полка A")
     b = _positive(leg_b_mm, "Полка B")
-    t = _positive(thickness_mm, "Толщина")
     if mode == HeatingMode.FOUR_SIDES:
-        # Outer perimeter approximation of an unequal/equal angle cross-section.
         return 2.0 * (a + b)
     if mode == HeatingMode.THREE_SIDES:
         return 2.0 * a + b
@@ -141,51 +172,143 @@ def box_perimeter(width_mm: float, height_mm: float, mode: HeatingMode) -> float
     raise ValueError("Для пользовательского периметра используйте HeatingMode.CUSTOM.")
 
 
+def pipe_area_cm2(outside_diameter_mm: float, wall_thickness_mm: float) -> float:
+    d = _positive(outside_diameter_mm, "Наружный диаметр")
+    t = _positive(wall_thickness_mm, "Толщина стенки")
+    inner = d - 2.0 * t
+    if inner <= 0:
+        raise ValueError("Толщина стенки должна быть меньше половины наружного диаметра.")
+    return math.pi * (d * d - inner * inner) / 4.0 / 100.0
+
+
+def pipe_perimeter(outside_diameter_mm: float) -> float:
+    return math.pi * _positive(outside_diameter_mm, "Наружный диаметр")
+
+
+def round_bar_area_cm2(diameter_mm: float) -> float:
+    d = _positive(diameter_mm, "Диаметр")
+    return math.pi * d * d / 4.0 / 100.0
+
+
+def round_bar_perimeter(diameter_mm: float) -> float:
+    return math.pi * _positive(diameter_mm, "Диаметр")
+
+
+def sheet_area_for_one_m(width_mm: float, thickness_mm: float) -> float:
+    w = _positive(width_mm, "Ширина листа")
+    t = _positive(thickness_mm, "Толщина листа")
+    return w * t / 100.0
+
+
+def sheet_perimeter_for_one_m(width_mm: float, mode: HeatingMode) -> float:
+    """Flat sheet approximation for a 1 m length.
+
+    Four/three/two-side modes correspond to heating both broad faces, one broad
+    face plus one edge, or one broad face respectively. This keeps the
+    geometry explicit instead of hiding a coefficient.
+    """
+    w = _positive(width_mm, "Ширина листа")
+    if mode == HeatingMode.FOUR_SIDES:
+        return 2.0 * w + 2000.0
+    if mode == HeatingMode.THREE_SIDES:
+        return 2.0 * w + 1000.0
+    if mode == HeatingMode.TWO_SIDES:
+        return w
+    raise ValueError("Для пользовательского периметра используйте HeatingMode.CUSTOM.")
+
+
+def resolve_profile_area(profile: PTMProfile) -> float:
+    if profile.area_cm2 is not None:
+        return _positive(profile.area_cm2, "Площадь сечения")
+
+    p = profile
+    if p.profile_type == PTMProfileType.PIPE:
+        if p.outside_diameter_mm is None or p.wall_thickness_mm is None:
+            raise ValueError("Для трубы не заданы наружный диаметр и толщина стенки.")
+        return pipe_area_cm2(p.outside_diameter_mm, p.wall_thickness_mm)
+
+    if p.profile_type == PTMProfileType.ROUND_BAR:
+        if p.diameter_mm is None:
+            raise ValueError("Для круга не задан диаметр.")
+        return round_bar_area_cm2(p.diameter_mm)
+
+    if p.profile_type == PTMProfileType.SHEET:
+        if p.width_mm is None or p.sheet_thickness_mm is None:
+            raise ValueError("Для листа не заданы ширина и толщина.")
+        return sheet_area_for_one_m(p.width_mm, p.sheet_thickness_mm)
+
+    if p.profile_type == PTMProfileType.I_BEAM:
+        if None in (p.height_mm, p.width_mm, p.web_thickness_mm, p.flange_thickness_mm):
+            raise ValueError("Для двутавра не заданы размеры.")
+        h, b, s, t = p.height_mm, p.width_mm, p.web_thickness_mm, p.flange_thickness_mm
+        return (2.0 * b * t + (h - 2.0 * t) * s) / 100.0
+
+    if p.profile_type == PTMProfileType.CHANNEL:
+        if None in (p.height_mm, p.width_mm, p.web_thickness_mm, p.flange_thickness_mm):
+            raise ValueError("Для швеллера не заданы размеры.")
+        h, b, s, t = p.height_mm, p.width_mm, p.web_thickness_mm, p.flange_thickness_mm
+        return (2.0 * b * t + (h - 2.0 * t) * s) / 100.0
+
+    if p.profile_type == PTMProfileType.ANGLE:
+        if None in (p.leg_a_mm, p.leg_b_mm, p.wall_thickness_mm):
+            raise ValueError("Для уголка не заданы размеры.")
+        return (
+            p.leg_a_mm * p.wall_thickness_mm
+            + (p.leg_b_mm - p.wall_thickness_mm) * p.wall_thickness_mm
+        ) / 100.0
+
+    if p.profile_type == PTMProfileType.BOX:
+        if None in (p.height_mm, p.width_mm, p.wall_thickness_mm):
+            raise ValueError("Для профиля не заданы размеры.")
+        h, b, t = p.height_mm, p.width_mm, p.wall_thickness_mm
+        if 2.0 * t >= min(h, b):
+            raise ValueError("Толщина стенки слишком велика относительно размеров профиля.")
+        return 2.0 * t * (h + b - 2.0 * t) / 100.0
+
+    raise ValueError(f"Неизвестный тип профиля: {p.profile_type.value}")
+
+
 def resolve_heated_perimeter(inp: PTMCalculationInput) -> float:
-    profile = inp.profile
+    p = inp.profile
     if inp.heating_mode == HeatingMode.CUSTOM:
-        return _positive(
-            inp.heated_perimeter_mm or 0.0,
-            "Пользовательский обогреваемый периметр",
-        )
+        return _positive(inp.heated_perimeter_mm or 0.0, "Пользовательский обогреваемый периметр")
 
-    if profile.perimeter_all_sides_mm is not None:
-        if inp.heating_mode == HeatingMode.FOUR_SIDES:
-            return _positive(profile.perimeter_all_sides_mm, "Обогреваемый периметр")
-        # For catalogue rows with only an all-side reference value, do not
-        # silently invent a partial-heating value. The UI can use CUSTOM.
-        raise ValueError(
-            f"Для профиля «{profile.name}» отсутствует подтверждённый периметр "
-            f"для режима «{inp.heating_mode.value}». Используйте пользовательский периметр."
-        )
+    if p.perimeter_all_sides_mm is not None and inp.heating_mode == HeatingMode.FOUR_SIDES:
+        return _positive(p.perimeter_all_sides_mm, "Обогреваемый периметр")
 
-    if profile.profile_type == PTMProfileType.I_BEAM:
-        if None in (profile.height_mm, profile.width_mm, profile.web_thickness_mm):
-            raise ValueError("Для двутавра не заданы геометрические размеры.")
-        return i_beam_perimeter(
-            profile.height_mm,
-            profile.width_mm,
-            profile.web_thickness_mm,
-            inp.heating_mode,
-        )
+    if p.profile_type == PTMProfileType.I_BEAM:
+        if None not in (p.height_mm, p.width_mm, p.web_thickness_mm):
+            return i_beam_perimeter(p.height_mm, p.width_mm, p.web_thickness_mm, inp.heating_mode)
 
-    if profile.profile_type == PTMProfileType.CHANNEL:
-        if None in (profile.height_mm, profile.width_mm, profile.web_thickness_mm):
-            raise ValueError("Для швеллера не заданы геометрические размеры.")
-        return channel_perimeter(
-            profile.height_mm,
-            profile.width_mm,
-            profile.web_thickness_mm,
-            inp.heating_mode,
-        )
+    if p.profile_type == PTMProfileType.CHANNEL:
+        if None not in (p.height_mm, p.width_mm, p.web_thickness_mm):
+            return channel_perimeter(p.height_mm, p.width_mm, p.web_thickness_mm, inp.heating_mode)
 
-    if profile.profile_type == PTMProfileType.BOX:
-        if None in (profile.width_mm, profile.height_mm):
-            raise ValueError("Для профиля не заданы геометрические размеры.")
-        return box_perimeter(profile.width_mm, profile.height_mm, inp.heating_mode)
+    if p.profile_type == PTMProfileType.ANGLE:
+        if None not in (p.leg_a_mm, p.leg_b_mm):
+            return angle_perimeter(p.leg_a_mm, p.leg_b_mm, inp.heating_mode)
+
+    if p.profile_type == PTMProfileType.BOX:
+        if None not in (p.width_mm, p.height_mm):
+            return box_perimeter(p.width_mm, p.height_mm, inp.heating_mode)
+
+    if p.profile_type == PTMProfileType.PIPE:
+        if p.outside_diameter_mm is not None:
+            # Round pipe is the explicit exception where the heated perimeter
+            # cannot be toggled side-by-side in the reference UI.
+            return pipe_perimeter(p.outside_diameter_mm)
+
+    if p.profile_type == PTMProfileType.ROUND_BAR:
+        if p.diameter_mm is not None:
+            return round_bar_perimeter(p.diameter_mm)
+
+    if p.profile_type == PTMProfileType.SHEET:
+        if p.width_mm is not None:
+            return sheet_perimeter_for_one_m(p.width_mm, inp.heating_mode)
 
     raise ValueError(
-        f"Для типа «{profile.profile_type.value}» пока нужен пользовательский обогреваемый периметр."
+        f"Для профиля «{p.name}» отсутствует подтверждённая геометрия "
+        "для выбранного режима обогрева."
     )
 
 
@@ -195,9 +318,11 @@ def calculate(inp: PTMCalculationInput) -> PTMCalculationResult:
     if inp.quantity <= 0:
         raise ValueError("Количество должно быть больше нуля.")
 
+    area = resolve_profile_area(inp.profile)
     perimeter = resolve_heated_perimeter(inp)
-    ptm = calculate_ptm(inp.profile.area_cm2, perimeter)
+    ptm = calculate_ptm(area, perimeter)
     surface_per_m = perimeter / 1000.0
+
     surface_per_t = None
     if inp.profile.mass_kg_per_m is not None and inp.profile.mass_kg_per_m > 0:
         surface_per_t = surface_per_m * 1000.0 / inp.profile.mass_kg_per_m
@@ -209,7 +334,7 @@ def calculate(inp: PTMCalculationInput) -> PTMCalculationResult:
 
     return PTMCalculationResult(
         ptm_mm=ptm,
-        section_area_cm2=inp.profile.area_cm2,
+        section_area_cm2=area,
         heated_perimeter_mm=perimeter,
         surface_m2_per_m=surface_per_m,
         surface_m2_per_t=surface_per_t,
@@ -220,9 +345,15 @@ def calculate(inp: PTMCalculationInput) -> PTMCalculationResult:
     )
 
 
-# First lossless seed for the exact profile referenced by the user's URL.
-# Geometry is kept as catalogue data; the calculation engine derives PTM from
-# area/perimeter instead of hardcoding a final result.
+def list_standards(profile_type: Optional[PTMProfileType] = None) -> list[str]:
+    if profile_type is None:
+        values = {name for items in STANDARD_OPTIONS.values() for name in items}
+        return sorted(values)
+    return list(STANDARD_OPTIONS.get(profile_type, ()))
+
+
+# Source-backed starter catalogue. The table can be expanded without changing
+# the domain formulas. 20Б1 is kept as the first regression/reference row.
 PTM_PROFILES: tuple[PTMProfile, ...] = (
     PTMProfile(
         standard="ГОСТ Р 57837-2017",
@@ -234,14 +365,11 @@ PTM_PROFILES: tuple[PTMProfile, ...] = (
         width_mm=100.0,
         web_thickness_mm=5.5,
         flange_thickness_mm=8.0,
-        source="ГОСТ Р 57837-2017; публичные сортаментные таблицы",
-        notes="Геометрия и масса сохранены отдельно от расчётной формулы; угловые скругления не моделируются.",
+        source="ГОСТ Р 57837-2017 / сортамент",
+        source_url="https://engineerum.com/sortament/gost-r-57837-2017/",
+        notes="Площадь и масса: табличные. Периметр для PTM рассчитывается из h, b, s.",
     ),
 )
-
-
-def list_standards() -> list[str]:
-    return sorted({p.standard for p in PTM_PROFILES})
 
 
 def list_profiles(
