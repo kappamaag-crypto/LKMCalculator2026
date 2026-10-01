@@ -73,6 +73,7 @@ class PTMProfile:
     name: str
     area_cm2: Optional[float]
     mass_kg_per_m: Optional[float]
+    subtype: str = ""
     height_mm: Optional[float] = None
     width_mm: Optional[float] = None
     web_thickness_mm: Optional[float] = None
@@ -394,6 +395,7 @@ def _load_catalog() -> tuple[PTMProfile, ...]:
                         name=str(row.get("name") or ""),
                         area_cm2=row.get("area_cm2"),
                         mass_kg_per_m=row.get("mass_kg_per_m"),
+                        subtype=str(row.get("subtype") or ""),
                         height_mm=row.get("height_mm"),
                         width_mm=row.get("width_mm"),
                         web_thickness_mm=row.get("web_thickness_mm"),
