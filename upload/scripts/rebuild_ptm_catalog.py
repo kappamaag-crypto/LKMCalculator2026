@@ -1,11 +1,11 @@
 """Rebuild the PTM steel sortament catalogue.
 
-Primary source: the public OGZ/PTM calculator requested by the user.
-Fallback sources: public static sortament tables with equivalent standard data.
+Primary source: the public calculator requested by the user.
+Fallback source: public static sortament tables when the target page is not
+available from the local machine.
 
-The script intentionally preserves source URL, standard, profile name,
-raw values and fetch timestamp. It never deletes a profile because another
-source disagrees with it; conflicting observations are retained.
+The output is source-backed and keeps source URL, raw values and retrieval
+time. The calculator never depends on the remote site at runtime.
 """
 
 from __future__ import annotations
@@ -13,13 +13,12 @@ from __future__ import annotations
 import csv
 import json
 import re
-import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Iterable
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,20 +62,17 @@ TARGET_STANDARDS = {
         ("10210-2-2006", "DIN EN 10210-2-2006"),
         ("10219-2-2006", "DIN EN 10219-2-2006"),
     ],
-    "5": [("", "По размерам")],
-    "6": [("", "По размерам")],
-    "7": [("", "По толщине")],
 }
 
 FALLBACK_SOURCES = {
-    "ГОСТ Р 57837-2017": "https://engineerum.com/sortament/gost-r-57837-2017/",
-    "СТО АСЧМ 20-93": "https://engineerum.com/sortament/sto-aschm-20-93/",
-    "ГОСТ 26020-83": "https://engineerum.com/sortament/gost-26020-83/",
-    "ГОСТ 8239-89": "https://engineerum.com/sortament/gost-8239-89/",
-    "ГОСТ 19425-74": "https://engineerum.com/sortament/gost-19425-74/",
-    "ГОСТ 8240-97": "https://engineerum.com/sortament/gost-8240-97/",
-    "ГОСТ 8509-93, 8510-86": "https://engineerum.com/sortament/gost-8509-93/",
-    "ГОСТ 30245-2003": "https://engineerum.com/sortament/gost-30245-2003/",
+    "ГОСТ Р 57837-2017": ("Двутавр", "https://engineerum.com/sortament/gost-r-57837-2017/"),
+    "СТО АСЧМ 20-93": ("Двутавр", "https://engineerum.com/sortament/sto-aschm-20-93/"),
+    "ГОСТ 26020-83": ("Двутавр", "https://engineerum.com/sortament/gost-26020-83/"),
+    "ГОСТ 8239-89": ("Двутавр", "https://engineerum.com/sortament/gost-8239-89/"),
+    "ГОСТ 19425-74": ("Двутавр", "https://engineerum.com/sortament/gost-19425-74/"),
+    "ГОСТ 8240-97": ("Швеллер", "https://engineerum.com/sortament/gost-8240-97/"),
+    "ГОСТ 8509-93, 8510-86": ("Уголок", "https://engineerum.com/sortament/gost-8509-93/"),
+    "ГОСТ 30245-2003": ("Профиль", "https://engineerum.com/sortament/gost-30245-2003/"),
 }
 
 
@@ -99,15 +95,17 @@ class Observation:
     outside_diameter_mm: float | None
     diameter_mm: float | None
     sheet_thickness_mm: float | None
+    perimeter_all_sides_mm: float | None
+    ptm_mm_source: float | None
+    surface_m2_per_m_source: float | None
+    surface_m2_per_t_source: float | None
     source: str
     source_url: str
     retrieved_at: str
-    raw_values: dict[str, str]
+    raw_values: dict[str, object]
 
 
 class TableParser(HTMLParser):
-    """Small stdlib-only HTML table parser."""
-
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.rows: list[list[str]] = []
@@ -128,8 +126,7 @@ class TableParser(HTMLParser):
     def handle_endtag(self, tag):
         tag = tag.lower()
         if tag in ("td", "th") and self._row is not None and self._cell is not None:
-            value = re.sub(r"\s+", " ", "".join(self._cell)).strip()
-            self._row.append(value)
+            self._row.append(re.sub(r"\\s+", " ", "".join(self._cell)).strip())
             self._cell = None
         elif tag == "tr" and self._row is not None:
             if any(self._row):
@@ -138,14 +135,14 @@ class TableParser(HTMLParser):
 
 
 def fetch(url: str) -> str:
-    req = Request(
+    request = Request(
         url,
         headers={
             "User-Agent": "LKMCalculator2026/PTM-catalog-rebuilder",
             "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
         },
     )
-    with urlopen(req, timeout=30) as response:
+    with urlopen(request, timeout=30) as response:
         raw = response.read()
         charset = response.headers.get_content_charset() or "utf-8"
         return raw.decode(charset, errors="replace")
@@ -154,107 +151,13 @@ def fetch(url: str) -> str:
 def num(value: str | None) -> float | None:
     if value is None:
         return None
-    s = str(value).strip().replace("\xa0", " ").replace(",", ".")
-    m = re.search(r"-?\d+(?:\.\d+)?", s)
-    return float(m.group()) if m else None
+    text = str(value).strip().replace("\\xa0", " ").replace(",", ".")
+    match = re.search(r"-?\\d+(?:\\.\\d+)?", text)
+    return float(match.group()) if match else None
 
 
 def normal_key(value: str) -> str:
-    return re.sub(r"\s+", " ", str(value or "")).strip().casefold()
-
-
-def header_map(headers: list[str]) -> dict[str, int]:
-    out: dict[str, int] = {}
-    for idx, h in enumerate(headers):
-        k = normal_key(h)
-        if "профил" in k or k == "марка":
-            out.setdefault("name", idx)
-        elif re.search(r"(^|\s)h[, ]", k) or k.startswith("h"):
-            out.setdefault("h", idx)
-        elif re.search(r"(^|\s)b[, ]", k) or k.startswith("b"):
-            out.setdefault("b", idx)
-        elif k.startswith("s"):
-            out.setdefault("s", idx)
-        elif k.startswith("t"):
-            out.setdefault("t", idx)
-        elif "r," in k or k == "r":
-            out.setdefault("r", idx)
-        elif "а, см" in k or "a, см" in k:
-            out.setdefault("area", idx)
-        elif "m, кг" in k or "м, кг" in k:
-            out.setdefault("mass", idx)
-    return out
-
-
-def parse_table_rows(
-    html: str,
-    *,
-    standard: str,
-    profile_type: str,
-    source: str,
-    source_url: str,
-) -> list[Observation]:
-    parser = TableParser()
-    parser.feed(html)
-    if not parser.rows:
-        return []
-
-    best_headers = None
-    best_map: dict[str, int] = {}
-    for row in parser.rows[:30]:
-        hm = header_map(row)
-        if "name" in hm and ("area" in hm or "mass" in hm):
-            best_headers, best_map = row, hm
-            break
-
-    if best_headers is None:
-        return []
-
-    retrieved = datetime.now(timezone.utc).isoformat()
-    output: list[Observation] = []
-
-    for row in parser.rows:
-        if row == best_headers or len(row) < len(best_headers):
-            continue
-        def cell(key: str) -> str:
-            idx = best_map.get(key)
-            return row[idx] if idx is not None and idx < len(row) else ""
-
-        name = cell("name")
-        if not name or name.lower() in {"профиль", "профиль / типоразмер"}:
-            continue
-        area = num(cell("area"))
-        mass = num(cell("mass"))
-        if area is None and mass is None:
-            continue
-
-        output.append(
-            Observation(
-                standard=standard,
-                profile_type=profile_type,
-                subtype="",
-                name=name,
-                area_cm2=area,
-                mass_kg_per_m=mass,
-                height_mm=num(cell("h")),
-                width_mm=num(cell("b")),
-                web_thickness_mm=num(cell("s")),
-                flange_thickness_mm=num(cell("t")),
-                radius_mm=num(cell("r")),
-                leg_a_mm=None,
-                leg_b_mm=None,
-                wall_thickness_mm=None,
-                outside_diameter_mm=None,
-                diameter_mm=None,
-                sheet_thickness_mm=None,
-                source=source,
-                source_url=source_url,
-                retrieved_at=retrieved,
-                raw_values={str(i): value for i, value in enumerate(row)},
-            )
-        )
-
-    return output
+    return re.sub(r"\\s+", " ", str(value or "")).strip().casefold()
 
 
 def build_target_url(tb: str, sn: str, pn: str | None = None) -> str:
@@ -265,64 +168,178 @@ def build_target_url(tb: str, sn: str, pn: str | None = None) -> str:
 
 
 def extract_profile_options(html: str) -> list[str]:
-    """Extract <option> labels/values without assuming a specific JS framework."""
-    parser = HTMLParser()
-    # A lightweight regex is more tolerant here because select markup varies.
-    options = re.findall(
-        r"<option[^>]*value=["']([^"']*)["'][^>]*>(.*?)</option>",
+    """Extract options from the profile selector, tolerating markup revisions."""
+    scoped = re.findall(
+        r"<select[^>]*(?:name|id)=[\"'](?:pn|profile|profile_id)[\"'][^>]*>(.*?)</select>",
         html,
         re.I | re.S,
     )
-    result = []
+    source = "\\n".join(scoped) if scoped else html
+    options = re.findall(
+        r"<option[^>]*value=[\"']([^\"']*)[\"'][^>]*>(.*?)</option>",
+        source,
+        re.I | re.S,
+    )
+    values: list[str] = []
     for value, label in options:
+        value = re.sub(r"\\s+", " ", value).strip()
         label = re.sub(r"<[^>]+>", "", label)
-        label = re.sub(r"\s+", " ", label).strip()
-        if value and label and len(label) < 100:
-            result.append(value)
-    return list(dict.fromkeys(result))
+        label = re.sub(r"\\s+", " ", label).strip()
+        if not value or not label or len(label) > 100:
+            continue
+        if normal_key(label) in {"выберите", "выбрать"}:
+            continue
+        values.append(value)
+    return list(dict.fromkeys(values))
 
 
 def extract_result_values(html: str) -> dict[str, float]:
-    """Extract the five result values from rendered/server-side HTML."""
-    plain = re.sub(r"<[^>]+>", " ", html)
-    plain = re.sub(r"\s+", " ", plain)
-    labels = {
-        "ptm_mm": r"Приведен(?:ная|ённая)\s+толщина\s+металла\s*:?\s*([0-9]+(?:[.,][0-9]+)?)",
-        "area_cm2": r"Площадь\s+сечения\s*:?\s*([0-9]+(?:[.,][0-9]+)?)",
-        "perimeter_mm": r"Обогреваемый\s+периметр\s*:?\s*([0-9]+(?:[.,][0-9]+)?)",
-        "surface_m2_per_m": r"Площадь\s+поверхности\s*/\s*1\s*м\s*:?\s*([0-9]+(?:[.,][0-9]+)?)",
-        "surface_m2_per_t": r"Площадь\s+поверхности\s*/\s*1\s*т\s*:?\s*([0-9]+(?:[.,][0-9]+)?)",
+    html_values = re.sub(
+        r"<input[^>]*value=[\"']([^\"']*)[\"'][^>]*>",
+        lambda m: " " + m.group(1) + " ",
+        html,
+        flags=re.I,
+    )
+    html_values = re.sub(
+        r"<option[^>]*>(.*?)</option>",
+        lambda m: " " + re.sub(r"<[^>]+>", "", m.group(1)) + " ",
+        html_values,
+        flags=re.I | re.S,
+    )
+    plain = re.sub(r"<[^>]+>", " ", html_values)
+    plain = re.sub(r"\\s+", " ", plain)
+
+    patterns = {
+        "ptm_mm": r"Приведен(?:ная|ённая)\\s+толщина\\s+металла\\s*:?\\s*([0-9]+(?:[.,][0-9]+)?)",
+        "area_cm2": r"Площадь\\s+сечения\\s*:?\\s*([0-9]+(?:[.,][0-9]+)?)",
+        "perimeter_mm": r"Обогреваемый\\s+периметр\\s*:?\\s*([0-9]+(?:[.,][0-9]+)?)",
+        "surface_m2_per_m": r"Площадь\\s+поверхности\\s*/\\s*1\\s*м\\s*:?\\s*([0-9]+(?:[.,][0-9]+)?)",
+        "surface_m2_per_t": r"Площадь\\s+поверхности\\s*/\\s*1\\s*т\\s*:?\\s*([0-9]+(?:[.,][0-9]+)?)",
     }
-    out = {}
-    for key, pattern in labels.items():
-        m = re.search(pattern, plain, re.I)
-        if m:
-            out[key] = float(m.group(1).replace(",", "."))
-    return out
+    result: dict[str, float] = {}
+    for key, pattern in patterns.items():
+        match = re.search(pattern, plain, re.I)
+        if match:
+            result[key] = float(match.group(1).replace(",", "."))
+    return result
 
 
-def discover_target_profiles(tb: str, sn: str) -> list[str]:
-    html = fetch(build_target_url(tb, sn))
-    return extract_profile_options(html)
+def header_map(headers: list[str]) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for index, header in enumerate(headers):
+        key = normal_key(header)
+        if "профил" in key or key in {"марка", "типоразмер"}:
+            result.setdefault("name", index)
+        elif re.search(r"(^|\\s)h[, ]", key) or key.startswith("h"):
+            result.setdefault("h", index)
+        elif re.search(r"(^|\\s)b[, ]", key) or key.startswith("b"):
+            result.setdefault("b", index)
+        elif key.startswith("s"):
+            result.setdefault("s", index)
+        elif key.startswith("t"):
+            result.setdefault("t", index)
+        elif key in {"r", "r, мм"} or "r, мм" in key:
+            result.setdefault("r", index)
+        elif "а, см" in key or "a, см" in key:
+            result.setdefault("area", index)
+        elif "m, кг" in key or "м, кг" in key:
+            result.setdefault("mass", index)
+    return result
+
+
+def parse_static_table(
+    html: str,
+    standard: str,
+    profile_type: str,
+    source: str,
+    source_url: str,
+) -> list[Observation]:
+    parser = TableParser()
+    parser.feed(html)
+    if not parser.rows:
+        return []
+
+    mapping: dict[str, int] | None = None
+    for row in parser.rows[:50]:
+        hm = header_map(row)
+        if "name" in hm and ("area" in hm or "mass" in hm):
+            mapping = hm
+            break
+    if mapping is None:
+        return []
+
+    def get(row: list[str], key: str) -> str:
+        index = mapping.get(key)
+        return row[index] if index is not None and index < len(row) else ""
+
+    now = datetime.now(timezone.utc).isoformat()
+    observations: list[Observation] = []
+    for row in parser.rows:
+        name = get(row, "name")
+        if not name or normal_key(name) in {"профиль", "типоразмер"}:
+            continue
+        area = num(get(row, "area"))
+        mass = num(get(row, "mass"))
+        if area is None and mass is None:
+            continue
+        observations.append(
+            Observation(
+                standard=standard,
+                profile_type=profile_type,
+                subtype="",
+                name=name,
+                area_cm2=area,
+                mass_kg_per_m=mass,
+                height_mm=num(get(row, "h")),
+                width_mm=num(get(row, "b")),
+                web_thickness_mm=num(get(row, "s")),
+                flange_thickness_mm=num(get(row, "t")),
+                radius_mm=num(get(row, "r")),
+                leg_a_mm=None,
+                leg_b_mm=None,
+                wall_thickness_mm=None,
+                outside_diameter_mm=None,
+                diameter_mm=None,
+                sheet_thickness_mm=None,
+                perimeter_all_sides_mm=None,
+                ptm_mm_source=None,
+                surface_m2_per_m_source=None,
+                surface_m2_per_t_source=None,
+                source=source,
+                source_url=source_url,
+                retrieved_at=now,
+                raw_values={"cells": row},
+            )
+        )
+    return observations
 
 
 def scrape_target_standard(tb: str, sn: str, standard: str) -> list[Observation]:
-    profile_values = discover_target_profiles(tb, sn)
-    rows: list[Observation] = []
+    landing_url = build_target_url(tb, sn)
+    landing_html = fetch(landing_url)
+    profile_values = extract_profile_options(landing_html)
+    observations: list[Observation] = []
+
     for pn in profile_values:
-        html = fetch(build_target_url(tb, sn, pn))
+        url = build_target_url(tb, sn, pn)
+        html = fetch(url)
         values = extract_result_values(html)
-        if not {"ptm_mm", "area_cm2", "perimeter_mm"}.issubset(values):
+        required = {"ptm_mm", "area_cm2", "perimeter_mm"}
+        if not required.issubset(values):
             continue
-        name = pn
-        rows.append(
+
+        mass = None
+        if values.get("surface_m2_per_m") and values.get("surface_m2_per_t"):
+            mass = values["surface_m2_per_m"] * 1000.0 / values["surface_m2_per_t"]
+
+        observations.append(
             Observation(
                 standard=standard,
                 profile_type=PTM_TYPES.get(tb, "UNKNOWN"),
                 subtype="",
-                name=name,
+                name=pn,
                 area_cm2=values["area_cm2"],
-                mass_kg_per_m=None,
+                mass_kg_per_m=mass,
                 height_mm=None,
                 width_mm=None,
                 web_thickness_mm=None,
@@ -334,98 +351,165 @@ def scrape_target_standard(tb: str, sn: str, standard: str) -> list[Observation]
                 outside_diameter_mm=None,
                 diameter_mm=None,
                 sheet_thickness_mm=None,
+                perimeter_all_sides_mm=values["perimeter_mm"],
+                ptm_mm_source=values["ptm_mm"],
+                surface_m2_per_m_source=values.get("surface_m2_per_m"),
+                surface_m2_per_t_source=values.get("surface_m2_per_t"),
                 source="ognehimzashita.ru calculator",
-                source_url=build_target_url(tb, sn, pn),
+                source_url=url,
                 retrieved_at=datetime.now(timezone.utc).isoformat(),
                 raw_values=values,
             )
         )
-    return rows
+    return observations
 
 
-def deduplicate(observations: Iterable[Observation]) -> list[Observation]:
-    by_key: dict[tuple[str, str, str], Observation] = {}
+def merge_observations(observations: Iterable[Observation]) -> list[dict]:
+    """Merge sources by standard/type/profile without losing provenance."""
+    groups: dict[tuple[str, str, str], list[Observation]] = {}
     for item in observations:
         key = (normal_key(item.standard), normal_key(item.profile_type), normal_key(item.name))
-        # Preserve first source observation; additional sources are retained in
-        # raw_values under a provenance list in the output stage.
-        if key not in by_key:
-            by_key[key] = item
-    return list(by_key.values())
+        groups.setdefault(key, []).append(item)
+
+    output: list[dict] = []
+    for items in groups.values():
+        primary = items[0]
+        # Prefer the target calculator observation when it exists.
+        for item in items:
+            if item.source == "ognehimzashita.ru calculator":
+                primary = item
+                break
+
+        row = asdict(primary)
+        row["source_observations"] = [asdict(item) for item in items]
+
+        # Fill missing tabular dimensions/mass from a static source only.
+        for item in items:
+            if item is primary:
+                continue
+            for field_name in (
+                "subtype",
+                "height_mm",
+                "width_mm",
+                "web_thickness_mm",
+                "flange_thickness_mm",
+                "radius_mm",
+                "leg_a_mm",
+                "leg_b_mm",
+                "wall_thickness_mm",
+                "outside_diameter_mm",
+                "diameter_mm",
+                "sheet_thickness_mm",
+            ):
+                if row.get(field_name) is None and getattr(item, field_name) is not None:
+                    row[field_name] = getattr(item, field_name)
+            if row.get("mass_kg_per_m") is None and item.mass_kg_per_m is not None:
+                row["mass_kg_per_m"] = item.mass_kg_per_m
+
+        output.append(row)
+    return sorted(output, key=lambda x: (x["standard"], x["profile_type"], x["name"]))
 
 
 def main() -> int:
     print("=== PTM CATALOG REBUILD ===")
-    print(f"Target: {TARGET_BASE}")
     observations: list[Observation] = []
     failures: list[dict[str, str]] = []
 
+    # Target calculator: this is the authoritative extraction route requested
+    # by the user. It is intentionally cached into a local catalogue.
     for tb, items in TARGET_STANDARDS.items():
         for sn, standard in items:
-            if not sn:
-                continue
             try:
-                print(f"[TARGET] {tb}/{standard} ...")
+                print(f"[TARGET] {tb} / {standard}")
                 rows = scrape_target_standard(tb, sn, standard)
-                if rows:
-                    observations.extend(rows)
-                    print(f"  rows={len(rows)}")
-                else:
-                    failures.append({"type":tb, "standard":standard, "url":build_target_url(tb, sn)})
-                    print("  rows=0")
+                print(f"  profiles={len(rows)}")
+                observations.extend(rows)
             except Exception as exc:
-                failures.append({"type":tb, "standard":standard, "url":build_target_url(tb, sn), "error":str(exc)})
+                failures.append({
+                    "stage": "target",
+                    "type": tb,
+                    "standard": standard,
+                    "url": build_target_url(tb, sn),
+                    "error": str(exc),
+                })
                 print(f"  FAILED: {exc}")
 
-    # Fallback/static sources can be enabled after target collection. This
-    # preserves a usable catalogue even when the target site temporarily
-    # blocks automated requests.
-    existing = []
-    if OUT_JSON.exists():
+    # Public static fallback for standards that the target site did not yield.
+    seen = {(normal_key(x.standard), normal_key(x.profile_type), normal_key(x.name)) for x in observations}
+    for standard, (profile_type, url) in FALLBACK_SOURCES.items():
         try:
-            existing = json.loads(OUT_JSON.read_text(encoding="utf-8")).get("profiles", [])
+            html = fetch(url)
+            rows = parse_static_table(
+                html,
+                standard=standard,
+                profile_type=profile_type,
+                source="public static sortament table",
+                source_url=url,
+            )
+            added = 0
+            for row in rows:
+                key = (normal_key(row.standard), normal_key(row.profile_type), normal_key(row.name))
+                if key not in seen:
+                    observations.append(row)
+                    seen.add(key)
+                    added += 1
+            print(f"[FALLBACK] {standard}: added={added}")
+        except Exception as exc:
+            failures.append({
+                "stage": "fallback",
+                "standard": standard,
+                "url": url,
+                "error": str(exc),
+            })
+            print(f"[FALLBACK] {standard}: FAILED: {exc}")
+
+    profiles = merge_observations(observations)
+
+    if not profiles and OUT_JSON.exists():
+        try:
+            old = json.loads(OUT_JSON.read_text(encoding="utf-8"))
+            profiles = old.get("profiles", [])
+            print("No new data; preserved existing PTM catalogue.")
         except Exception:
-            existing = []
-
-    profiles = [
-        asdict(x) for x in deduplicate(observations)
-    ]
-
-    # Never destroy an already-known source-backed profile merely because a
-    # rebuild has a transient network failure.
-    if not profiles and existing:
-        profiles = existing
+            pass
 
     payload = {
-        "schema_version":"1.0-ptm-sortament",
-        "source_policy":"SOURCE_BACKED",
-        "generated_at":datetime.now(timezone.utc).isoformat(),
-        "sources":[
-            {"source":"ognehimzashita.ru calculator","url":TARGET_BASE},
-            *[
-                {"source":"fallback","url":url, "standard":standard}
-                for standard, url in FALLBACK_SOURCES.items()
-            ],
-        ],
-        "failures":failures,
-        "profiles":profiles,
+        "schema_version": "1.0-ptm-sortament",
+        "source_policy": "SOURCE_BACKED",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "target_base": TARGET_BASE,
+        "failures": failures,
+        "profiles": profiles,
     }
 
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    with OUT_CSV.open("w", newline="", encoding="utf-8-sig") as fh:
-        writer = csv.DictWriter(
-            fh,
-            fieldnames=[
-                "standard","profile_type","subtype","name","area_cm2","mass_kg_per_m",
-                "height_mm","width_mm","web_thickness_mm","flange_thickness_mm","radius_mm",
-                "source","source_url","retrieved_at"
-            ],
-        )
+    csv_fields = [
+        "standard",
+        "profile_type",
+        "subtype",
+        "name",
+        "area_cm2",
+        "mass_kg_per_m",
+        "height_mm",
+        "width_mm",
+        "web_thickness_mm",
+        "flange_thickness_mm",
+        "radius_mm",
+        "perimeter_all_sides_mm",
+        "ptm_mm_source",
+        "surface_m2_per_m_source",
+        "surface_m2_per_t_source",
+        "source",
+        "source_url",
+        "retrieved_at",
+    ]
+    with OUT_CSV.open("w", newline="", encoding="utf-8-sig") as handle:
+        writer = csv.DictWriter(handle, fieldnames=csv_fields)
         writer.writeheader()
         for row in profiles:
-            writer.writerow({key: row.get(key) for key in writer.fieldnames})
+            writer.writerow({key: row.get(key) for key in csv_fields})
 
     SOURCE_INDEX.write_text(
         json.dumps(
@@ -435,6 +519,7 @@ def main() -> int:
                 "target_standards": TARGET_STANDARDS,
                 "fallback_sources": FALLBACK_SOURCES,
                 "failures": failures,
+                "profile_count": len(profiles),
             },
             ensure_ascii=False,
             indent=2,
