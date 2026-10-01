@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0-ptm-sortament",
+  "source_policy": "SOURCE_BACKED",
+  "generated_at": null,
+  "sources": [
+    {
+      "source": "ognehimzashita.ru calculator",
+      "url": "https://ognehimzashita.ru/calc",
+      "role": "reference-calculator",
+      "note": "Exact calculator page is scraped locally by rebuild_ptm_catalog.py when accessible."
+    },
+    {
+      "source": "Engineerum",
+      "url": "https://engineerum.com/sortament/gost-r-57837-2017/",
+      "role": "table-fallback"
+    }
+  ],
+  "profiles": [
+    {
+      "standard": "ГОСТ Р 57837-2017",
+      "profile_type": "Двутавр",
+      "subtype": "балочный нормальный",
+      "name": "20Б1",
+      "area_cm2": 27.16,
+      "mass_kg_per_m": 21.3,
+      "height_mm": 200,
+      "width_mm": 100,
+      "web_thickness_mm": 5.5,
+      "flange_thickness_mm": 8,
+      "radius_mm": 10,
+      "source": "Engineerum / ГОСТ Р 57837-2017",
+      "source_url": "https://engineerum.com/sortament/gost-r-57837-2017/"
+    }
+  ]
+}
