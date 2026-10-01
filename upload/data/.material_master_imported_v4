@@ -1,0 +1,9 @@
+{
+  "import_version": "4",
+  "catalog_schema_version": "3.0-material-master-6",
+  "catalog_sha256": "f8276ad5d9674c9e94f801929fcc69bb0cd3f6eadac088bb98efa79658be9880",
+  "imported_at": "2026-10-01T11:02:57.022478+00:00",
+  "records_seen": 188,
+  "inserted": 168,
+  "updated": 20
+}
