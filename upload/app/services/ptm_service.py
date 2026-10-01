@@ -16,8 +16,11 @@ from app.domain.ptm import (
 class PTMService:
     """Thin application boundary around the pure PTM domain model."""
 
-    def list_standards(self) -> list[str]:
-        return list_standards()
+    def list_standards(
+        self,
+        profile_type: PTMProfileType | None = None,
+    ) -> list[str]:
+        return list_standards(profile_type=profile_type)
 
     def list_profiles(
         self,
