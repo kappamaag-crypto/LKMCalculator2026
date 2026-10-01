@@ -34,7 +34,7 @@
 | 12 | ЧАСТИЧНО | Engineering context. |
 | 13 | ЧАСТИЧНО | Surface condition. |
 | 14 | ЧАСТИЧНО | SPKEFFA rules. |
-| 15 | IN_PROGRESS | PTM: реализован отдельный domain/service/UI-контур; добавлены требуемые категории сортамента и стандарты, автоматический пересчёт F/P/PTM/м²·м/м²·т, режимы 2/3/4 сторон и ручные размеры для размерных профилей. Полные табличные данные всех перечисленных стандартов ещё не импортированы и требуют source-backed заполнения. ОГЗ отдельно и пока не входит в расчёт ПТМ. |
+| 15 | IN_PROGRESS | PTM: реализован отдельный domain/service/UI-контур; добавлены все требуемые категории и заявленные стандарты. Каталог вынесен в `upload/data/ptm_sortament_v1.json`; `upload/scripts/rebuild_ptm_catalog.py` перебирает target calculator `ognehimzashita.ru/calc` по standard/profile и сохраняет F, P, PTM, м²/м, м²/т и provenance, с public static fallback. Полная фактическая загрузка зависит от локального доступа к источникам; execution-proof не закрыт. ОГЗ отдельно и пока не входит в расчёт ПТМ. |
 | 16 | ЧАСТИЧНО | Recommendations. |
 | 17 | ЧАСТИЧНО | Inspection DFT UI. |
 | 18 | ЧАСТИЧНО | Evidence log; full suite green: 513 passed, 3 skipped. |
