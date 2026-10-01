@@ -34,7 +34,7 @@
 | 12 | ЧАСТИЧНО | Engineering context. |
 | 13 | ЧАСТИЧНО | Surface condition. |
 | 14 | ЧАСТИЧНО | SPKEFFA rules. |
-| 15 | ОТЛОЖЕНО | OGZ. |
+| 15 | IN_PROGRESS | PTM / OGZ: добавлен domain/service/UI-контур ПТМ; полное заполнение сортамента и таблиц ОГЗ остаётся открытым. |
 | 16 | ЧАСТИЧНО | Recommendations. |
 | 17 | ЧАСТИЧНО | Inspection DFT UI. |
 | 18 | ЧАСТИЧНО | Evidence log; full suite green: 513 passed, 3 skipped. |
