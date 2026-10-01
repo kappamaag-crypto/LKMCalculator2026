@@ -18,6 +18,20 @@ def test_ptm_formula():
     assert calculate_ptm(27.16, 789.0) == 27.16 * 10.0 / 789.0
 
 
+def test_gost_57837_full_profile_catalog_is_loaded():
+    assert len(PTM_PROFILES) == 302
+    counts = {}
+    for profile in PTM_PROFILES:
+        counts[profile.subtype] = counts.get(profile.subtype, 0) + 1
+    assert counts == {
+        "балочный нормальный": 50,
+        "балочный широкополочный": 66,
+        "колонный": 89,
+        "свайный": 14,
+        "дополнительной серии балочный": 55,
+        "дополнительной серии колонный": 28,
+    }
+
 def test_reference_profile_20b1_is_present():
     profile = next(
         p for p in PTM_PROFILES
