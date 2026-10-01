@@ -173,12 +173,66 @@ class CustomerExcelExporter(ExcelExporter):
         self._restore_merged_fills(ws)
         return 2 * extra
 
+    @staticmethod
+    def _compact_section_for_one_layer(ws) -> None:
+        """Remove the second template layer/thinner rows when the result has one layer.
+
+        The customer template is designed with two layer rows and two thinner rows.
+        For a real one-layer calculation those placeholder rows must disappear rather
+        than remain as stale template data.
+        """
+        original_merges = list(ws.merged_cells.ranges)
+        removed_original_rows = {8, 10}
+
+        for merged in original_merges:
+            ws.unmerge_cells(str(merged))
+
+        # Original template layout:
+        # 7 = layer 1, 8 = layer 2, 9 = thinner 1, 10 = thinner 2, 11 = totals.
+        ws.delete_rows(8, 1)
+        ws.delete_rows(9, 1)
+
+        def map_row(row: int) -> int | None:
+            if row in removed_original_rows:
+                return None
+            shift = sum(1 for removed in removed_original_rows if removed < row)
+            return row - shift
+
+        for merged in original_merges:
+            min_col, min_row, max_col, max_row = range_boundaries(str(merged))
+            mapped_rows = [
+                mapped
+                for source_row in range(min_row, max_row + 1)
+                if (mapped := map_row(source_row)) is not None
+            ]
+            if not mapped_rows:
+                continue
+
+            # Recreate contiguous surviving portions of a vertical merge. Most
+            # template merges are horizontal, but splitting here avoids inventing
+            # a merge across a deleted row if the template ever changes.
+            start = prev = mapped_rows[0]
+            for current in mapped_rows[1:] + [None]:
+                if current is not None and current == prev + 1:
+                    prev = current
+                    continue
+                ws.merge_cells(
+                    start_row=start,
+                    start_column=min_col,
+                    end_row=prev,
+                    end_column=max_col,
+                )
+                if current is not None:
+                    start = prev = current
+
     def _prepare_base_sheet(self, wb, layer_count: int):
         if "База" not in wb.sheetnames:
             return None
         ws = wb["База"]
         self._trim_base_sheet(ws, 11)
-        if layer_count > 2:
+        if layer_count <= 1:
+            self._compact_section_for_one_layer(ws)
+        elif layer_count > 2:
             self._expand_section(
                 ws,
                 self._SECTION["layer_start"],
@@ -201,11 +255,22 @@ class CustomerExcelExporter(ExcelExporter):
             return None
         return (layer.cost_per_m2 or 0.0) + (layer.thinner_cost_per_m2 or 0.0)
 
+    @staticmethod
+    def _material_title(material) -> str:
+        """Return the material name used in the dedicated Excel material column.
+
+        RAL/color is exported separately, so variant information must not be embedded
+        into this cell.
+        """
+        parts = [material.manufacturer, material.brand, material.material_name]
+        base = " ".join(part for part in parts if part)
+        return base or material.material_name or "Без названия"
+
     def _write_layer_row(self, ws, row: int, layer, area: float) -> None:
         material = layer.material
         values = [
             area,
-            material.display_name(),
+            self._material_title(material),
             self._binder(material.binder_type),
             material.ral or material.color or "-",
             material.density,
@@ -308,10 +373,16 @@ class CustomerExcelExporter(ExcelExporter):
         if ws is None:
             return super().export_calculation(result, path, recommendation)
 
-        extra = max(len(result.layers) - 2, 0)
-        total_row = 11 + 2 * extra
+        layer_count = len(result.layers)
+        extra = max(layer_count - 2, 0)
+        if layer_count <= 1:
+            thinner_start = 8
+            total_row = 9
+        else:
+            thinner_start = 9 + extra
+            total_row = 11 + 2 * extra
         self._write_metadata(ws, result)
-        self._write_block(ws, result, 7, 9 + extra, total_row)
+        self._write_block(ws, result, 7, thinner_start, total_row)
         self._configure_print_layout(ws, total_row)
         wb.save(path)
         return path

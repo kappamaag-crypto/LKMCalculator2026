@@ -123,7 +123,9 @@ class MaterialEditDialog(QDialog):
         self.chk_two_component = QCheckBox("Двухкомпонентный материал")
         self.chk_two_component.setChecked(material.is_two_component if material else False)
         self.chk_thinner_required = QCheckBox("Разбавитель требуется")
-        self.chk_thinner_required.setChecked(material.thinner_required if material else False)
+        self.chk_thinner_required.setChecked(
+            bool(material.thinner_required) if material else False
+        )
         self.chk_active = QCheckBox("Активен")
         self.chk_active.setChecked(material.is_active if material else True)
         self.chk_incomplete = QCheckBox("Карточка неполная")

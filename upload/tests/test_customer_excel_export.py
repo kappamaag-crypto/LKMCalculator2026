@@ -32,7 +32,7 @@ def _template(path: Path) -> None:
     wb.save(path)
 
 
-def _result(layer_count: int, with_mixed_thinners: bool = False, long_name: bool = False, with_two_component: bool = False):
+def _result(layer_count: int, with_mixed_thinners: bool = False, long_name: bool = False, with_two_component: bool = False, ral: str | None = None):
     materials = []
     for i in range(1, layer_count + 1):
         materials.append(Material(
@@ -44,6 +44,7 @@ def _result(layer_count: int, with_mixed_thinners: bool = False, long_name: bool
             solids_by_volume_percent=72.0 if with_two_component and i == 2 else 70.0,
             price_per_kg=100.0 + i,
             price_per_liter=140.0 + i,
+            ral=ral if ral and i == 1 else "",
             is_two_component=with_two_component and i == 2,
         ))
     thinner = Material(manufacturer="Blank", material_name="Разбавитель универсальный", material_type=MaterialType.THINNER, density=0.9, price_per_kg=50.0)
@@ -54,12 +55,29 @@ def _result(layer_count: int, with_mixed_thinners: bool = False, long_name: bool
     return result
 
 
-def _export(tmp_path: Path, layer_count: int, with_mixed_thinners: bool = False, mode: str = "full", long_name: bool = False, with_two_component: bool = False):
+def _export(tmp_path: Path, layer_count: int, with_mixed_thinners: bool = False, mode: str = "full", long_name: bool = False, with_two_component: bool = False, ral: str | None = None):
     template = tmp_path / "template.xlsx"; _template(template)
     output = tmp_path / f"result_{layer_count}_{mode}.xlsx"
     settings = AppSettings(report_mode=mode, excel_template_path=str(template))
-    CustomerExcelExporter(settings).export_calculation(_result(layer_count, with_mixed_thinners, long_name, with_two_component), output)
+    CustomerExcelExporter(settings).export_calculation(_result(layer_count, with_mixed_thinners, long_name, with_two_component, ral), output)
     return load_workbook(output, data_only=False)
+
+
+def test_customer_excel_one_layer_removes_second_template_layer(tmp_path):
+    ws = _export(tmp_path, 1)["База"]
+    assert ws.max_row == 9
+    assert ws["C7"].value == "Blank Слой 1"
+    assert ws["C8"].value is None
+    assert ws["B8"].value == "Разбавитель"
+    assert ws["C9"].value == "Толщина покрытия (мкм)"
+    assert str(ws.print_area) == "'База'!$B$1:$R$9"
+
+
+def test_customer_excel_ral_is_only_in_ral_column(tmp_path):
+    ws = _export(tmp_path, 1, ral="7042")["База"]
+    assert ws["C7"].value == "Blank Слой 1"
+    assert "RAL" not in str(ws["C7"].value or "")
+    assert ws["E7"].value == "7042"
 
 
 def test_customer_excel_is_single_table(tmp_path):

@@ -34,6 +34,7 @@ def main() -> None:
 
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import Qt
+    from PySide6.QtGui import QFont
     from app.ui.main_window import MainWindow
     from app import __app_name__, __version__
 
@@ -45,6 +46,14 @@ def main() -> None:
     app.setApplicationName(__app_name__)
     app.setApplicationVersion(__version__)
     app.setOrganizationName("LKM Calculator")
+
+    # Some Qt/platform font backends can expose a pixel-sized application font
+    # with pointSize() == -1. Normalize it before widgets/dialogs are created so
+    # code expecting a valid point size never triggers QFont warnings.
+    app_font = QFont(app.font())
+    if app_font.pointSize() <= 0:
+        app_font.setPointSize(10)
+        app.setFont(app_font)
 
     window = MainWindow()
     window.show()
