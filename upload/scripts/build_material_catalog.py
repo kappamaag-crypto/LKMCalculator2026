@@ -297,7 +297,6 @@ def _column_letter(number: int) -> str:
 def row_id(file_name: str, sheet: str, row_number: int) -> str:
     return hashlib.sha1(f"{file_name}|{sheet}|{row_number}".encode("utf-8")).hexdigest()
 
-
 def make_source_row(file_name: str, sheet: str, row_number: int, vals: list[Any], headers: dict[str, list[int]]) -> dict[str, Any]:
     cells = []
     for col, value in enumerate(vals):
@@ -599,7 +598,6 @@ def choose_preferred(
     return float(counts.most_common(1)[0][0])
 
 
-
 def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
     result: list[dict[str, Any]] = []
 
@@ -696,7 +694,29 @@ def finalize(materials: dict[str, dict[str, Any]], review_candidates: dict[str, 
             "theoretical_consumption_kg_m2": tc,
             "practical_consumption_kg_m2": pc,
             "calculation_ready": density is not None and sv is not None,
-            "data_quality_status": (\n                "READY" if density is not None and sv is not None\n                else "PARTIAL_DENSITY" if density is not None\n                else "PARTIAL_SOLIDS_BY_VOLUME" if sv is not None\n                else "NAME_ONLY"\n            ),\n            "conflict_fields": [\n                fld for fld, values in (\n                    ("density", sorted({round(float(o["density"]), 8) for o in observations if isinstance(o.get("density"), (int, float)) and 0.5 <= float(o["density"]) <= 5})),\n                    ("solids_by_volume_percent", sorted({round(float(o["solids_by_volume_percent"]), 8) for o in observations if isinstance(o.get("solids_by_volume_percent"), (int, float)) and 5 <= float(o["solids_by_volume_percent"]) <= 100})),\n                ) if len(values) > 1\n            ],\n            "source_records": item.get("source_records", []),
+            "data_quality_status": (
+                "READY" if density is not None and sv is not None
+                else "PARTIAL_DENSITY" if density is not None
+                else "PARTIAL_SOLIDS_BY_VOLUME" if sv is not None
+                else "NAME_ONLY"
+            ),
+            "conflict_fields": [
+                fld for fld, values in (
+                    ("density", sorted({
+                        round(float(o["density"]), 8)
+                        for o in observations
+                        if isinstance(o.get("density"), (int, float))
+                        and 0.5 <= float(o["density"]) <= 5
+                    })),
+                    ("solids_by_volume_percent", sorted({
+                        round(float(o["solids_by_volume_percent"]), 8)
+                        for o in observations
+                        if isinstance(o.get("solids_by_volume_percent"), (int, float))
+                        and 5 <= float(o["solids_by_volume_percent"]) <= 100
+                    })),
+                ) if len(values) > 1
+            ],
+            "source_records": item.get("source_records", []),
             "observations": observations,
             "catalog_fields": catalog,
             "source_row_ids": sorted({o.get("source_row_id") for o in observations if o.get("source_row_id")}),
@@ -897,8 +917,7 @@ def main() -> None:
         "generated_by": "upload/scripts/build_material_catalog.py",
         "generated_from": list(WORKBOOKS),
         "row_count": len(source_rows),
-        "rows": source_rows,
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
+        "rows": source_rows,    }, ensure_ascii=False, indent=2), encoding="utf-8")
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
     fields = [
