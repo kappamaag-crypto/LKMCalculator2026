@@ -233,9 +233,11 @@ def resolve_profile_area(profile: PTMProfile) -> float:
         return round_bar_area_cm2(p.diameter_mm)
 
     if p.profile_type == PTMProfileType.SHEET:
-        if p.width_mm is None or p.sheet_thickness_mm is None:
-            raise ValueError("Для листа не заданы ширина и толщина.")
-        return sheet_area_for_one_m(p.width_mm, p.sheet_thickness_mm)
+        if p.sheet_thickness_mm is None:
+            raise ValueError("Для листа не задана толщина.")
+        # The PTM for sheet is independent of arbitrary sheet width. A 1 m
+        # wide strip is used as the calculation reference.
+        return sheet_area_for_one_m(1000.0, p.sheet_thickness_mm)
 
     if p.profile_type == PTMProfileType.I_BEAM:
         if None in (p.height_mm, p.width_mm, p.web_thickness_mm, p.flange_thickness_mm):
@@ -303,8 +305,7 @@ def resolve_heated_perimeter(inp: PTMCalculationInput) -> float:
             return round_bar_perimeter(p.diameter_mm)
 
     if p.profile_type == PTMProfileType.SHEET:
-        if p.width_mm is not None:
-            return sheet_perimeter_for_one_m(p.width_mm, inp.heating_mode)
+        return sheet_perimeter_for_one_m(1000.0, inp.heating_mode)
 
     raise ValueError(
         f"Для профиля «{p.name}» отсутствует подтверждённая геометрия "
@@ -323,14 +324,14 @@ def calculate(inp: PTMCalculationInput) -> PTMCalculationResult:
     ptm = calculate_ptm(area, perimeter)
     surface_per_m = perimeter / 1000.0
 
-    surface_per_t = None
-    if inp.profile.mass_kg_per_m is not None and inp.profile.mass_kg_per_m > 0:
-        surface_per_t = surface_per_m * 1000.0 / inp.profile.mass_kg_per_m
+    mass_per_m = inp.profile.mass_kg_per_m
+    if mass_per_m is None:
+        # Steel density reference 7850 kg/m³ => 0.785 kg per metre per cm².
+        mass_per_m = area * 0.785
 
+    surface_per_t = surface_per_m * 1000.0 / mass_per_m if mass_per_m > 0 else None
     total_surface = surface_per_m * inp.length_m * inp.quantity
-    total_mass = None
-    if inp.profile.mass_kg_per_m is not None and inp.profile.mass_kg_per_m > 0:
-        total_mass = inp.profile.mass_kg_per_m * inp.length_m * inp.quantity
+    total_mass = mass_per_m * inp.length_m * inp.quantity if mass_per_m > 0 else None
 
     return PTMCalculationResult(
         ptm_mm=ptm,
